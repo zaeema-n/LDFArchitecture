@@ -1,21 +1,3 @@
-// import ballerina/http;
-
-// # A service representing a network-accessible API
-// # bound to port `9090`.
-// service / on new http:Listener(9090) {
-
-//     # A resource for generating greetings
-//     # + name - name as a string or nil
-//     # + return - string name with hello message or error
-//     resource function get greeting(string? name) returns string|error {
-//         // Send a response back to the caller.
-//         if name is () {
-//             return error("name should not be empty!");
-//         }
-//         return string `Hello, ${name}`;
-//     }
-// }
-
 import ballerina/graphql;
 import ballerina/log;
 import ballerina/time;
@@ -36,6 +18,13 @@ type EntityMetadata record {
     string kind;
     int birthDate;
     int deathDate;
+};
+
+// Define the new record type
+type AttributeValue record {
+    time:Utc startTime;
+    time:Utc end;
+    anydata value;
 };
 
 service /query on new graphql:Listener(9090) {
@@ -69,34 +58,44 @@ service /query on new graphql:Listener(9090) {
         return metadata;
     }
 
-    resource function get getEntityAttribute(string entityId, string attributeName, time:Utc? ts) returns record { time:Utc start; time:Utc end; anydata value }|record { time:Utc start; time:Utc end; anydata value }[]|() {
+    resource function get getEntityAttribute(string entityId, string attributeName, time:Utc? ts) returns AttributeValue|AttributeValue[]|() {
         // Implement your logic to fetch the attribute value based on the given entityId, attributeName, and optional timestamp
         log:printInfo("Fetching attribute for entity ID: " + entityId + ", attribute: " + attributeName + ", timestamp: " + ts.toString());
 
         // Example data, replace with actual logic to fetch attribute values
         if (ts is time:Utc) {
             // Return a single value for the given timestamp
-            record { time:Utc start; time:Utc end; anydata value } value = {
-                start: time:currentTime(),
-                end: time:currentTime(),
+            AttributeValue value = {
+                startTime: time:utcNow(),
+                end: time:utcNow(),
                 value: "exampleValue"
             };
             return value;
         } else {
             // Return all values for all time ranges
-            record { time:Utc start; time:Utc end; anydata value }[] values = [
+            AttributeValue[] values = [
                 {
-                    start: time:currentTime(),
-                    end: time:currentTime(),
+                    startTime: time:utcNow(),
+                    end: time:utcNow(),
                     value: "exampleValue1"
                 },
                 {
-                    start: time:currentTime(),
-                    end: time:currentTime(),
+                    startTime: time:utcNow(),
+                    end: time:utcNow(),
                     value: "exampleValue2"
                 }
             ];
             return values;
         }
+    }
+
+    // New endpoint for getRelatedEntityIds
+    resource function get getRelatedEntityIds(string entityId, string relationship, time:Utc ts) returns string[] {
+        // Implement your logic to fetch the related entity IDs based on the given entityId, relationship, and timestamp
+        log:printInfo("Fetching related entity IDs for entity ID: " + entityId + ", relationship: " + relationship + ", timestamp: " + ts.toString());
+
+        // Example data, replace with actual logic to fetch related entity IDs
+        string[] relatedEntityIds = ["relatedId1", "relatedId2", "relatedId3"];
+        return relatedEntityIds;
     }
 }
