@@ -6,12 +6,12 @@ enum MajorType {
     Business
 };
 
-type Entity record {
-    string id;
-    MajorType kind;
-    int birthDate?;
-    int deathDate?;
-};
+// type Entity record {
+//     string id;
+//     MajorType kind;
+//     int birthDate?;
+//     int deathDate?;
+// };
 
 type EntityMetadata record {
     string kind;
