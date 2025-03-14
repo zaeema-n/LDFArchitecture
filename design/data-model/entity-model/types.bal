@@ -49,3 +49,4 @@ type AdministrativeEntity record {|
     AdministrativeMinorType minorType;
 |};
 
+
