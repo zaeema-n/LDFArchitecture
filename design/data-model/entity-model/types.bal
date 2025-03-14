@@ -1,48 +1,51 @@
-enum MajorType {
-    Person,
-    Business
+import ballerina/time;
+
+type PersonMinorType "Citizen" | "Resident" | "Visitor" | "Foreigner";
+type BusinessMinorType "Private" | "Public" | "NonProfit";
+type GovernmentMinorType "TBD";
+type LandParcelMinorType "Plain" | "Police" | "Education" | "Health" | "Election";
+type AdministrativeMinorType "World" | "Country" | "Ocean" | "Continent";
+
+type MajorType "Person" | "Business" | "Government" | "LandParcel" | "Administrative";
+
+type MinorType PersonMinorType | BusinessMinorType | GovernmentMinorType | LandParcelMinorType | AdministrativeMinorType;
+
+type Entity record {
+    MajorType majorType;
+    MinorType minorType;
+    map<anydata> parameters?;
+    time:Utc dateOfCreation;
+    time:Utc? dateOfTermination;
+    string name;
 };
 
-enum MinorType {
-    Citizen,
-    Resident,
-    Visitor,
-    Foreigner
-};
+type PersonEntity record {|
+    *Entity;
+    MajorType majorType = "Person";
+    PersonMinorType minorType;
+|};
 
-enum BusinessType {
-    Private,
-    Public,
-    NonProfit
-};
+type BusinessEntity record {|
+    *Entity;
+    MajorType majorType = "Business";
+    BusinessMinorType minorType;
+|};
 
-type PersonRecord record {
-    MajorType kind; // Major type: Person
-    MinorType subkind;
-    string name;            // Additional parameter
-    int bornDate;           // Additional parameter
-    int deathDate; 
-};
+type GovernmentEntity record {|
+    *Entity;
+    MajorType majorType = "Government";
+    GovernmentMinorType minorType;
+|};
 
-type CitizenRecord record {
-    PersonRecord person;
-    string citizenId;
-};
+type LandParcelEntity record {|
+    *Entity;
+    MajorType majorType = "LandParcel";
+    LandParcelMinorType minorType;
+|};
 
-type ResidentRecord record {
-    PersonRecord person;
-    string residentPermit;
-};
-
-type VisitorRecord record {
-    PersonRecord person;
-    string visaType;
-};
-
-type ForeignerRecord record {
-    PersonRecord person;
-    string passportNumber;
-};
-
-type PersonType PersonRecord|Citizen|Resident|Visitor|Foreigner;
+type AdministrativeEntity record {|
+    *Entity;
+    MajorType majorType = "Administrative";
+    AdministrativeMinorType minorType;
+|};
 
