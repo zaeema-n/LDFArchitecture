@@ -1,0 +1,116 @@
+openapi: 3.0.0
+info:
+  title: Entity API
+  version: 1.0.0
+paths:
+  /entities:
+    post:
+      summary: Create a new entity
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Entity'
+      responses:
+        '201':
+          description: Entity created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Entity'
+  /entities/{id}:
+    put:
+      summary: Update an existing entity
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Entity'
+      responses:
+        '200':
+          description: Entity updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Entity'
+    delete:
+      summary: Delete an entity
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Entity deleted
+components:
+  schemas:
+    Entity:
+      type: object
+      properties:
+        id:
+          type: string
+        kind:
+          $ref: '#/components/schemas/Kind'
+        created:
+          type: string
+          format: date-time
+        terminated:
+          type: string
+          format: date-time
+          nullable: true
+        name:
+          $ref: '#/components/schemas/TimeBasedValue'
+        metadata:
+          type: object
+          additionalProperties: true
+        attributes:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              $ref: '#/components/schemas/TimeBasedValue'
+        relationships:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/Relationship'
+    Kind:
+      type: object
+      properties:
+        major:
+          type: string
+        minor:
+          type: string
+    TimeBasedValue:
+      type: object
+      properties:
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+          nullable: true
+        value:
+          type: object
+    Relationship:
+      type: object
+      properties:
+        relatedEntityId:
+          type: string
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+          nullable: true
