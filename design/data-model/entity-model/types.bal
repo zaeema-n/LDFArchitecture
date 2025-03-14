@@ -1,5 +1,4 @@
 import ballerina/time;
-import ballerina/uuid;
 
 type Kind record {
     string major;
@@ -28,27 +27,3 @@ type Entity record {
     map<TimeBasedValue[]> attributes;
     map<Relationship> relationships;
 };
-
-function foo() {
-  Entity entity1 = {
-    id: uuid:createType4AsString(),
-    kind: {major: "Person", minor: "Citizen"},
-    created: time:utcNow(),
-    name: {startTime: time:utcNow(), value: "John Doe"},
-    metadata: {},
-    attributes: {},
-    relationships: {}
-};
-
-entity1.attributes["age"] = [{startTime: time:utcNow(), value: 25}];
-entity1.attributes["address"] = [{startTime: time:utcNow(), value: "Colombo"}];
-entity1.relationships["father"] = {relatedEntityId: uuid:createType4AsString(), startTime: time:utcNow()};
-entity1.relationships["mother"] = {relatedEntityId: uuid:createType4AsString(), startTime: time:utcNow()};
-entity1.relationships["spouse"] = {relatedEntityId: uuid:createType4AsString(), startTime: time:utcNow()};
-entity1.relationships["child"] = {relatedEntityId: uuid:createType4AsString(), startTime: time:utcNow()};
-entity1.relationships["friend"] = {relatedEntityId: uuid:createType4AsString(), startTime: time:utcNow()};
-
-
-}
-
-
