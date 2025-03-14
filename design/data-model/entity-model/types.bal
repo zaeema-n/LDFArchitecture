@@ -16,6 +16,7 @@ type Entity record {
     map<anydata> parameters?;
     time:Utc dateOfCreation;
     time:Utc? dateOfTermination;
+    string name;
 };
 
 type PersonEntity record {|
