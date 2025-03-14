@@ -1,52 +1,54 @@
 import ballerina/time;
+import ballerina/uuid;
 
-type PersonMinorType "Citizen" | "Resident" | "Visitor" | "Foreigner";
-type BusinessMinorType "Private" | "Public" | "NonProfit";
-type GovernmentMinorType "TBD";
-type LandParcelMinorType "Plain" | "Police" | "Education" | "Health" | "Election";
-type AdministrativeMinorType "World" | "Country" | "Ocean" | "Continent";
-
-type MajorType "Person" | "Business" | "Government" | "LandParcel" | "Administrative";
-
-type MinorType PersonMinorType | BusinessMinorType | GovernmentMinorType | LandParcelMinorType | AdministrativeMinorType;
-
-type Entity record {
-    MajorType majorType;
-    MinorType minorType;
-    map<anydata> parameters?;
-    time:Utc dateOfCreation;
-    time:Utc? dateOfTermination;
-    string name;
+type Kind record {
+    string major;
+    string minor;
 };
 
-type PersonEntity record {|
-    *Entity;
-    MajorType majorType = "Person";
-    PersonMinorType minorType;
-|};
+type TimeBasedValue record {
+    time:Utc startTime;
+    time:Utc? endTime = ();
+    anydata value;
+};
 
-type BusinessEntity record {|
-    *Entity;
-    MajorType majorType = "Business";
-    BusinessMinorType minorType;
-|};
+type Relationship record {
+    string relatedEntityId;
+    time:Utc startTime;
+    time:Utc? endTime = ();
+};
 
-type GovernmentEntity record {|
-    *Entity;
-    MajorType majorType = "Government";
-    GovernmentMinorType minorType;
-|};
+type Entity record {
+    readonly string id; // = uuid:createType4AsString();
+    readonly Kind kind;
+    readonly time:Utc created;
+    time:Utc? terminated = ();
+    TimeBasedValue name;
+    map<anydata> metadata;
+    map<TimeBasedValue[]> attributes;
+    map<Relationship> relationships;
+};
 
-type LandParcelEntity record {|
-    *Entity;
-    MajorType majorType = "LandParcel";
-    LandParcelMinorType minorType;
-|};
+function foo() {
+  Entity entity1 = {
+    id: uuid:createType4AsString(),
+    kind: {major: "Person", minor: "Citizen"},
+    created: time:utcNow(),
+    name: {startTime: time:utcNow(), value: "John Doe"},
+    metadata: {},
+    attributes: {},
+    relationships: {}
+};
 
-type AdministrativeEntity record {|
-    *Entity;
-    MajorType majorType = "Administrative";
-    AdministrativeMinorType minorType;
-|};
+entity1.attributes["age"] = [{startTime: time:utcNow(), value: 25}];
+entity1.attributes["address"] = [{startTime: time:utcNow(), value: "Colombo"}];
+entity1.relationships["father"] = {relatedEntityId: uuid:createType4AsString(), startTime: time:utcNow()};
+entity1.relationships["mother"] = {relatedEntityId: uuid:createType4AsString(), startTime: time:utcNow()};
+entity1.relationships["spouse"] = {relatedEntityId: uuid:createType4AsString(), startTime: time:utcNow()};
+entity1.relationships["child"] = {relatedEntityId: uuid:createType4AsString(), startTime: time:utcNow()};
+entity1.relationships["friend"] = {relatedEntityId: uuid:createType4AsString(), startTime: time:utcNow()};
+
+
+}
 
 
