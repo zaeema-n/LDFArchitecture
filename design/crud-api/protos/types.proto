@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package crud;
+
+option go_package = "lk/datafoundation/crud-api";
+
+// Define the Kind message
+message Kind {
+  string major = 1;
+  string minor = 2;
+}
+
+// Define the Entity message
+message Entity {
+  string id = 1;
+  Kind kind = 2;
+  string created = 3;  // ISO 8601 format
+  string terminated = 4;  // ISO 8601 format
+  TimeBasedValue name = 5;
+  map<string, string> metadata = 6;
+  map<string, TimeBasedValue> attributes = 7;
+  map<string, Relationship> relationships = 8;
+}
+
+// Define the TimeBasedValue message
+message TimeBasedValue {
+  string startTime = 1;  // ISO 8601 format
+  string endTime = 2;  // ISO 8601 format
+  string value = 3;
+}
+
+// Define the Relationship message
+message Relationship {
+  string relatedEntityId = 1;
+  string startTime = 2;  // ISO 8601 format
+  string endTime = 3;  // ISO 8601 format
+}
+
+// Define the CRUD service
+service CrudService {
+  rpc CreateEntity(Entity) returns (Entity);
+  rpc ReadEntity(Entity) returns (Entity);
+  rpc UpdateEntity(Entity) returns (Entity);
+  rpc DeleteEntity(Entity) returns (Entity);
+}
