@@ -22,12 +22,18 @@ Read about running the [Update API](design/update-api/README.md)
 curl -X POST http://localhost:8080/entities \
   -H "Content-Type: application/json" \
   -d '{
-    "id": "123",
+    "id": "124",
     "kind": {
       "major": "example",
       "minor": "test"
     },
-    "created": "2024-03-15T00:00:00Z"
+    "created": "2024-03-15T00:00:00Z",
+    "metadata": {
+      "type": "entity",
+      "status": "active",
+      "version": "1.0",
+      "description": "test entity"
+    }
   }'
 ```
 
@@ -42,7 +48,13 @@ curl -X PUT http://localhost:8080/entities/123 \
       "major": "example",
       "minor": "updated"
     },
-    "created": "2024-03-15T00:00:00Z"
+    "created": "2024-03-15T00:00:00Z",
+    "metadata": {
+      "type": "entity",
+      "status": "updated",
+      "version": "2.0",
+      "description": "updated entity"
+    }
   }'
 ```
 
