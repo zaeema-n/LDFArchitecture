@@ -1,9 +1,15 @@
 # Update API
 
-## Generate Stubs
+## Generate Open API 
 
 ```bash
-bal grpc --mode client --input ../crud-api/protos/types.proto --output client/
+bal openapi -i ../contracts/rest/update_api.yaml  --mode service
+```
+
+## Generate GRPC Stubs
+
+```bash
+bal grpc --mode client --input ../crud-api/protos/types_v1.proto --output .
 ```
 
 > 💡 **Note**  

@@ -59,11 +59,14 @@ components:
       properties:
         id:
           type: string
+          readOnly: true
         kind:
           $ref: '#/components/schemas/Kind'
+          readOnly: true
         created:
           type: string
           format: date-time
+          readOnly: true
         terminated:
           type: string
           format: date-time
@@ -102,6 +105,7 @@ components:
           nullable: true
         value:
           type: object
+          additionalProperties: true
     Relationship:
       type: object
       properties:

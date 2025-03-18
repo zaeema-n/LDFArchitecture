@@ -8,7 +8,7 @@ import (
 )
 
 // Add this function to handle metadata operations
-func (repo *MongoRepository) HandleMetadata(ctx context.Context, entityId string, metadata map[string]string) error {
+func (repo *MongoRepository) HandleMetadata(ctx context.Context, entityId string, metadata map[string]interface{}) error {
 	update := bson.M{
 		"$set": bson.M{
 			"metadata": metadata,

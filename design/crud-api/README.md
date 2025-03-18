@@ -17,13 +17,23 @@ go get go.mongodb.org/mongo-driver/mongo
 cd crud-api
 ```
 
+
 ```bash
 go mod init github.com/zaeema-n/LDFArchitecture/design/crud-api
 ```
 
 ```bash
-protoc --go_out=. --go-grpc_out=.--proto_path=protos protos/types.proto
+protoc --go_out=. --go-grpc_out=. --proto_path=protos protos/types_v1.proto
 ```
+
+### Build
+
+```bash
+go build ./...
+go build -o crud-service cmd/server/service.go
+```
+
+
 
 ## Usage
 

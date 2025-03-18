@@ -51,6 +51,7 @@ dependencies = [
 org = "ballerina"
 name = "data.jsondata"
 version = "1.0.0"
+scope = "testOnly"
 dependencies = [
 	{org = "ballerina", name = "jballerina.java"},
 	{org = "ballerina", name = "lang.object"}
@@ -60,6 +61,7 @@ dependencies = [
 org = "ballerina"
 name = "file"
 version = "1.11.0"
+scope = "testOnly"
 dependencies = [
 	{org = "ballerina", name = "io"},
 	{org = "ballerina", name = "jballerina.java"},
@@ -95,6 +97,7 @@ modules = [
 org = "ballerina"
 name = "http"
 version = "2.13.5"
+scope = "testOnly"
 dependencies = [
 	{org = "ballerina", name = "auth"},
 	{org = "ballerina", name = "cache"},
@@ -178,6 +181,7 @@ dependencies = [
 org = "ballerina"
 name = "lang.decimal"
 version = "0.0.0"
+scope = "testOnly"
 dependencies = [
 	{org = "ballerina", name = "jballerina.java"}
 ]
@@ -254,6 +258,7 @@ dependencies = [
 org = "ballerina"
 name = "mime"
 version = "2.11.0"
+scope = "testOnly"
 dependencies = [
 	{org = "ballerina", name = "io"},
 	{org = "ballerina", name = "jballerina.java"},
@@ -286,6 +291,7 @@ dependencies = [
 org = "ballerina"
 name = "os"
 version = "1.9.0"
+scope = "testOnly"
 dependencies = [
 	{org = "ballerina", name = "io"},
 	{org = "ballerina", name = "jballerina.java"}
