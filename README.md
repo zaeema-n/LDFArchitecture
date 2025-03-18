@@ -54,6 +54,8 @@ curl -X GET http://localhost:8080/entities/12345
 
 **Update**
 
+> TODO: The update creates a new record and that's a bug, please fix it. 
+
 ```bash
 curl -X PUT http://localhost:8080/entities/12345 \
   -H "Content-Type: application/json" \

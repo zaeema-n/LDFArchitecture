@@ -18,7 +18,7 @@ func (repo *MongoRepository) HandleMetadata(ctx context.Context, entityId string
 	opts := options.Update().SetUpsert(true)
 	_, err := repo.collection().UpdateOne(
 		ctx,
-		bson.M{"_id": entityId},
+		bson.M{"id": entityId},
 		update,
 		opts,
 	)
@@ -33,7 +33,7 @@ func (repo *MongoRepository) GetMetadata(ctx context.Context, entityId string) (
 
 	err := repo.collection().FindOne(
 		ctx,
-		bson.M{"_id": entityId},
+		bson.M{"id": entityId},
 	).Decode(&result)
 
 	return result.Metadata, err
