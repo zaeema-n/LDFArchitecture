@@ -3,7 +3,7 @@
 ## Generate Open API 
 
 ```bash
-bal openapi -i ../contracts/rest/update_api.yaml  --mode service
+bal openapi -i ../contracts/rest/update_api.yaml --mode service
 ```
 
 ## Generate GRPC Stubs
