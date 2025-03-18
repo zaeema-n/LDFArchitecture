@@ -9,7 +9,6 @@
 
 Read about running the [CRUD Service](design/crud-api/README.md)
 
-
 ### Run Update API Service
 
 Read about running the [Update API](design/update-api/README.md)
@@ -20,6 +19,45 @@ Read about running the [Update API](design/update-api/README.md)
 
 ```bash
 curl -X POST http://localhost:8080/entities \
+-H "Content-Type: application/json" \
+-d '{
+  "id": "12345",
+  "kind": {
+    "major": "example",
+    "minor": "test"
+  },
+  "created": "2024-03-17T10:00:00Z",
+  "terminated": "",
+  "name": {
+    "startTime": "2024-03-17T10:00:00Z",
+    "endTime": "",
+    "value": {
+      "typeUrl": "type.googleapis.com/google.protobuf.StringValue",
+      "value": "entity-name"
+    }
+  },
+  "metadata": [
+    {"key": "owner", "value": "test-user"},
+    {"key": "version", "value": "1.0"},
+    {"key": "developer", "value": "V8A"}
+  ],
+  "attributes": [],
+  "relationships": []
+}'
+```
+
+**Read**
+
+```bash
+curl -X GET http://localhost:8080/entities/12345
+```
+
+**Update**
+
+> TODO: The update creates a new record and that's a bug, please fix it. 
+
+```bash
+curl -X PUT http://localhost:8080/entities/12345 \
   -H "Content-Type: application/json" \
   -d '{
     "id": "123",
@@ -27,22 +65,14 @@ curl -X POST http://localhost:8080/entities \
       "major": "example",
       "minor": "test"
     },
-    "created": "2024-03-15T00:00:00Z"
-  }'
-```
-
-**Update**
-
-```bash
-curl -X PUT http://localhost:8080/entities/123 \
-  -H "Content-Type: application/json" \
-  -d '{
-    "id": "123",
-    "kind": {
-      "major": "example",
-      "minor": "updated"
+    "created": "2024-03-18T00:00:00Z",
+    "name": {
+      "startTime": "2024-03-18T00:00:00Z",
+      "value": "entity-name"
     },
-    "created": "2024-03-15T00:00:00Z"
+    "metadata": [
+      {"key": "version", "value": "5.0"}
+    ]
   }'
 ```
 
