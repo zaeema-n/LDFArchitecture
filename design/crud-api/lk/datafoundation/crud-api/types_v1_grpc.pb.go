@@ -33,7 +33,7 @@ const (
 type CrudServiceClient interface {
 	CreateEntity(ctx context.Context, in *Entity, opts ...grpc.CallOption) (*Entity, error)
 	ReadEntity(ctx context.Context, in *EntityId, opts ...grpc.CallOption) (*Entity, error)
-	UpdateEntity(ctx context.Context, in *Entity, opts ...grpc.CallOption) (*Entity, error)
+	UpdateEntity(ctx context.Context, in *UpdateEntityRequest, opts ...grpc.CallOption) (*Entity, error)
 	DeleteEntity(ctx context.Context, in *EntityId, opts ...grpc.CallOption) (*Empty, error)
 }
 
@@ -65,7 +65,7 @@ func (c *crudServiceClient) ReadEntity(ctx context.Context, in *EntityId, opts .
 	return out, nil
 }
 
-func (c *crudServiceClient) UpdateEntity(ctx context.Context, in *Entity, opts ...grpc.CallOption) (*Entity, error) {
+func (c *crudServiceClient) UpdateEntity(ctx context.Context, in *UpdateEntityRequest, opts ...grpc.CallOption) (*Entity, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(Entity)
 	err := c.cc.Invoke(ctx, CrudService_UpdateEntity_FullMethodName, in, out, cOpts...)
@@ -93,7 +93,7 @@ func (c *crudServiceClient) DeleteEntity(ctx context.Context, in *EntityId, opts
 type CrudServiceServer interface {
 	CreateEntity(context.Context, *Entity) (*Entity, error)
 	ReadEntity(context.Context, *EntityId) (*Entity, error)
-	UpdateEntity(context.Context, *Entity) (*Entity, error)
+	UpdateEntity(context.Context, *UpdateEntityRequest) (*Entity, error)
 	DeleteEntity(context.Context, *EntityId) (*Empty, error)
 	mustEmbedUnimplementedCrudServiceServer()
 }
@@ -111,7 +111,7 @@ func (UnimplementedCrudServiceServer) CreateEntity(context.Context, *Entity) (*E
 func (UnimplementedCrudServiceServer) ReadEntity(context.Context, *EntityId) (*Entity, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ReadEntity not implemented")
 }
-func (UnimplementedCrudServiceServer) UpdateEntity(context.Context, *Entity) (*Entity, error) {
+func (UnimplementedCrudServiceServer) UpdateEntity(context.Context, *UpdateEntityRequest) (*Entity, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateEntity not implemented")
 }
 func (UnimplementedCrudServiceServer) DeleteEntity(context.Context, *EntityId) (*Empty, error) {
@@ -175,7 +175,7 @@ func _CrudService_ReadEntity_Handler(srv interface{}, ctx context.Context, dec f
 }
 
 func _CrudService_UpdateEntity_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(Entity)
+	in := new(UpdateEntityRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -187,7 +187,7 @@ func _CrudService_UpdateEntity_Handler(srv interface{}, ctx context.Context, dec
 		FullMethod: CrudService_UpdateEntity_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(CrudServiceServer).UpdateEntity(ctx, req.(*Entity))
+		return srv.(CrudServiceServer).UpdateEntity(ctx, req.(*UpdateEntityRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }

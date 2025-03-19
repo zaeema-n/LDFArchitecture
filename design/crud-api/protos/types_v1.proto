@@ -45,13 +45,19 @@ message TimeBasedValueList {
 service CrudService {
     rpc CreateEntity(Entity) returns (Entity);
     rpc ReadEntity(EntityId) returns (Entity);
-    rpc UpdateEntity(Entity) returns (Entity);
+    rpc UpdateEntity(UpdateEntityRequest) returns (Entity);
     rpc DeleteEntity(EntityId) returns (Empty);
 }
 
 // Request message for deleting an entity by ID
 message EntityId {
     string id = 1;
+}
+
+// Request message for updating an entity
+message UpdateEntityRequest {
+    string id = 1;
+    Entity entity = 2;
 }
 
 // Empty message response

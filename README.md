@@ -60,7 +60,7 @@ curl -X GET http://localhost:8080/entities/12345
 curl -X PUT http://localhost:8080/entities/12345 \
   -H "Content-Type: application/json" \
   -d '{
-    "id": "123",
+    "id": "12345",
     "kind": {
       "major": "example",
       "minor": "test"
@@ -79,5 +79,5 @@ curl -X PUT http://localhost:8080/entities/12345 \
 **Delete**
 
 ```bash
-curl -X DELETE http://localhost:8080/entities/123
+curl -X DELETE http://localhost:8080/entities/12345
 ```
