@@ -17,10 +17,17 @@ go get go.mongodb.org/mongo-driver/mongo
 cd crud-api
 ```
 
+## Go Module Setup
+
+Initialize a Go module. 
 
 ```bash
 go mod init github.com/zaeema-n/LDFArchitecture/design/crud-api
 ```
+
+Generating the protobuf stubs for Go-lang
+This will be used to write the data pipeline from CRUD server to the API server
+via Grpc. 
 
 ```bash
 protoc --go_out=. --go-grpc_out=. --proto_path=protos protos/types_v1.proto
@@ -32,8 +39,6 @@ protoc --go_out=. --go-grpc_out=. --proto_path=protos protos/types_v1.proto
 go build ./...
 go build -o crud-service cmd/server/service.go
 ```
-
-
 
 ## Usage
 

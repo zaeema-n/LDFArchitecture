@@ -81,3 +81,12 @@ curl -X PUT http://localhost:8080/entities/12345 \
 ```bash
 curl -X DELETE http://localhost:8080/entities/12345
 ```
+
+## Run E2E Tests
+
+Make sure the CRUD server and the API server are running. 
+
+```bash
+cd design/tests/e2e
+python basic_crud_tests.py
+```
