@@ -23,6 +23,8 @@ message Relationship {
     string relatedEntityId = 1;
     string startTime = 2;
     string endTime = 3;
+    string id = 4;
+    string name = 5;
 }
 
 message Entity {

@@ -7,10 +7,11 @@ import (
 	"os"
 
 	"lk/datafoundation/crud-api/db/config"
-	"lk/datafoundation/crud-api/db/repository"
 	pb "lk/datafoundation/crud-api/lk/datafoundation/crud-api"
 
 	"github.com/joho/godotenv"
+
+	mongorepository "lk/datafoundation/crud-api/db/repository/mongo"
 
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -20,7 +21,7 @@ import (
 // Server implements the CrudService
 type Server struct {
 	pb.UnimplementedCrudServiceServer
-	repo *repository.MongoRepository
+	repo *mongorepository.MongoRepository
 }
 
 // convertMetadata converts map[string]*anypb.Any to map[string]interface{}
@@ -101,7 +102,7 @@ func main() {
 
 	// Create MongoDB repository
 	ctx := context.Background()
-	repo := repository.NewMongoRepository(ctx, mongoConfig)
+	repo := mongorepository.NewMongoRepository(ctx, mongoConfig)
 
 	listener, err := net.Listen("tcp", ":50051")
 	if err != nil {
