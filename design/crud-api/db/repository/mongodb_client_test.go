@@ -17,6 +17,16 @@ import (
 var testRepo *MongoRepository
 var testCtx context.Context
 
+// Helper function to get DB name from the repository
+func (r *MongoRepository) GetDBName() string {
+	return r.config.DBName
+}
+
+// Helper function to get collection name from the repository
+func (r *MongoRepository) GetCollectionName() string {
+	return r.config.Collection
+}
+
 // TestMain sets up the test environment
 func TestMain(m *testing.M) {
 	// Load .env file
@@ -33,7 +43,7 @@ func TestMain(m *testing.M) {
 	testRepo = NewMongoRepository(testCtx, testConfig)
 
 	// Clear test collection before tests
-	testRepo.collection().Drop(testCtx)
+	// testRepo.collection().Drop(testCtx)
 
 	// Add before running tests
 	if err := testRepo.client.Ping(testCtx, nil); err != nil {
@@ -42,16 +52,28 @@ func TestMain(m *testing.M) {
 	log.Println("Successfully connected to MongoDB")
 
 	// Run tests
+	log.Println("Running tests")
+	log.Println("DB Name: " + testRepo.GetDBName())
+	log.Println("Collection Name: " + testRepo.GetCollectionName())
 	exitCode := m.Run()
 
 	// Clean up after tests
-	testRepo.collection().Drop(testCtx)
+	// testRepo.collection().Drop(testCtx)
 
+	log.Println("Tests completed")
 	os.Exit(exitCode)
 }
 
-// TestCreateAndReadEntity tests creating and reading an entity with metadata
+// TestCreateAndReadEntity verifies the entity creation and reading functionality:
+// 1. Creates an entity with test metadata
+// 2. Confirms the entity exists in the database after creation
+// 3. Reads the entity and verifies the metadata values
+// 4. Validates that the entity ID is correctly set
+// 5. Confirms the metadata values are stored correctly
 func TestCreateAndReadEntity(t *testing.T) {
+	// Log database and collection information
+	log.Printf("Test using database: %s, collection: %s", testRepo.GetDBName(), testRepo.GetCollectionName())
+
 	// Create test entity with metadata
 	entityID := "test-entity-1"
 
@@ -94,8 +116,17 @@ func TestCreateAndReadEntity(t *testing.T) {
 	assert.Contains(t, readEntity.Metadata, "key2")
 }
 
+// TestUpdateEntityMetadata verifies the metadata update functionality:
+// 1. Creates an entity with initial metadata
+// 2. Updates the metadata with new values
+// 3. Reads the updated entity and verifies the metadata changes
+// 4. Confirms that the metadata values are updated correctly
+// 5. Validates that the entity ID remains unchanged
 // TestUpdateEntityMetadata tests updating entity metadata
 func TestUpdateEntityMetadata(t *testing.T) {
+	// Log database and collection information
+	log.Printf("Test using database: %s, collection: %s", testRepo.GetDBName(), testRepo.GetCollectionName())
+
 	// Create test entity with initial metadata
 	entityID := "test-entity-2"
 
@@ -140,8 +171,17 @@ func TestUpdateEntityMetadata(t *testing.T) {
 	assert.Contains(t, readEntity.Metadata, "key3")
 }
 
-// TestDeleteEntity tests deleting an entity with metadata
+// TestDeleteEntity verifies the entity deletion functionality:
+// 1. Creates an entity with test metadata
+// 2. Confirms the entity exists in the database after creation
+// 3. Tests the DeleteEntity method by removing the entity
+// 4. Verifies that exactly one document was deleted (DeletedCount = 1)
+// 5. Confirms the entity no longer exists by attempting to read it
+// 6. Validates that an error is returned when trying to read a deleted entity
 func TestDeleteEntity(t *testing.T) {
+	// Log database and collection information
+	log.Printf("Test using database: %s, collection: %s", testRepo.GetDBName(), testRepo.GetCollectionName())
+
 	// Create test entity
 	entityID := "test-entity-3"
 
@@ -171,8 +211,16 @@ func TestDeleteEntity(t *testing.T) {
 	assert.Error(t, err) // Should return an error since entity doesn't exist
 }
 
-// TestMetadataHandling tests specific metadata operations
+// TestMetadataHandling verifies the handling of complex metadata with various data types:
+// 1. Tests storage and retrieval of different protobuf wrapper types (String, Int32, Bool)
+// 2. Confirms that Entity.Id is correctly used as MongoDB's _id field
+// 3. Validates that metadata values maintain their type information through storage/retrieval
+// 4. Ensures that type-specific unwrapping (UnmarshalTo) works correctly after retrieval
+// 5. Verifies the integrity of data values after a complete create-read cycle
 func TestMetadataHandling(t *testing.T) {
+	// Log database and collection information
+	log.Printf("Test using database: %s, collection: %s", testRepo.GetDBName(), testRepo.GetCollectionName())
+
 	// Create test entity with metadata
 	entityID := "test-entity-4"
 

@@ -13,8 +13,6 @@ import (
 	"github.com/joho/godotenv"
 
 	"google.golang.org/grpc"
-	"google.golang.org/protobuf/types/known/anypb"
-	"google.golang.org/protobuf/types/known/wrapperspb"
 )
 
 // Server implements the CrudService
@@ -23,19 +21,10 @@ type Server struct {
 	repo *repository.MongoRepository
 }
 
-// convertMetadata converts map[string]*anypb.Any to map[string]interface{}
-func convertMetadata(in map[string]*anypb.Any) map[string]interface{} {
-	out := make(map[string]interface{})
-	for k, v := range in {
-		out[k] = v.GetValue()
-	}
-	return out
-}
-
 // CreateEntity handles entity creation with metadata
 func (s *Server) CreateEntity(ctx context.Context, req *pb.Entity) (*pb.Entity, error) {
 	log.Printf("Creating Entity with metadata: %s", req.Id)
-	err := s.repo.HandleMetadata(ctx, req.Id, convertMetadata(req.Metadata))
+	err := s.repo.HandleMetadata(ctx, req.Id, req.Metadata)
 	if err != nil {
 		return nil, err
 	}
@@ -50,25 +39,17 @@ func (s *Server) ReadEntity(ctx context.Context, req *pb.EntityId) (*pb.Entity, 
 		return nil, err
 	}
 	// Convert back to Any
-	anyMetadata := make(map[string]*anypb.Any)
-	for k, v := range metadata {
-		// Wrap string in a StringValue proto message
-		anyVal, err := anypb.New(wrapperspb.String(v))
-		if err != nil {
-			return nil, err
-		}
-		anyMetadata[k] = anyVal
-	}
+
 	return &pb.Entity{
 		Id:       req.Id,
-		Metadata: anyMetadata,
+		Metadata: metadata,
 	}, nil
 }
 
 // UpdateEntity modifies existing metadata
 func (s *Server) UpdateEntity(ctx context.Context, req *pb.Entity) (*pb.Entity, error) {
 	log.Printf("Updating Entity metadata: %s", req.Id)
-	err := s.repo.HandleMetadata(ctx, req.Id, convertMetadata(req.Metadata))
+	err := s.repo.HandleMetadata(ctx, req.Id, req.Metadata)
 	if err != nil {
 		return nil, err
 	}
