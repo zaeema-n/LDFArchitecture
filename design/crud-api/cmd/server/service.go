@@ -7,7 +7,7 @@ import (
 	"os"
 
 	"lk/datafoundation/crud-api/db/config"
-	"lk/datafoundation/crud-api/db/repository"
+	mongorepository "lk/datafoundation/crud-api/db/repository/mongo"
 	pb "lk/datafoundation/crud-api/lk/datafoundation/crud-api"
 
 	"github.com/joho/godotenv"
@@ -18,7 +18,7 @@ import (
 // Server implements the CrudService
 type Server struct {
 	pb.UnimplementedCrudServiceServer
-	repo *repository.MongoRepository
+	repo *mongorepository.MongoRepository
 }
 
 // CreateEntity handles entity creation with metadata
@@ -93,7 +93,7 @@ func main() {
 
 	// Create MongoDB repository
 	ctx := context.Background()
-	repo := repository.NewMongoRepository(ctx, mongoConfig)
+	repo := mongorepository.NewMongoRepository(ctx, mongoConfig)
 
 	listener, err := net.Listen("tcp", ":50051")
 	if err != nil {
