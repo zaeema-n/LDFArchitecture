@@ -14,7 +14,7 @@ Config.toml
 #macOS filters
 
 .DS_Store
-
+design/.DS_Store
 # Ballerina
 
 target/
