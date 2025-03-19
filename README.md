@@ -79,5 +79,5 @@ curl -X PUT http://localhost:8080/entities/12345 \
 **Delete**
 
 ```bash
-curl -X DELETE http://localhost:8080/entities/123
+curl -X DELETE http://localhost:8080/entities/12345
 ```

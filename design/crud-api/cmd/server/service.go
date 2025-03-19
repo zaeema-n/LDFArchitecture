@@ -24,7 +24,7 @@ type Server struct {
 // CreateEntity handles entity creation with metadata
 func (s *Server) CreateEntity(ctx context.Context, req *pb.Entity) (*pb.Entity, error) {
 	log.Printf("Creating Entity with metadata: %s", req.Id)
-	err := s.repo.HandleMetadata(ctx, req.Id, req.Metadata)
+	err := s.repo.HandleMetadata(ctx, req.Id, req)
 	if err != nil {
 		return nil, err
 	}
@@ -47,13 +47,24 @@ func (s *Server) ReadEntity(ctx context.Context, req *pb.EntityId) (*pb.Entity, 
 }
 
 // UpdateEntity modifies existing metadata
-func (s *Server) UpdateEntity(ctx context.Context, req *pb.Entity) (*pb.Entity, error) {
-	log.Printf("Updating Entity metadata: %s", req.Id)
-	err := s.repo.HandleMetadata(ctx, req.Id, req.Metadata)
+func (s *Server) UpdateEntity(ctx context.Context, req *pb.UpdateEntityRequest) (*pb.Entity, error) {
+	// Extract ID from request parameter and entity data
+	updateEntityID := req.Id
+	updateEntity := req.Entity
+
+	log.Printf("Updating Entity metadata: %s", updateEntityID)
+
+	// Pass the ID and metadata to HandleMetadata
+	err := s.repo.HandleMetadata(ctx, updateEntityID, updateEntity)
 	if err != nil {
 		return nil, err
 	}
-	return req, nil
+
+	// Return updated entity
+	return &pb.Entity{
+		Id:       updateEntity.Id,
+		Metadata: updateEntity.Metadata,
+	}, nil
 }
 
 // DeleteEntity removes metadata
