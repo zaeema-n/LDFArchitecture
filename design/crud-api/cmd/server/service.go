@@ -13,6 +13,7 @@ import (
 	"github.com/joho/godotenv"
 
 	mongorepository "lk/datafoundation/crud-api/db/repository/mongo"
+	neo4jrepository "lk/datafoundation/crud-api/db/repository/neo4j"
 
 	"google.golang.org/grpc"
 )
@@ -20,13 +21,19 @@ import (
 // Server implements the CrudService
 type Server struct {
 	pb.UnimplementedCrudServiceServer
-	repo *mongorepository.MongoRepository
+	mongoRepo *mongorepository.MongoRepository
+	neo4jRepo *neo4jrepository.Neo4jRepository
 }
+
+// type Neo4jServer struct {
+// 	pb.UnimplementedCrudServiceServer
+// 	repo *neo4jrepository.Neo4jRepository
+// }
 
 // CreateEntity handles entity creation with metadata
 func (s *Server) CreateEntity(ctx context.Context, req *pb.Entity) (*pb.Entity, error) {
 	log.Printf("Creating Entity with metadata: %s", req.Id)
-	err := s.repo.HandleMetadata(ctx, req.Id, req)
+	err := s.mongoRepo.HandleMetadata(ctx, req.Id, req)
 	if err != nil {
 		return nil, err
 	}
@@ -36,7 +43,7 @@ func (s *Server) CreateEntity(ctx context.Context, req *pb.Entity) (*pb.Entity, 
 // ReadEntity retrieves an entity's metadata
 func (s *Server) ReadEntity(ctx context.Context, req *pb.EntityId) (*pb.Entity, error) {
 	log.Printf("Reading Entity metadata: %s", req.Id)
-	metadata, err := s.repo.GetMetadata(ctx, req.Id)
+	metadata, err := s.mongoRepo.GetMetadata(ctx, req.Id)
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +64,7 @@ func (s *Server) UpdateEntity(ctx context.Context, req *pb.UpdateEntityRequest) 
 	log.Printf("Updating Entity metadata: %s", updateEntityID)
 
 	// Pass the ID and metadata to HandleMetadata
-	err := s.repo.HandleMetadata(ctx, updateEntityID, updateEntity)
+	err := s.mongoRepo.HandleMetadata(ctx, updateEntityID, updateEntity)
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +79,7 @@ func (s *Server) UpdateEntity(ctx context.Context, req *pb.UpdateEntityRequest) 
 // DeleteEntity removes metadata
 func (s *Server) DeleteEntity(ctx context.Context, req *pb.EntityId) (*pb.Empty, error) {
 	log.Printf("Deleting Entity metadata: %s", req.Id)
-	_, err := s.repo.DeleteEntity(ctx, req.Id)
+	_, err := s.mongoRepo.DeleteEntity(ctx, req.Id)
 	if err != nil {
 		return nil, err
 	}
@@ -103,7 +110,7 @@ func main() {
 	}
 
 	grpcServer := grpc.NewServer()
-	server := &Server{repo: repo}
+	server := &Server{mongoRepo: repo}
 
 	pb.RegisterCrudServiceServer(grpcServer, server)
 
