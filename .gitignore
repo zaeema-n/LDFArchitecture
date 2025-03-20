@@ -19,3 +19,4 @@ design/.DS_Store
 
 target/
 
+.env

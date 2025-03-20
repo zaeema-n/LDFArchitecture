@@ -17,6 +17,7 @@ import (
 var testRepo *MongoRepository
 var testCtx context.Context
 
+
 // Helper function to get DB name from the repository
 func (r *MongoRepository) GetDBName() string {
 	return r.config.DBName
@@ -26,6 +27,7 @@ func (r *MongoRepository) GetDBName() string {
 func (r *MongoRepository) GetCollectionName() string {
 	return r.config.Collection
 }
+
 
 // TestMain sets up the test environment
 func TestMain(m *testing.M) {
@@ -43,7 +45,9 @@ func TestMain(m *testing.M) {
 	testRepo = NewMongoRepository(testCtx, testConfig)
 
 	// Clear test collection before tests
+
 	// testRepo.collection().Drop(testCtx)
+
 
 	// Add before running tests
 	if err := testRepo.client.Ping(testCtx, nil); err != nil {
@@ -116,6 +120,7 @@ func TestCreateAndReadEntity(t *testing.T) {
 	assert.Contains(t, readEntity.Metadata, "key2")
 }
 
+
 // TestUpdateEntityMetadata verifies the metadata update functionality:
 // 1. Creates an entity with initial metadata
 // 2. Updates the metadata with new values
@@ -126,6 +131,7 @@ func TestCreateAndReadEntity(t *testing.T) {
 func TestUpdateEntityMetadata(t *testing.T) {
 	// Log database and collection information
 	log.Printf("Test using database: %s, collection: %s", testRepo.GetDBName(), testRepo.GetCollectionName())
+
 
 	// Create test entity with initial metadata
 	entityID := "test-entity-2"
@@ -210,6 +216,7 @@ func TestDeleteEntity(t *testing.T) {
 	_, err = testRepo.ReadEntity(testCtx, entityID)
 	assert.Error(t, err) // Should return an error since entity doesn't exist
 }
+
 
 // TestMetadataHandling verifies the handling of complex metadata with various data types:
 // 1. Tests storage and retrieval of different protobuf wrapper types (String, Int32, Bool)

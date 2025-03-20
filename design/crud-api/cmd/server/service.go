@@ -7,10 +7,12 @@ import (
 	"os"
 
 	"lk/datafoundation/crud-api/db/config"
-	mongorepository "lk/datafoundation/crud-api/db/repository/mongo"
+
 	pb "lk/datafoundation/crud-api/lk/datafoundation/crud-api"
 
 	"github.com/joho/godotenv"
+
+	mongorepository "lk/datafoundation/crud-api/db/repository/mongo"
 
 	"google.golang.org/grpc"
 )

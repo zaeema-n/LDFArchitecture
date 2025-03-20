@@ -5,3 +5,9 @@ type MongoConfig struct {
 	DBName     string `env:"MONGO_DB_NAME"`
 	Collection string `env:"MONGO_COLLECTION"`
 }
+
+type Neo4jConfig struct {
+	URI      string `env:"NEO4J_URI"`
+	Username string `env:"NEO4J_USER"`
+	Password string `env:"NEO4J_PASSWORD"`
+}
