@@ -19,3 +19,4 @@ Config.toml
 
 target/
 
+.env

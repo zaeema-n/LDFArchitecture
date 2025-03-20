@@ -295,45 +295,6 @@ func TestGetRelationship(t *testing.T) {
 	assert.Nil(t, relationshipMap["endDate"], "Expected end date to be nil")
 }
 
-// func TestUpdateEntity(t *testing.T) {
-// 	// Create initial entity using createEntity with the correct parameters
-// 	entityMap := map[string]interface{}{
-// 		"id":          "11",
-// 		"kind":        "Person",
-// 		"name":        "Mary",
-// 		"dateCreated": "2025-03-18",
-// 	}
-
-// 	_, err := repository.createEntity(context.Background(), entityMap)
-// 	assert.Nil(t, err, "Expected no error when creating the entity")
-
-// 	// Prepare the update data
-// 	updateData := map[string]interface{}{
-// 		"name":      "Mary Updated",
-// 		"dateEnded": "2025-04-01",
-// 		"newField":  "Some new value",
-// 	}
-
-// 	// Update the entity
-// 	updatedEntity, err := repository.updateEntity(context.Background(), "11", updateData)
-// 	log.Printf("Updated entity: %v", updatedEntity)
-// 	assert.Nil(t, err, "Expected no error when updating entity")
-
-// 	// Verify that the entity was updated
-// 	assert.Equal(t, "Mary Updated", updatedEntity["name"], "Expected entity to have updated name")
-// 	assert.Equal(t, "2025-04-01", updatedEntity["dateEnded"], "Expected entity to have updated dateEnded")
-// 	assert.Equal(t, "Some new value", updatedEntity["newField"], "Expected entity to have the newField added")
-
-// 	// Fetch the entity again using ReadEntity
-// 	entity, err := repository.ReadEntity(context.Background(), "7")
-// 	assert.Nil(t, err, "Expected no error when reading updated entity")
-
-// 	// Verify the changes in the fetched entity
-// 	assert.Equal(t, "David Updated", entity["name"], "Expected entity to have updated name")
-// 	assert.Equal(t, "2025-04-01", entity["dateEnded"], "Expected entity to have updated dateEnded")
-// 	assert.Equal(t, "Some new value", entity["newField"], "Expected entity to have newField")
-// }
-
 func TestUpdateEntity(t *testing.T) {
 	// Create a test entity
 	entityData := map[string]interface{}{
