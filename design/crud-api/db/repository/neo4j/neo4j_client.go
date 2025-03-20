@@ -465,81 +465,6 @@ func (r *Neo4jRepository) getRelationship(ctx context.Context, relationshipID st
 	return nil, fmt.Errorf("relationship with ID %s not found", relationshipID)
 }
 
-// func (r *Neo4jRepository) updateEntity(ctx context.Context, entityID string, updateData map[string]interface{}) (map[string]interface{}, error) {
-// 	// Convert entity ID to integer
-// 	entityInt, err := strconv.Atoi(entityID)
-// 	if err != nil {
-// 		return nil, fmt.Errorf("invalid entity ID format: %v", err)
-// 	}
-
-// 	// Open session
-// 	session := r.getSession(ctx)
-// 	defer session.Close(ctx)
-
-// 	// Check if the entity exists
-// 	existsQuery := `MATCH (e) WHERE e.id = $id RETURN e`
-// 	result, err := session.Run(ctx, existsQuery, map[string]interface{}{"id": entityInt})
-// 	if err != nil {
-// 		return nil, fmt.Errorf("error checking if entity exists: %v", err)
-// 	}
-
-// 	// If entity doesn't exist, return error
-// 	if !result.Next(ctx) {
-// 		return nil, fmt.Errorf("entity with ID %d does not exist", entityInt)
-// 	}
-
-// 	// Prepare the query and parameters dynamically
-// 	updateQuery := `MATCH (e) WHERE e.id = $id `
-// 	params := map[string]interface{}{"id": entityInt}
-
-// 	// Dynamically build SET clause for all fields in updateData
-// 	setClauses := []string{}
-// 	for key, value := range updateData {
-// 		params[key] = value
-// 		setClauses = append(setClauses, fmt.Sprintf("e.%s = $%s", key, key))
-// 	}
-
-// 	// Join all SET clauses with commas
-// 	if len(setClauses) > 0 {
-// 		updateQuery += "SET " + strings.Join(setClauses, ", ")
-// 	}
-
-// 	// Execute the update query
-// 	_, err = session.Run(ctx, updateQuery, params)
-// 	if err != nil {
-// 		return nil, fmt.Errorf("error updating entity: %v", err)
-// 	}
-
-// 	// Fetch the updated entity
-// 	updatedEntityQuery := `MATCH (e) WHERE e.id = $id RETURN e`
-// 	result, err = session.Run(ctx, updatedEntityQuery, map[string]interface{}{"id": entityInt})
-// 	if err != nil {
-// 		return nil, fmt.Errorf("error fetching updated entity: %v", err)
-// 	}
-
-// 	// Retrieve the updated entity
-// 	if result.Next(ctx) {
-// 		updatedEntity, _ := result.Record().Get("e")
-
-// 		// Convert the node to a map
-// 		node, ok := updatedEntity.(neo4j.Node)
-// 		if !ok {
-// 			return nil, fmt.Errorf("failed to cast updated entity to neo4j.Node")
-// 		}
-
-// 		// Dynamically convert all properties to strings
-// 		updatedEntityMap := make(map[string]interface{})
-// 		for key, value := range node.Props {
-// 			updatedEntityMap[key] = fmt.Sprintf("%v", value) // Convert each property to a string
-// 		}
-
-// 		// Return the updated entity
-// 		return updatedEntityMap, nil
-// 	}
-
-// 	return nil, fmt.Errorf("failed to retrieve updated entity")
-// }
-
 // this function can only be used to update the name and dateEnded fields of an entity
 func (r *Neo4jRepository) updateEntity(ctx context.Context, id string, updateData map[string]interface{}) (map[string]interface{}, error) {
 	// Convert entity ID to integer
@@ -765,7 +690,3 @@ func (r *Neo4jRepository) deleteEntity(ctx context.Context, entityID string) err
 
 	return nil
 }
-
-
-
-
