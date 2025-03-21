@@ -25,18 +25,35 @@ type Server struct {
 	neo4jRepo *neo4jrepository.Neo4jRepository
 }
 
-// type Neo4jServer struct {
-// 	pb.UnimplementedCrudServiceServer
-// 	repo *neo4jrepository.Neo4jRepository
-// }
-
 // CreateEntity handles entity creation with metadata
 func (s *Server) CreateEntity(ctx context.Context, req *pb.Entity) (*pb.Entity, error) {
 	log.Printf("Creating Entity with metadata: %s", req.Id)
+
+	// Save metadata in MongoDB
 	err := s.mongoRepo.HandleMetadata(ctx, req.Id, req)
 	if err != nil {
+		log.Printf("Error saving metadata in MongoDB: %v", err)
 		return nil, err
 	}
+	log.Printf("Successfully saved metadata in MongoDB for entity: %s", req.Id)
+
+	// Prepare data for Neo4j
+	entityMap := map[string]interface{}{
+		"Id":         req.Id,
+		"Kind":       req.Kind.GetMajor(),          // Assuming Kind is a nested message
+		"Name":       req.Name.GetValue().String(), // Assuming Name is a TimeBasedValue
+		"Created":    req.Created,
+		"Terminated": req.Terminated,
+	}
+
+	// Save entity in Neo4j
+	_, err = s.neo4jRepo.CreateGraphEntity(ctx, entityMap)
+	if err != nil {
+		log.Printf("Error saving entity in Neo4j: %v", err)
+		return nil, err
+	}
+	log.Printf("Successfully saved entity in Neo4j for entity: %s", req.Id)
+
 	return req, nil
 }
 
