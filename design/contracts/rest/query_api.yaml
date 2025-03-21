@@ -21,9 +21,12 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  type: string
+                type: object
+                properties:
+                  body:
+                    type: array
+                    items:
+                      type: string
 
   /entities/search:
     post:
@@ -37,10 +40,10 @@ paths:
               properties:
                 kind:
                   type: string
-                birthDate:
+                created:
                   type: string
                   format: date-time
-                deathDate:
+                terminated:
                   type: string
                   format: date-time
                 attributes:
@@ -54,9 +57,12 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  type: string
+                type: object
+                properties:
+                  body:
+                    type: array
+                    items:
+                      type: string
 
   /entities/{entityId}/metadata:
     get:
@@ -74,16 +80,10 @@ paths:
             application/json:
               schema:
                 type: object
-                properties:
-                  kind:
-                    type: string
-                  birthday:
-                    type: string
-                    format: date
-                  deathday:
-                    type: string
-                    format: date
-                    nullable: true
+                additionalProperties: true
+                description: >
+                  A JSON object containing entity metadata.
+                  Structure may vary based on entity type.
 
   /entities/{entityId}/attributes/{attributeName}:
     get:
@@ -99,7 +99,13 @@ paths:
           required: true
           schema:
             type: string
-        - name: ts
+        - name: startTime
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: endTime
           in: query
           required: false
           schema:
@@ -155,20 +161,43 @@ paths:
             schema:
               type: object
               required:
-                - relationship
-                - ts
+                - relatedEntityId
+                - startTime
+                - endTime
+                - id
+                - name
               properties:
-                relationship:
+                relatedEntityId:
                   type: string
-                ts:
+                startTime:
                   type: string
                   format: date-time
+                endTime:
+                  type: string
+                  format: date-time
+                id:
+                  type: string
+                name:
+                  type: string
       responses:
         200:
-          description: List of related entity IDs
+          description: List of related entities
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  type: string
+                  type: object
+                  properties:
+                    relatedEntityId:
+                      type: string
+                    startTime:
+                      type: string
+                      format: date-time
+                    endTime:
+                      type: string
+                      format: date-time
+                    id:
+                      type: string
+                    name:
+                      type: string
