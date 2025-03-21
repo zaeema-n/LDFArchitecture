@@ -57,6 +57,7 @@ service / on ep0 {
         return result;
     }
 
+    # TODO: Remove/Don't expose this endpoint from Ingest API (has been only added for testing purposes)
     # Read an entity by ID
     #
     # + id - The ID of the entity to retrieve
