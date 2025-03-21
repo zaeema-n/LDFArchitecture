@@ -1,0 +1,174 @@
+openapi: 3.0.3
+info:
+  title: Query API
+  version: 1.0.0
+servers:
+  - url: https://api.opendata.com/v1
+    description: Production server
+paths:
+  /entities/root:
+    get:
+      summary: Get root entity IDs of a given kind
+      parameters:
+        - name: kind
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: List of root entity IDs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+
+  /entities/search:
+    post:
+      summary: Find entities based on criteria
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                kind:
+                  type: string
+                birthDate:
+                  type: string
+                  format: date-time
+                deathDate:
+                  type: string
+                  format: date-time
+                attributes:
+                  type: object
+                  additionalProperties: true
+                  description: >
+                    Attribute filters. Example: {"height":180, "eyeColor":"blue"}
+      responses:
+        200:
+          description: List of matching entity IDs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+
+  /entities/{entityId}/metadata:
+    get:
+      summary: Get metadata of an entity
+      parameters:
+        - name: entityId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: Entity metadata
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  kind:
+                    type: string
+                  birthday:
+                    type: string
+                    format: date
+                  deathday:
+                    type: string
+                    format: date
+                    nullable: true
+
+  /entities/{entityId}/attributes/{attributeName}:
+    get:
+      summary: Get entity attribute
+      parameters:
+        - name: entityId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: attributeName
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: ts
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+      responses:
+        200:
+          description: Attribute value(s)
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: object
+                    properties:
+                      start:
+                        type: string
+                        format: date-time
+                      end:
+                        type: string
+                        format: date-time
+                        nullable: true
+                      value:
+                        type: string
+                  - type: array
+                    items:
+                      type: object
+                      properties:
+                        start:
+                          type: string
+                          format: date-time
+                        end:
+                          type: string
+                          format: date-time
+                          nullable: true
+                        value:
+                          type: string
+                  - type: string
+                    enum: [null]
+
+  /entities/{entityId}/relations:
+    post:
+      summary: Get related entity IDs
+      parameters:
+        - name: entityId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - relationship
+                - ts
+              properties:
+                relationship:
+                  type: string
+                ts:
+                  type: string
+                  format: date-time
+      responses:
+        200:
+          description: List of related entity IDs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
