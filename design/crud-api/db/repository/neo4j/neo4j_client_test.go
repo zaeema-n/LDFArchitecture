@@ -388,3 +388,94 @@ func TestDeleteEntity(t *testing.T) {
 	// Step 4: Verify the error message contains information about relationships
 	assert.Contains(t, err.Error(), "entity has relationships and cannot be deleted", "Expected error message to indicate relationships prevent deletion")
 }
+
+func TestAddMinistriesAndDepartments(t *testing.T) {
+	// Define ministries and their departments
+	ministries := []struct {
+		id          string
+		name        string
+		departments []struct {
+			id   string
+			name string
+		}
+	}{
+		{
+			id:   "ministry1",
+			name: "Ministry of Education",
+			departments: []struct {
+				id   string
+				name string
+			}{
+				{id: "dept1", name: "Department of Schools"},
+				{id: "dept2", name: "Department of Higher Education"},
+				{id: "dept3", name: "Department of Research"},
+			},
+		},
+		{
+			id:   "ministry2",
+			name: "Ministry of Health",
+			departments: []struct {
+				id   string
+				name string
+			}{
+				{id: "dept4", name: "Department of Hospitals"},
+				{id: "dept5", name: "Department of Public Health"},
+				{id: "dept6", name: "Department of Medical Research"},
+			},
+		},
+		{
+			id:   "ministry3",
+			name: "Ministry of Finance",
+			departments: []struct {
+				id   string
+				name string
+			}{
+				{id: "dept7", name: "Department of Budget"},
+				{id: "dept8", name: "Department of Taxation"},
+				{id: "dept9", name: "Department of Audits"},
+			},
+		},
+	}
+
+	// Start time for the relationships
+	startTime := "2022-07-22"
+
+	// Create ministries and departments, and establish relationships
+	for _, ministry := range ministries {
+		// Create the ministry
+		ministryEntity := map[string]interface{}{
+			"Id":      ministry.id,
+			"Kind":    "Ministry",
+			"Name":    ministry.name,
+			"Created": "2022-07-22",
+		}
+
+		_, err := repository.CreateGraphEntity(context.Background(), ministryEntity)
+		assert.Nil(t, err, "Failed to create ministry: %s", ministry.name)
+
+		// Create departments and relationships
+		for _, department := range ministry.departments {
+			// Create the department
+			departmentEntity := map[string]interface{}{
+				"Id":      department.id,
+				"Kind":    "Department",
+				"Name":    department.name,
+				"Created": "2022-07-22",
+			}
+
+			_, err := repository.CreateGraphEntity(context.Background(), departmentEntity)
+			assert.Nil(t, err, "Failed to create department: %s", department.name)
+
+			// Establish the is_department relationship
+			relationship := &pb.Relationship{
+				Id:              ministry.id + "_to_" + department.id,
+				Name:            "is_department",
+				RelatedEntityId: department.id,
+				StartTime:       startTime,
+			}
+
+			_, err = repository.CreateRelationship(context.Background(), ministry.id, relationship)
+			assert.Nil(t, err, "Failed to create relationship between ministry %s and department %s", ministry.name, department.name)
+		}
+	}
+}
