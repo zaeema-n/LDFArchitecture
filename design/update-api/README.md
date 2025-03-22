@@ -5,6 +5,12 @@
 This will generate the endpoints for the Update API server using the OpenAPI specification. 
 The OpenAPI specification is the base for public API for Update API.
 
+> 💡 Note: Always make sure the contract has the expected endpoints and request params
+> before working on the code. The generated endpoints should not be editable at all. 
+> Maybe the only changes that can be done is adding error handlers, but request and response
+> must be defined in the contract. 
+
+
 ```bash
 bal openapi -i ../contracts/rest/update_api.yaml --mode service
 ```
