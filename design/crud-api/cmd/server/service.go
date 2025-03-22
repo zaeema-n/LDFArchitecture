@@ -111,6 +111,7 @@ func (s *Server) ReadEntity(ctx context.Context, req *pb.Entity) (*pb.Entity, er
 	// Get the entity from MongoDB
 	metadata, err := s.mongoRepo.GetMetadata(ctx, req.Id)
 	if err != nil {
+		// Pass MongoDB errors to the client
 		return nil, err
 	}
 

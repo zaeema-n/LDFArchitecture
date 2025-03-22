@@ -107,14 +107,28 @@ function convertJsonToEntity(json jsonPayload) returns Entity|error {
             json[] attributesJsonArray = <json[]>check jsonPayload.attributes;
             foreach json item in attributesJsonArray {
                 string key = (check item.key).toString();
-                json[] valuesJson = <json[]>check item.value;
+                
+                // Add safe type checking for value
+                json valueJson = check item.value;
                 TimeBasedValue[] timeBasedValues = [];
                 
-                foreach json valueItem in valuesJson {
+                if valueJson is json[] {
+                    json[] valuesJson = <json[]>valueJson;
+                    foreach json valueItem in valuesJson {
+                        TimeBasedValue tbv = {
+                            startTime: (check valueItem.startTime).toString(),
+                            endTime: valueItem?.endTime is () ? "" : (check valueItem.endTime).toString(),
+                            value: check pbAny:pack((check valueItem.value).toString())
+                        };
+                        timeBasedValues.push(tbv);
+                    }
+                } else {
+                    // Handle the case when value is not an array (could be a single object)
+                    // Create a single TimeBasedValue object
                     TimeBasedValue tbv = {
-                        startTime: (check valueItem.startTime).toString(),
-                        endTime: valueItem?.endTime is () ? "" : (check valueItem.endTime).toString(),
-                        value: check pbAny:pack((check valueItem.value).toString())
+                        startTime: valueJson?.startTime is () ? "" : (check valueJson.startTime).toString(),
+                        endTime: valueJson?.endTime is () ? "" : (check valueJson.endTime).toString(),
+                        value: check pbAny:pack(valueJson?.value is () ? "" : (check valueJson.value).toString())
                     };
                     timeBasedValues.push(tbv);
                 }
@@ -128,14 +142,25 @@ function convertJsonToEntity(json jsonPayload) returns Entity|error {
         } else if jsonPayload?.attributes is map<json> {
             map<json> attributesMap = <map<json>>check jsonPayload.attributes;
             foreach var [key, val] in attributesMap.entries() {
-                json[] valuesJson = <json[]>val;
                 TimeBasedValue[] timeBasedValues = [];
                 
-                foreach json valueItem in valuesJson {
+                // Add safe type checking for val
+                if val is json[] {
+                    json[] valuesJson = <json[]>val;
+                    foreach json valueItem in valuesJson {
+                        TimeBasedValue tbv = {
+                            startTime: (check valueItem.startTime).toString(),
+                            endTime: valueItem?.endTime is () ? "" : (check valueItem.endTime).toString(),
+                            value: check pbAny:pack((check valueItem.value).toString())
+                        };
+                        timeBasedValues.push(tbv);
+                    }
+                } else {
+                    // Handle the case when val is not an array
                     TimeBasedValue tbv = {
-                        startTime: (check valueItem.startTime).toString(),
-                        endTime: valueItem?.endTime is () ? "" : (check valueItem.endTime).toString(),
-                        value: check pbAny:pack((check valueItem.value).toString())
+                        startTime: val?.startTime is () ? "" : (check val.startTime).toString(),
+                        endTime: val?.endTime is () ? "" : (check val.endTime).toString(),
+                        value: check pbAny:pack(val?.value is () ? "" : (check val.value).toString())
                     };
                     timeBasedValues.push(tbv);
                 }
