@@ -24,6 +24,29 @@ type Server struct {
 	neo4jRepo *neo4jrepository.Neo4jRepository
 }
 
+// validateGraphEntityCreation checks if an entity has all required fields for Neo4j storage
+func (s *Server) validateGraphEntityCreation(entity *pb.Entity) bool {
+	// Check if Kind is present and has a Major value
+	if entity.Kind == nil || entity.Kind.GetMajor() == "" {
+		log.Printf("Skipping Neo4j entity creation for %s: Missing or empty Kind.Major", entity.Id)
+		return false
+	}
+
+	// Check if Name is present and has a Value
+	if entity.Name == nil || entity.Name.GetValue() == nil {
+		log.Printf("Skipping Neo4j entity creation for %s: Missing or empty Name.Value", entity.Id)
+		return false
+	}
+
+	// Check if Created date is present
+	if entity.Created == "" {
+		log.Printf("Skipping Neo4j entity creation for %s: Missing Created date", entity.Id)
+		return false
+	}
+
+	return true
+}
+
 // CreateEntity handles entity creation with metadata
 func (s *Server) CreateEntity(ctx context.Context, req *pb.Entity) (*pb.Entity, error) {
 	log.Printf("Creating Entity with metadata: %s", req.Id)
@@ -45,13 +68,17 @@ func (s *Server) CreateEntity(ctx context.Context, req *pb.Entity) (*pb.Entity, 
 		"Terminated": req.Terminated,
 	}
 
-	// Save entity in Neo4j
-	_, err = s.neo4jRepo.CreateGraphEntity(ctx, entityMap)
-	if err != nil {
-		log.Printf("Error saving entity in Neo4j: %v", err)
-		return nil, err
+	// Validate required fields for Neo4j entity creation
+	if !s.validateGraphEntityCreation(req) {
+		// Save entity in Neo4j
+		log.Printf("Entity %s saved in MongoDB only, skipping Neo4j due to missing required fields", req.Id)
+		_, err = s.neo4jRepo.CreateGraphEntity(ctx, entityMap)
+		if err != nil {
+			log.Printf("Error saving entity in Neo4j: %v", err)
+			return nil, err
+		}
+		log.Printf("Successfully saved entity in Neo4j for entity: %s", req.Id)
 	}
-	log.Printf("Successfully saved entity in Neo4j for entity: %s", req.Id)
 
 	return req, nil
 }
@@ -117,9 +144,23 @@ func main() {
 		Collection: os.Getenv("MONGO_COLLECTION"),
 	}
 
+	// Initialize Neo4j config
+	neo4jConfig := &config.Neo4jConfig{
+		URI:      os.Getenv("NEO4J_URI"),
+		Username: os.Getenv("NEO4J_USER"),
+		Password: os.Getenv("NEO4J_PASSWORD"),
+	}
+
 	// Create MongoDB repository
 	ctx := context.Background()
-	repo := mongorepository.NewMongoRepository(ctx, mongoConfig)
+	mongoRepo := mongorepository.NewMongoRepository(ctx, mongoConfig)
+
+	// Create Neo4j repository
+	neo4jRepo, err := neo4jrepository.NewNeo4jRepository(ctx, neo4jConfig)
+	if err != nil {
+		log.Fatalf("Failed to create Neo4j repository: %v", err)
+	}
+	defer neo4jRepo.Close(ctx)
 
 	listener, err := net.Listen("tcp", ":50051")
 	if err != nil {
@@ -127,7 +168,10 @@ func main() {
 	}
 
 	grpcServer := grpc.NewServer()
-	server := &Server{mongoRepo: repo}
+	server := &Server{
+		mongoRepo: mongoRepo,
+		neo4jRepo: neo4jRepo,
+	}
 
 	pb.RegisterCrudServiceServer(grpcServer, server)
 

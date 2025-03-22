@@ -134,7 +134,7 @@ func (r *Neo4jRepository) CreateGraphEntity(ctx context.Context, entityMap map[s
 		return createdEntityMap, nil
 	}
 
-	return nil, fmt.Errorf("failed to retrieve created entity")
+	return nil, fmt.Errorf("failed to create entity")
 }
 
 // CreateRelationship creates a relationship between two entities
