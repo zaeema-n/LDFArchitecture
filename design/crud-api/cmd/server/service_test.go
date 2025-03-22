@@ -2,47 +2,69 @@ package main
 
 import (
 	"context"
-	"net"
+	"log"
+	"os"
 	"testing"
-	"time"
 
+	"lk/datafoundation/crud-api/db/config"
+	mongorepository "lk/datafoundation/crud-api/db/repository/mongo"
+	neo4jrepository "lk/datafoundation/crud-api/db/repository/neo4j"
 	pb "lk/datafoundation/crud-api/lk/datafoundation/crud-api"
 
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
+	"github.com/stretchr/testify/assert"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
-// Mock server implementation
-type mockServer struct {
-	pb.UnimplementedCrudServiceServer
+var server *Server
+
+// TestMain sets up the actual MongoDB and Neo4j repositories before running the tests
+func TestMain(m *testing.M) {
+	// Load environment variables for database configurations
+	neo4jConfig := &config.Neo4jConfig{
+		URI:      os.Getenv("NEO4J_URI"),
+		Username: os.Getenv("NEO4J_USER"),
+		Password: os.Getenv("NEO4J_PASSWORD"),
+	}
+
+	mongoConfig := &config.MongoConfig{
+		URI:        os.Getenv("MONGO_URI"),
+		DBName:     os.Getenv("MONGO_DB_NAME"),
+		Collection: os.Getenv("MONGO_COLLECTION"),
+	}
+
+	// Initialize Neo4j repository
+	ctx := context.Background()
+	neo4jRepo, err := neo4jrepository.NewNeo4jRepository(ctx, neo4jConfig)
+	if err != nil {
+		log.Fatalf("Failed to initialize Neo4j repository: %v", err)
+	}
+	defer neo4jRepo.Close(ctx)
+
+	// Initialize MongoDB repository
+	mongoRepo := mongorepository.NewMongoRepository(ctx, mongoConfig)
+	if mongoRepo == nil {
+		log.Fatalf("Failed to initialize MongoDB repository")
+	}
+
+	// Create the server with the initialized repositories
+	server = &Server{
+		mongoRepo: mongoRepo,
+		neo4jRepo: neo4jRepo,
+	}
+
+	// Run the tests
+	code := m.Run()
+
+	// Exit with the test result code
+	os.Exit(code)
 }
 
-func (s *mockServer) CreateEntity(ctx context.Context, req *pb.Entity) (*pb.Entity, error) {
-	return req, nil
-}
+// TestCreateEntity tests the CreateEntity function
+func TestCreateEntity(t *testing.T) {
 
-func TestCrudService(t *testing.T) {
-	// Start a mock gRPC server
-	lis, err := net.Listen("tcp", ":0") // Use :0 to get a free port
-	if err != nil {
-		t.Fatalf("Failed to listen: %v", err)
-	}
-	grpcServer := grpc.NewServer()
-	pb.RegisterCrudServiceServer(grpcServer, &mockServer{})
-	go grpcServer.Serve(lis)
-	defer grpcServer.Stop()
-
-	// Create a client connection to the mock server using grpc.DialContext
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	conn, err := grpc.DialContext(ctx, lis.Addr().String(), grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		t.Fatalf("Failed to dial: %v", err)
-	}
-	defer conn.Close()
-
-	client := pb.NewCrudServiceClient(conn)
+	// Encode Name as *anypb.Any
+	nameValue, err := anypb.New(&anypb.Any{Value: []byte("John Doe")})
+	assert.NoError(t, err)
 
 	// Define test cases
 	tests := []struct {
@@ -55,25 +77,44 @@ func TestCrudService(t *testing.T) {
 			entity: &pb.Entity{
 				Id: "123",
 				Kind: &pb.Kind{
-					Major: "example",
-					Minor: "test",
+					Major: "Person",
+					Minor: "Employee",
 				},
-				Created: "2023-01-01T00:00:00Z",
+				Name:       &pb.TimeBasedValue{Value: nameValue},
+				Created:    "2025-03-20",
+				Terminated: "",
 			},
 			wantErr: false,
 		},
-		// Add more test cases as needed
+		{
+			name: "CreateEntity_MissingId",
+			entity: &pb.Entity{
+				Id: "",
+				Kind: &pb.Kind{
+					Major: "Person",
+					Minor: "Employee",
+				},
+				Name:       &pb.TimeBasedValue{Value: nameValue},
+				Created:    "2025-03-20",
+				Terminated: "",
+			},
+			wantErr: true,
+		},
 	}
 
 	// Run test cases
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-			defer cancel()
+			ctx := context.Background()
 
-			_, err := client.CreateEntity(ctx, tt.entity)
+			resp, err := server.CreateEntity(ctx, tt.entity)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("CreateEntity() error = %v, wantErr %v", err, tt.wantErr)
+			}
+
+			if !tt.wantErr {
+				// Verify the response matches the input entity
+				assert.Equal(t, tt.entity, resp, "Expected response to match the input entity")
 			}
 		})
 	}

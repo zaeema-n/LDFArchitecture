@@ -2,11 +2,17 @@
 
 ## Generate Open API 
 
+This will generate the endpoints for the Update API server using the OpenAPI specification. 
+The OpenAPI specification is the base for public API for Update API.
+
 ```bash
 bal openapi -i ../contracts/rest/update_api.yaml --mode service
 ```
 
 ## Generate GRPC Stubs
+
+The client stub generated here will be sending and receiving values via Grpc. 
+This will send requests to the corresponding CRUD server endpoint. 
 
 ```bash
 bal grpc --mode client --input ../crud-api/protos/types_v1.proto --output .
@@ -16,6 +22,8 @@ bal grpc --mode client --input ../crud-api/protos/types_v1.proto --output .
 > At the generation make sure to remove any sample code generated to show how to use the API. Because that might add an unnecessary main file. 
 
 ## Run Test
+
+Make sure the CRUD server is running. (`cd design/crud-api; ./crud-server`)
 
 ```bash
 # Run all tests in the current package

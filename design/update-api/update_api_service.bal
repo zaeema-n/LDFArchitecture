@@ -43,7 +43,14 @@ service / on ep0 {
     resource function put entities/[string id](@http:Payload json jsonPayload) returns Entity|error {
         // Convert JSON to Entity with custom mapping
         Entity payload = check convertJsonToEntity(jsonPayload);
-        var result = ep->UpdateEntity(payload);
+
+        // Create UpdateEntityRequest with both id from URL and entity from payload
+        UpdateEntityRequest updateRequest = {
+            id: id,
+            entity: payload
+        };
+        
+        var result = ep->UpdateEntity(updateRequest);
         if result is error {
             return result;
         }

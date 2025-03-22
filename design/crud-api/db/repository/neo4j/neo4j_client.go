@@ -6,7 +6,6 @@ import (
 	"lk/datafoundation/crud-api/db/config"
 	pb "lk/datafoundation/crud-api/lk/datafoundation/crud-api"
 	"log"
-	"strconv"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
@@ -52,71 +51,62 @@ func (r *Neo4jRepository) getSession(ctx context.Context) neo4j.SessionWithConte
 	})
 }
 
-// createEntity checks if an entity exists and creates it if it doesn’t
-func (r *Neo4jRepository) createEntity(ctx context.Context, entityMap map[string]interface{}) (map[string]interface{}, error) {
-	// Ensure the map has the necessary fields
-	id, ok := entityMap["id"].(string)
+// CreateGraphEntity checks if an entity exists and creates it if it doesn’t
+func (r *Neo4jRepository) CreateGraphEntity(ctx context.Context, entityMap map[string]interface{}) (map[string]interface{}, error) {
+	id, ok := entityMap["Id"].(string)
 	if !ok {
-		return nil, fmt.Errorf("missing or invalid 'id' field")
+		return nil, fmt.Errorf("missing or invalid 'Id' field")
 	}
 
-	kind, ok := entityMap["kind"].(string)
+	kind, ok := entityMap["Kind"].(string)
 	if !ok {
-		return nil, fmt.Errorf("missing or invalid 'kind' field")
+		return nil, fmt.Errorf("missing or invalid 'Kind' field")
 	}
 
-	name, ok := entityMap["name"].(string)
+	name, ok := entityMap["Name"].(string)
 	if !ok {
-		return nil, fmt.Errorf("missing or invalid 'name' field")
+		return nil, fmt.Errorf("missing or invalid 'Name' field")
 	}
 
-	dateCreated, ok := entityMap["dateCreated"].(string)
+	created, ok := entityMap["Created"].(string)
 	if !ok {
-		return nil, fmt.Errorf("missing or invalid 'dateCreated' field")
+		return nil, fmt.Errorf("missing or invalid 'Created' field")
 	}
 
-	// Optional field
-	var dateEnded *string
-	if ended, ok := entityMap["dateEnded"].(string); ok {
-		dateEnded = &ended
-	}
-
-	// Convert ID to integer (or string if needed)
-	entityID, err := strconv.Atoi(id)
-	if err != nil {
-		return nil, fmt.Errorf("invalid ID format: %v", err)
+	var terminated *string
+	if term, ok := entityMap["Terminated"].(string); ok {
+		terminated = &term
 	}
 
 	session := r.getSession(ctx)
 	defer session.Close(ctx)
 
 	// Check if the node already exists
-	existsQuery := `MATCH (e:` + kind + ` {id: $id}) RETURN e`
-	result, err := session.Run(ctx, existsQuery, map[string]interface{}{"id": entityID})
+	existsQuery := `MATCH (e:` + kind + ` {Id: $Id}) RETURN e`
+	result, err := session.Run(ctx, existsQuery, map[string]interface{}{"Id": id})
 	if err != nil {
 		return nil, fmt.Errorf("error checking if entity exists: %v", err)
-	}
+	} // If entity exists, return an error
 
 	// If entity exists, return an error
 	if result.Next(ctx) {
-		return nil, fmt.Errorf("entity with ID %s already exists", id)
+		return nil, fmt.Errorf("entity with Id %s already exists", id)
 	}
 
 	// Create the node
-	createQuery := `CREATE (e:` + kind + ` {id: $id, name: $name, dateCreated: date($dateCreated)`
-	if dateEnded != nil {
-		createQuery += `, dateEnded: date($dateEnded)`
+	createQuery := `CREATE (e:` + kind + ` {Id: $Id, Name: $Name, Created: date($Created)`
+	if terminated != nil {
+		createQuery += `, Terminated: date($Terminated)`
 	}
 	createQuery += `}) RETURN e`
 
-	// Set parameters for the query
 	params := map[string]interface{}{
-		"id":          entityID,
-		"name":        name,
-		"dateCreated": dateCreated,
+		"Id":      id,
+		"Name":    name,
+		"Created": created,
 	}
-	if dateEnded != nil {
-		params["dateEnded"] = *dateEnded
+	if terminated != nil {
+		params["Terminated"] = *terminated
 	}
 
 	// Run the query to create the entity and return it
@@ -125,60 +115,37 @@ func (r *Neo4jRepository) createEntity(ctx context.Context, entityMap map[string
 		return nil, fmt.Errorf("error creating entity: %v", err)
 	}
 
-	// Retrieve the created entity (assuming it returns a node)
 	if result.Next(ctx) {
 		createdEntity, _ := result.Record().Get("e")
-
-		// Convert the node to a map
 		node, ok := createdEntity.(neo4j.Node)
 		if !ok {
 			return nil, fmt.Errorf("failed to cast created entity to neo4j.Node")
 		}
 
-		// Convert all properties to strings
 		createdEntityMap := map[string]interface{}{
-			"id":          fmt.Sprintf("%v", node.Props["id"]),          // Convert to string
-			"name":        fmt.Sprintf("%v", node.Props["name"]),        // Convert to string
-			"dateCreated": fmt.Sprintf("%v", node.Props["dateCreated"]), // Convert to string
+			"Id":      fmt.Sprintf("%v", node.Props["Id"]),
+			"Name":    fmt.Sprintf("%v", node.Props["Name"]),
+			"Created": fmt.Sprintf("%v", node.Props["Created"]),
 		}
-		if dateEnded != nil {
-			createdEntityMap["dateEnded"] = fmt.Sprintf("%v", *dateEnded) // Convert to string
+		if terminated != nil {
+			createdEntityMap["Terminated"] = fmt.Sprintf("%v", *terminated)
 		}
 
-		// Return the created entity
 		return createdEntityMap, nil
 	}
 
 	return nil, fmt.Errorf("failed to retrieve created entity")
 }
 
-func (r *Neo4jRepository) createRelationship(ctx context.Context, entityID string, rel *pb.Relationship) (map[string]interface{}, error) {
-	// Convert entityID (parent ID) to integer
-	parentID, err := strconv.Atoi(entityID)
-	if err != nil {
-		return nil, fmt.Errorf("invalid parent ID format: %v", err)
-	}
-
-	// Convert relatedEntityId (child ID) to integer
-	childID, err := strconv.Atoi(rel.RelatedEntityId)
-	if err != nil {
-		return nil, fmt.Errorf("invalid child ID format: %v", err)
-	}
-
-	// Convert relationship ID to integer
-	relationshipID, err := strconv.Atoi(rel.Id)
-	if err != nil {
-		return nil, fmt.Errorf("invalid relationship ID format: %v", err)
-	}
-
+// CreateRelationship creates a relationship between two entities
+func (r *Neo4jRepository) CreateRelationship(ctx context.Context, entityID string, rel *pb.Relationship) (map[string]interface{}, error) {
 	session := r.getSession(ctx)
 	defer session.Close(ctx)
 
-	// Check if both entities exist
-	existsQuery := `MATCH (p {id: $parentID}), (c {id: $childID}) RETURN p, c`
+	existsQuery := `MATCH (p {Id: $parentID}), (c {Id: $childID}) RETURN p, c`
 	result, err := session.Run(ctx, existsQuery, map[string]interface{}{
-		"parentID": parentID,
-		"childID":  childID,
+		"parentID": entityID,
+		"childID":  rel.RelatedEntityId,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("error checking entities: %v", err)
@@ -187,143 +154,112 @@ func (r *Neo4jRepository) createRelationship(ctx context.Context, entityID strin
 		return nil, fmt.Errorf("either parent or child entity does not exist")
 	}
 
-	// Build the Cypher query to create the relationship
-	createQuery := `MATCH (p {id: $parentID}), (c {id: $childID})
-                    MERGE (p)-[r:` + rel.Name + ` {id: $relationshipID}]->(c)
-                    SET r.startDate = date($startDate)
+	createQuery := `MATCH (p {Id: $parentID}), (c {Id: $childID})
+                    MERGE (p)-[r:` + rel.Name + ` {Id: $relationshipID}]->(c)
+                    SET r.Created = date($startDate)
                     RETURN r`
 
-	// Parameters for the query
 	params := map[string]interface{}{
-		"parentID":       parentID,
-		"childID":        childID,
-		"relationshipID": relationshipID,
+		"parentID":       entityID,
+		"childID":        rel.RelatedEntityId,
+		"relationshipID": rel.Id,
 		"startDate":      rel.StartTime,
 	}
 
-	// If EndTime exists, add it to the query and parameters
 	if rel.EndTime != "" {
-		createQuery += `, r.endDate = date($endDate)`
+		createQuery += `, r.Terminated = date($endDate)`
 		params["endDate"] = rel.EndTime
 	}
 
-	// Run the query to create the relationship and return it
 	result, err = session.Run(ctx, createQuery, params)
 	if err != nil {
 		return nil, fmt.Errorf("error creating relationship: %v", err)
 	}
 
-	// Retrieve the created relationship
 	if result.Next(ctx) {
 		createdRel, _ := result.Record().Get("r")
-
-		// Convert the relationship to a map
 		relationship, ok := createdRel.(neo4j.Relationship)
 		if !ok {
 			return nil, fmt.Errorf("failed to cast created relationship to neo4j.Relationship")
 		}
 
-		// Convert all properties to strings
 		relationshipMap := map[string]interface{}{
-			"id":               fmt.Sprintf("%v", relationship.Props["id"]),
-			"startDate":        fmt.Sprintf("%v", relationship.Props["startDate"]),
+			"Id":               fmt.Sprintf("%v", relationship.Props["Id"]),
+			"Created":          fmt.Sprintf("%v", relationship.Props["Created"]),
 			"relationshipType": rel.Name,
 		}
 		if rel.EndTime != "" {
-			relationshipMap["endDate"] = fmt.Sprintf("%v", relationship.Props["endDate"])
+			relationshipMap["Terminated"] = fmt.Sprintf("%v", relationship.Props["Terminated"])
 		}
 
-		// Return the created relationship
 		return relationshipMap, nil
 	}
 
 	return nil, fmt.Errorf("failed to retrieve created relationship")
 }
 
-// ReadEntity retrieves an entity by its ID from the Neo4j database and returns it as a map.
-func (r *Neo4jRepository) ReadEntity(ctx context.Context, entityID string) (map[string]interface{}, error) {
-	// Ensure the entity ID is valid
+// ReadGraphEntity retrieves an entity by its ID from the Neo4j database and returns it as a map.
+func (r *Neo4jRepository) ReadGraphEntity(ctx context.Context, entityID string) (map[string]interface{}, error) {
 	if entityID == "" {
-		return nil, fmt.Errorf("entity ID cannot be empty")
+		return nil, fmt.Errorf("entity Id cannot be empty")
 	}
 
-	// Convert entity ID to an integer
-	entityInt, err := strconv.Atoi(entityID)
-	if err != nil {
-		return nil, fmt.Errorf("invalid entity ID format: %v", err)
-	}
-
-	// Get a session
 	session := r.getSession(ctx)
 	defer session.Close(ctx)
 
-	// Query to retrieve entity details
-	query := `MATCH (e {id: $id})
-              RETURN labels(e)[0] AS kind, e.id AS id, e.name AS name, 
-                     toString(e.dateCreated) AS dateCreated, 
-                     CASE WHEN e.dateEnded IS NOT NULL THEN toString(e.dateEnded) ELSE NULL END AS dateEnded`
+	query := `MATCH (e {Id: $Id})
+              RETURN labels(e)[0] AS Kind, e.Id AS Id, e.Name AS Name, 
+                     toString(e.Created) AS Created, 
+                     CASE WHEN e.Terminated IS NOT NULL THEN toString(e.Terminated) ELSE NULL END AS Terminated`
 
-	// Execute the query
-	result, err := session.Run(ctx, query, map[string]interface{}{"id": entityInt})
+	result, err := session.Run(ctx, query, map[string]interface{}{"Id": entityID})
 	if err != nil {
 		return nil, fmt.Errorf("error querying entity: %v", err)
 	}
 
-	// Extract and process entity data
 	if result.Next(ctx) {
 		record := result.Record()
 
 		entity := map[string]interface{}{
-			"id":          fmt.Sprintf("%v", record.Values[1]), // Convert ID back to string
-			"kind":        fmt.Sprintf("%v", record.Values[0]),
-			"name":        fmt.Sprintf("%v", record.Values[2]),
-			"dateCreated": fmt.Sprintf("%v", record.Values[3]),
+			"Id":      fmt.Sprintf("%v", record.Values[1]),
+			"Kind":    fmt.Sprintf("%v", record.Values[0]),
+			"Name":    fmt.Sprintf("%v", record.Values[2]),
+			"Created": fmt.Sprintf("%v", record.Values[3]),
 		}
 
-		// Handle optional dateEnded field
-		if dateEndedVal, exists := record.Get("dateEnded"); exists && dateEndedVal != nil {
-			entity["dateEnded"] = fmt.Sprintf("%v", dateEndedVal)
+		if terminatedVal, exists := record.Get("Terminated"); exists && terminatedVal != nil {
+			entity["Terminated"] = fmt.Sprintf("%v", terminatedVal)
 		}
 
 		return entity, nil
 	}
 
-	return nil, fmt.Errorf("entity with ID %s not found", entityID)
+	return nil, fmt.Errorf("entity with Id %s not found", entityID)
 }
 
-// ReadRelatedEntityIds retrieves related entity IDs based on a given relationship
-func (r *Neo4jRepository) ReadRelatedEntityIds(ctx context.Context, entityID string, relationship string, ts string) ([]string, error) {
-	// Ensure the entity ID is valid
+// ReadRelatedGraphEntityIds retrieves related entity IDs based on a given relationship
+func (r *Neo4jRepository) ReadRelatedGraphEntityIds(ctx context.Context, entityID string, relationship string, ts string) ([]string, error) {
 	if entityID == "" {
-		return nil, fmt.Errorf("entity ID cannot be empty")
+		return nil, fmt.Errorf("entity Id cannot be empty")
 	}
 
-	entityInt, err := strconv.Atoi(entityID)
-	if err != nil {
-		return nil, fmt.Errorf("invalid entity ID format: %v", err)
-	}
-
-	// Open session
 	session := r.getSession(ctx)
 	defer session.Close(ctx)
 
-	// Query to find related entities within the given timestamp
 	query := fmt.Sprintf(`
-		MATCH (e {id: $entityID})-[r:%s]->(related)
-		WHERE r.startDate <= date($ts) AND (r.endDate IS NULL OR r.endDate > date($ts))
-		RETURN related.id AS relatedID
-	`, relationship)
+        MATCH (e {Id: $entityID})-[r:%s]->(related)
+        WHERE r.Created <= date($ts) AND (r.Terminated IS NULL OR r.Terminated > date($ts))
+        RETURN related.Id AS relatedID
+    `, relationship)
 
-	// Run the query
 	result, err := session.Run(ctx, query, map[string]interface{}{
-		"entityID": entityInt,
-		"ts":       ts, // Date format should be "YYYY-MM-DD"
+		"entityID": entityID,
+		"ts":       ts,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("error querying related entities: %v", err)
 	}
 
-	// Extract related entity IDs
 	var relatedIDs []string
 	for result.Next(ctx) {
 		record := result.Record()
@@ -339,11 +275,10 @@ func (r *Neo4jRepository) ReadRelatedEntityIds(ctx context.Context, entityID str
 	return relatedIDs, nil
 }
 
-func (r *Neo4jRepository) readRelationships(ctx context.Context, entityID string) ([]map[string]interface{}, error) {
-	// Convert entity ID to integer
-	entityInt, err := strconv.Atoi(entityID)
-	if err != nil {
-		return nil, fmt.Errorf("invalid entity ID format: %v", err)
+func (r *Neo4jRepository) ReadRelationships(ctx context.Context, entityID string) ([]map[string]interface{}, error) {
+
+	if entityID == "" {
+		return nil, fmt.Errorf("entity Id cannot be empty")
 	}
 
 	// Open session
@@ -352,22 +287,22 @@ func (r *Neo4jRepository) readRelationships(ctx context.Context, entityID string
 
 	// Cypher query to get all relationships (incoming and outgoing)
 	query := `
-		MATCH (e {id: $entityID})-[r]->(related)
-		RETURN type(r) AS type, related.id AS relatedID, "OUTGOING" AS direction, 
-		       toString(r.startDate) AS startDate, 
-		       CASE WHEN r.endDate IS NOT NULL THEN toString(r.endDate) ELSE NULL END AS endDate,
-		       r.id AS relationshipID
-		UNION
-		MATCH (e {id: $entityID})<-[r]-(related)
-		RETURN type(r) AS type, related.id AS relatedID, "INCOMING" AS direction, 
-		       toString(r.startDate) AS startDate, 
-		       CASE WHEN r.endDate IS NOT NULL THEN toString(r.endDate) ELSE NULL END AS endDate,
-		       r.id AS relationshipID
-	`
+        MATCH (e {Id: $entityID})-[r]->(related)
+        RETURN type(r) AS type, related.Id AS relatedID, "OUTGOING" AS direction, 
+               toString(r.Created) AS Created, 
+               CASE WHEN r.Terminated IS NOT NULL THEN toString(r.Terminated) ELSE NULL END AS Terminated,
+               r.Id AS relationshipID
+        UNION
+        MATCH (e {Id: $entityID})<-[r]-(related)
+        RETURN type(r) AS type, related.Id AS relatedID, "INCOMING" AS direction, 
+               toString(r.Created) AS Created, 
+               CASE WHEN r.Terminated IS NOT NULL THEN toString(r.Terminated) ELSE NULL END AS Terminated,
+               r.Id AS relationshipID
+    `
 
 	// Run the query
 	result, err := session.Run(ctx, query, map[string]interface{}{
-		"entityID": entityInt,
+		"entityID": entityID,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("error querying relationships: %v", err)
@@ -389,13 +324,13 @@ func (r *Neo4jRepository) readRelationships(ctx context.Context, entityID string
 			"type":           fmt.Sprintf("%v", values[0]), // Relationship type
 			"relatedID":      fmt.Sprintf("%v", values[1]),
 			"direction":      fmt.Sprintf("%v", values[2]), // "INCOMING" or "OUTGOING"
-			"startDate":      fmt.Sprintf("%v", values[3]),
+			"Created":        fmt.Sprintf("%v", values[3]),
 			"relationshipID": fmt.Sprintf("%v", values[5]), // Relationship ID
 		}
 
-		// Optional endDate
+		// Optional Terminated
 		if values[4] != nil {
-			rel["endDate"] = fmt.Sprintf("%v", values[4])
+			rel["Terminated"] = fmt.Sprintf("%v", values[4])
 		}
 
 		relationships = append(relationships, rel)
@@ -405,11 +340,10 @@ func (r *Neo4jRepository) readRelationships(ctx context.Context, entityID string
 	return relationships, nil
 }
 
-func (r *Neo4jRepository) getRelationship(ctx context.Context, relationshipID string) (map[string]interface{}, error) {
-	// Convert relationship ID to integer
-	relID, err := strconv.Atoi(relationshipID)
-	if err != nil {
-		return nil, fmt.Errorf("invalid relationship ID format: %v", err)
+func (r *Neo4jRepository) ReadRelationship(ctx context.Context, relationshipID string) (map[string]interface{}, error) {
+
+	if relationshipID == "" {
+		return nil, fmt.Errorf("relationship Id cannot be empty")
 	}
 
 	session := r.getSession(ctx)
@@ -417,17 +351,17 @@ func (r *Neo4jRepository) getRelationship(ctx context.Context, relationshipID st
 
 	// Cypher query to find the relationship by its ID
 	query := `
-		MATCH ()-[r]->()
-		WHERE r.id = $relationshipID
-		RETURN type(r) AS type, startNode(r).id AS startEntityID, endNode(r).id AS endEntityID, 
-		       toString(r.startDate) AS startDate, 
-		       CASE WHEN r.endDate IS NOT NULL THEN toString(r.endDate) ELSE NULL END AS endDate, 
-		       r.id AS relationshipID
-	`
+        MATCH ()-[r]->()
+        WHERE r.Id = $relationshipID
+        RETURN type(r) AS type, startNode(r).Id AS startEntityID, endNode(r).Id AS endEntityID, 
+               toString(r.Created) AS Created, 
+               CASE WHEN r.Terminated IS NOT NULL THEN toString(r.Terminated) ELSE NULL END AS Terminated, 
+               r.Id AS relationshipID
+    `
 
 	// Run the query to fetch the relationship
 	result, err := session.Run(ctx, query, map[string]interface{}{
-		"relationshipID": relID,
+		"relationshipID": relationshipID,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("error querying relationship: %v", err)
@@ -448,13 +382,13 @@ func (r *Neo4jRepository) getRelationship(ctx context.Context, relationshipID st
 			"type":           fmt.Sprintf("%v", values[0]), // Relationship type
 			"startEntityID":  fmt.Sprintf("%v", values[1]), // ID of the start entity
 			"endEntityID":    fmt.Sprintf("%v", values[2]), // ID of the end entity
-			"startDate":      fmt.Sprintf("%v", values[3]),
+			"Created":        fmt.Sprintf("%v", values[3]),
 			"relationshipID": fmt.Sprintf("%v", values[5]), // Relationship ID
 		}
 
-		// Optional endDate
+		// Optional Terminated
 		if values[4] != nil {
-			relationship["endDate"] = fmt.Sprintf("%v", values[4])
+			relationship["Terminated"] = fmt.Sprintf("%v", values[4])
 		}
 
 		// Return the relationship data as a map
@@ -462,20 +396,18 @@ func (r *Neo4jRepository) getRelationship(ctx context.Context, relationshipID st
 	}
 
 	// If no relationship was found
-	return nil, fmt.Errorf("relationship with ID %s not found", relationshipID)
+	return nil, fmt.Errorf("relationship with Id %s not found", relationshipID)
 }
 
-// this function can only be used to update the name and dateEnded fields of an entity
-func (r *Neo4jRepository) updateEntity(ctx context.Context, id string, updateData map[string]interface{}) (map[string]interface{}, error) {
-	// Convert entity ID to integer
-	entityInt, err := strconv.Atoi(id)
-	if err != nil {
-		return nil, fmt.Errorf("invalid entity ID format: %v", err)
+// UpdateGraphEntity updates the properties of an existing entity
+func (r *Neo4jRepository) UpdateGraphEntity(ctx context.Context, id string, updateData map[string]interface{}) (map[string]interface{}, error) {
+	if id == "" {
+		return nil, fmt.Errorf("entity Id cannot be empty")
 	}
 
 	// Prepare update parameters
 	params := map[string]interface{}{
-		"id": entityInt,
+		"Id": id,
 	}
 
 	// Open session
@@ -483,31 +415,31 @@ func (r *Neo4jRepository) updateEntity(ctx context.Context, id string, updateDat
 	defer session.Close(ctx)
 
 	// Check if the entity exists
-	existsQuery := `MATCH (e {id: $id}) RETURN e`
+	existsQuery := `MATCH (e {Id: $Id}) RETURN e`
 	result, err := session.Run(ctx, existsQuery, params)
 	if err != nil {
 		return nil, fmt.Errorf("error checking if entity exists: %v", err)
 	}
 
 	if !result.Next(ctx) {
-		return nil, fmt.Errorf("entity with ID %d does not exist", entityInt)
+		return nil, fmt.Errorf("entity with Id %s does not exist", id)
 	}
 
 	// Build Cypher query for updating entity
 	query := `
-        MATCH (e {id: $id})
+        MATCH (e {Id: $Id})
     `
 
-	// Add `name` if provided
-	if name, exists := updateData["name"]; exists {
-		params["name"] = name
-		query += `SET e.name = $name `
+	// Add `Name` if provided
+	if name, exists := updateData["Name"]; exists {
+		params["Name"] = name
+		query += `SET e.Name = $Name `
 	}
 
-	// Add `dateEnded` if provided
-	if dateEnded, exists := updateData["dateEnded"]; exists {
-		params["dateEnded"] = dateEnded
-		query += `SET e.dateEnded = date($dateEnded) `
+	// Add `Terminated` if provided
+	if terminated, exists := updateData["Terminated"]; exists {
+		params["Terminated"] = terminated
+		query += `SET e.Terminated = date($Terminated) `
 	}
 
 	// Execute update query and return updated entity
@@ -538,16 +470,15 @@ func (r *Neo4jRepository) updateEntity(ctx context.Context, id string, updateDat
 	return nil, fmt.Errorf("failed to retrieve updated entity")
 }
 
-func (r *Neo4jRepository) updateRelationship(ctx context.Context, relationshipID string, updateData map[string]interface{}) (map[string]interface{}, error) {
-	// Convert relationship ID to integer
-	relationshipInt, err := strconv.Atoi(relationshipID)
-	if err != nil {
-		return nil, fmt.Errorf("invalid relationship ID format: %v", err)
+func (r *Neo4jRepository) UpdateRelationship(ctx context.Context, relationshipID string, updateData map[string]interface{}) (map[string]interface{}, error) {
+
+	if relationshipID == "" {
+		return nil, fmt.Errorf("relationship Id cannot be empty")
 	}
 
 	// Prepare update parameters
 	params := map[string]interface{}{
-		"relationshipID": relationshipInt,
+		"relationshipID": relationshipID,
 	}
 
 	// Open session
@@ -555,28 +486,28 @@ func (r *Neo4jRepository) updateRelationship(ctx context.Context, relationshipID
 	defer session.Close(ctx)
 
 	// Check if the relationship exists
-	existsQuery := `MATCH ()-[r {id: $relationshipID}]->() RETURN r`
+	existsQuery := `MATCH ()-[r {Id: $relationshipID}]->() RETURN r`
 	result, err := session.Run(ctx, existsQuery, params)
 	if err != nil {
 		return nil, fmt.Errorf("error checking if relationship exists: %v", err)
 	}
 
 	if !result.Next(ctx) {
-		return nil, fmt.Errorf("relationship with ID %d does not exist", relationshipInt)
+		return nil, fmt.Errorf("relationship with Id %s does not exist", relationshipID)
 	}
 
 	// Build Cypher query for updating relationship
 	query := `
-        MATCH ()-[r {id: $relationshipID}]->()
+        MATCH ()-[r {Id: $relationshipID}]->()
     `
 
-	// Add `endDate` if provided (required)
-	endDate, exists := updateData["endDate"]
+	// Add `Terminated` if provided (required)
+	terminated, exists := updateData["Terminated"]
 	if !exists {
-		return nil, fmt.Errorf("endDate is required")
+		return nil, fmt.Errorf("terminated is required")
 	}
-	params["endDate"] = endDate
-	query += `SET r.endDate = date($endDate) RETURN r`
+	params["Terminated"] = terminated
+	query += `SET r.Terminated = date($Terminated) RETURN r`
 
 	// Execute update query and return updated relationship
 	result, err = session.Run(ctx, query, params)
@@ -604,16 +535,14 @@ func (r *Neo4jRepository) updateRelationship(ctx context.Context, relationshipID
 	return nil, fmt.Errorf("failed to retrieve updated relationship")
 }
 
-func (r *Neo4jRepository) deleteRelationship(ctx context.Context, relationshipID string) error {
-	// Convert relationship ID to integer
-	relationshipInt, err := strconv.Atoi(relationshipID)
-	if err != nil {
-		return fmt.Errorf("invalid relationship ID format: %v", err)
+func (r *Neo4jRepository) DeleteRelationship(ctx context.Context, relationshipID string) error {
+	if relationshipID == "" {
+		return fmt.Errorf("entity Id cannot be empty")
 	}
 
 	// Prepare query parameters
 	params := map[string]interface{}{
-		"relationshipID": relationshipInt,
+		"relationshipID": relationshipID,
 	}
 
 	// Open session
@@ -621,7 +550,7 @@ func (r *Neo4jRepository) deleteRelationship(ctx context.Context, relationshipID
 	defer session.Close(ctx)
 
 	// Check if the relationship exists
-	query := `MATCH ()-[r {id: $relationshipID}]->() RETURN r`
+	query := `MATCH ()-[r {Id: $relationshipID}]->() RETURN r`
 	result, err := session.Run(ctx, query, params)
 	if err != nil {
 		return fmt.Errorf("error checking if relationship exists: %v", err)
@@ -629,11 +558,11 @@ func (r *Neo4jRepository) deleteRelationship(ctx context.Context, relationshipID
 
 	// If no relationship is found, return an error
 	if !result.Next(ctx) {
-		return fmt.Errorf("relationship with ID %d does not exist", relationshipInt)
+		return fmt.Errorf("relationship with Id %s does not exist", relationshipID)
 	}
 
 	// Delete the relationship
-	deleteQuery := `MATCH ()-[r {id: $relationshipID}]->() DELETE r`
+	deleteQuery := `MATCH ()-[r {Id: $relationshipID}]->() DELETE r`
 	_, err = session.Run(ctx, deleteQuery, params)
 	if err != nil {
 		return fmt.Errorf("error deleting relationship: %v", err)
@@ -642,36 +571,31 @@ func (r *Neo4jRepository) deleteRelationship(ctx context.Context, relationshipID
 	return nil
 }
 
-func (r *Neo4jRepository) deleteEntity(ctx context.Context, entityID string) error {
-	// Convert entity ID to integer
-	entityInt, err := strconv.Atoi(entityID)
-	if err != nil {
-		return fmt.Errorf("invalid entity ID format: %v", err)
+// DeleteGraphEntity deletes an entity by its ID
+func (r *Neo4jRepository) DeleteGraphEntity(ctx context.Context, entityID string) error {
+	if entityID == "" {
+		return fmt.Errorf("entity Id cannot be empty")
 	}
 
-	// Open a session
 	session := r.getSession(ctx)
 	defer session.Close(ctx)
 
-	// Check if the entity exists before attempting to delete
-	query := `MATCH (e {id: $entityID}) RETURN e`
+	query := `MATCH (e {Id: $entityID}) RETURN e`
 	params := map[string]interface{}{
-		"entityID": entityInt,
+		"entityID": entityID,
 	}
 
-	// Run query to find the entity
 	result, err := session.Run(ctx, query, params)
 	if err != nil {
 		return fmt.Errorf("error checking if entity exists: %v", err)
 	}
 
-	// If entity doesn't exist, return an error
 	if !result.Next(ctx) {
-		return fmt.Errorf("entity with ID %d does not exist", entityInt)
+		return fmt.Errorf("entity with Id %s does not exist", entityID)
 	}
 
 	// Get the relationships of the entity
-	relationships, err := r.readRelationships(ctx, entityID)
+	relationships, err := r.ReadRelationships(ctx, entityID)
 	if err != nil {
 		return fmt.Errorf("error getting relationships: %v", err)
 	}
@@ -681,8 +605,8 @@ func (r *Neo4jRepository) deleteEntity(ctx context.Context, entityID string) err
 		return fmt.Errorf("entity has relationships and cannot be deleted. Relationships: %v", relationships)
 	}
 
-	// Delete the entity (node) with the given ID
-	deleteQuery := `MATCH (e {id: $entityID}) DELETE e`
+	// Delete the entity (node) with the given Id
+	deleteQuery := `MATCH (e {Id: $entityID}) DELETE e`
 	_, err = session.Run(ctx, deleteQuery, params)
 	if err != nil {
 		return fmt.Errorf("error deleting entity: %v", err)

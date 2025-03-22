@@ -7,79 +7,96 @@ import (
 	"os"
 
 	"lk/datafoundation/crud-api/db/config"
+
 	pb "lk/datafoundation/crud-api/lk/datafoundation/crud-api"
 
 	"github.com/joho/godotenv"
 
 	mongorepository "lk/datafoundation/crud-api/db/repository/mongo"
+	neo4jrepository "lk/datafoundation/crud-api/db/repository/neo4j"
 
 	"google.golang.org/grpc"
-	"google.golang.org/protobuf/types/known/anypb"
-	"google.golang.org/protobuf/types/known/wrapperspb"
 )
 
 // Server implements the CrudService
 type Server struct {
 	pb.UnimplementedCrudServiceServer
-	repo *mongorepository.MongoRepository
-}
-
-// convertMetadata converts map[string]*anypb.Any to map[string]interface{}
-func convertMetadata(in map[string]*anypb.Any) map[string]interface{} {
-	out := make(map[string]interface{})
-	for k, v := range in {
-		out[k] = v.GetValue()
-	}
-	return out
+	mongoRepo *mongorepository.MongoRepository
+	neo4jRepo *neo4jrepository.Neo4jRepository
 }
 
 // CreateEntity handles entity creation with metadata
 func (s *Server) CreateEntity(ctx context.Context, req *pb.Entity) (*pb.Entity, error) {
 	log.Printf("Creating Entity with metadata: %s", req.Id)
-	err := s.repo.HandleMetadata(ctx, req.Id, convertMetadata(req.Metadata))
+
+	// Save metadata in MongoDB
+	err := s.mongoRepo.HandleMetadata(ctx, req.Id, req)
 	if err != nil {
+		log.Printf("Error saving metadata in MongoDB: %v", err)
 		return nil, err
 	}
+	log.Printf("Successfully saved metadata in MongoDB for entity: %s", req.Id)
+
+	// Prepare data for Neo4j
+	entityMap := map[string]interface{}{
+		"Id":         req.Id,
+		"Kind":       req.Kind.GetMajor(),          // Assuming Kind is a nested message
+		"Name":       req.Name.GetValue().String(), // Assuming Name is a TimeBasedValue
+		"Created":    req.Created,
+		"Terminated": req.Terminated,
+	}
+
+	// Save entity in Neo4j
+	_, err = s.neo4jRepo.CreateGraphEntity(ctx, entityMap)
+	if err != nil {
+		log.Printf("Error saving entity in Neo4j: %v", err)
+		return nil, err
+	}
+	log.Printf("Successfully saved entity in Neo4j for entity: %s", req.Id)
+
 	return req, nil
 }
 
 // ReadEntity retrieves an entity's metadata
 func (s *Server) ReadEntity(ctx context.Context, req *pb.EntityId) (*pb.Entity, error) {
 	log.Printf("Reading Entity metadata: %s", req.Id)
-	metadata, err := s.repo.GetMetadata(ctx, req.Id)
+	metadata, err := s.mongoRepo.GetMetadata(ctx, req.Id)
 	if err != nil {
 		return nil, err
 	}
 	// Convert back to Any
-	anyMetadata := make(map[string]*anypb.Any)
-	for k, v := range metadata {
-		// Wrap string in a StringValue proto message
-		anyVal, err := anypb.New(wrapperspb.String(v))
-		if err != nil {
-			return nil, err
-		}
-		anyMetadata[k] = anyVal
-	}
+
 	return &pb.Entity{
 		Id:       req.Id,
-		Metadata: anyMetadata,
+		Metadata: metadata,
 	}, nil
 }
 
 // UpdateEntity modifies existing metadata
-func (s *Server) UpdateEntity(ctx context.Context, req *pb.Entity) (*pb.Entity, error) {
-	log.Printf("Updating Entity metadata: %s", req.Id)
-	err := s.repo.HandleMetadata(ctx, req.Id, convertMetadata(req.Metadata))
+func (s *Server) UpdateEntity(ctx context.Context, req *pb.UpdateEntityRequest) (*pb.Entity, error) {
+	// Extract ID from request parameter and entity data
+	updateEntityID := req.Id
+	updateEntity := req.Entity
+
+	log.Printf("Updating Entity metadata: %s", updateEntityID)
+
+	// Pass the ID and metadata to HandleMetadata
+	err := s.mongoRepo.HandleMetadata(ctx, updateEntityID, updateEntity)
 	if err != nil {
 		return nil, err
 	}
-	return req, nil
+
+	// Return updated entity
+	return &pb.Entity{
+		Id:       updateEntity.Id,
+		Metadata: updateEntity.Metadata,
+	}, nil
 }
 
 // DeleteEntity removes metadata
 func (s *Server) DeleteEntity(ctx context.Context, req *pb.EntityId) (*pb.Empty, error) {
 	log.Printf("Deleting Entity metadata: %s", req.Id)
-	_, err := s.repo.DeleteEntity(ctx, req.Id)
+	_, err := s.mongoRepo.DeleteEntity(ctx, req.Id)
 	if err != nil {
 		return nil, err
 	}
@@ -110,7 +127,7 @@ func main() {
 	}
 
 	grpcServer := grpc.NewServer()
-	server := &Server{repo: repo}
+	server := &Server{mongoRepo: repo}
 
 	pb.RegisterCrudServiceServer(grpcServer, server)
 

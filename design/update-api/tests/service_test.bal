@@ -182,7 +182,11 @@ function testMetadataUpdating() returns error? {
     };
     
     // Update entity
-    Entity updateEntityResponse = check ep->UpdateEntity(updateEntityRequest);
+    UpdateEntityRequest updateRequest = {
+        id: testId,
+        entity: updateEntityRequest
+    };
+    Entity updateEntityResponse = check ep->UpdateEntity(updateRequest);
     io:println("Entity updated with ID: " + updateEntityResponse.id);
     
     // Verify updated metadata
