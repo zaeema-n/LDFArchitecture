@@ -23,6 +23,8 @@ message Relationship {
     string relatedEntityId = 1;
     string startTime = 2;
     string endTime = 3;
+    string id = 4;
+    string name = 5;
 }
 
 message Entity {
@@ -44,7 +46,7 @@ message TimeBasedValueList {
 // Service definition for CRUD operations
 service CrudService {
     rpc CreateEntity(Entity) returns (Entity);
-    rpc ReadEntity(EntityId) returns (Entity);
+    rpc ReadEntity(Entity) returns (Entity);
     rpc UpdateEntity(UpdateEntityRequest) returns (Entity);
     rpc DeleteEntity(EntityId) returns (Empty);
 }

@@ -37,7 +37,7 @@ protoc --go_out=. --go-grpc_out=. --proto_path=protos protos/types_v1.proto
 
 ```bash
 go build ./...
-go build -o crud-service cmd/server/service.go
+go build -o crud-service cmd/server/service.go cmd/server/utils.go
 ```
 
 ## Usage
