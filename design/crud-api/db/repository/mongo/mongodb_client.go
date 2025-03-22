@@ -20,9 +20,14 @@ type MongoRepository struct {
 
 // A custom wrapper struct for Entity to use MongoDB's _id field
 type entityDocument struct {
-	ID       string                `bson:"_id"`
-	Metadata map[string]*anypb.Any `bson:"metadata,omitempty"`
-	// Add other entity fields as needed
+	ID            string                            `bson:"_id"`
+	Metadata      map[string]*anypb.Any             `bson:"metadata,omitempty"`
+	Kind          *pb.Kind                          `bson:"kind,omitempty"`
+	Created       string                            `bson:"created,omitempty"`
+	Terminated    string                            `bson:"terminated,omitempty"`
+	Name          *pb.TimeBasedValue                `bson:"name,omitempty"`
+	Attributes    map[string]*pb.TimeBasedValueList `bson:"attributes,omitempty"`
+	Relationships map[string]*pb.Relationship       `bson:"relationships,omitempty"`
 }
 
 // Convert protobuf Entity to MongoDB document
@@ -37,9 +42,14 @@ func toDocument(entity *pb.Entity) interface{} {
 // Convert MongoDB document to protobuf Entity
 func fromDocument(data *entityDocument) *pb.Entity {
 	return &pb.Entity{
-		Id:       data.ID,
-		Metadata: data.Metadata,
-		// Map other entity fields as needed
+		Id:            data.ID,
+		Metadata:      data.Metadata,
+		Kind:          data.Kind,
+		Created:       data.Created,
+		Terminated:    data.Terminated,
+		Name:          data.Name,
+		Attributes:    data.Attributes,
+		Relationships: data.Relationships,
 	}
 }
 

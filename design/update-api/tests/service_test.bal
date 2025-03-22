@@ -1,6 +1,7 @@
 import ballerina/io;
 import ballerina/test;
 import ballerina/protobuf.types.'any as pbAny;
+import ballerina/http;
 
 // Before Suite Function
 @test:BeforeSuite
@@ -293,6 +294,120 @@ function testEntityReading() returns error? {
     // Clean up
     Empty _ = check ep->DeleteEntity(readEntityRequest);
     io:println("Test entity deleted");
+    
+    return;
+}
+
+@test:Config {}
+function testCreateMinimalGraphEntity() returns error? {
+    // Initialize the client
+    CrudServiceClient ep = check new ("http://localhost:50051");
+    
+    // Test data setup - minimal entity with just required fields
+    string testId = "test-minimal-entity";
+    
+    // Create entity request with only required fields - no metadata, attributes, or relationships
+    Entity createEntityRequest = {
+        id: testId,
+        kind: {
+            major: "test",
+            minor: "minimal"
+        },
+        created: "2023-01-01",
+        terminated: "",
+        name: {
+            startTime: "2023-01-01",
+            endTime: "",
+            value: check pbAny:pack("minimal-test-entity")
+        }
+        // No metadata, attributes, or relationships specified - will use default empty arrays
+    };
+
+    // Create entity
+    Entity createEntityResponse = check ep->CreateEntity(createEntityRequest);
+    io:println("Minimal entity created with ID: " + createEntityResponse.id);
+    
+    // Verify entity was created correctly
+    EntityId readEntityRequest = {id: testId};
+    Entity readEntityResponse = check ep->ReadEntity(readEntityRequest);
+    
+    // Basic entity verification
+    test:assertEquals(readEntityResponse.id, testId, "Entity ID doesn't match");
+    test:assertEquals(readEntityResponse.kind.major, "test", "Entity kind.major doesn't match");
+    test:assertEquals(readEntityResponse.kind.minor, "minimal", "Entity kind.minor doesn't match");
+    
+    // Verify empty collections
+    test:assertEquals(readEntityResponse.metadata.length(), 0, "Metadata should be empty");
+    test:assertEquals(readEntityResponse.attributes.length(), 0, "Attributes should be empty");
+    test:assertEquals(readEntityResponse.relationships.length(), 0, "Relationships should be empty");
+    
+    // Clean up
+    EntityId deleteEntityRequest = {id: testId};
+    Empty _ = check ep->DeleteEntity(deleteEntityRequest);
+    io:println("Test minimal entity deleted");
+    
+    return;
+}
+
+@test:Config {}
+function testCreateMinimalGraphEntityViaRest() returns error? {
+    // Initialize an HTTP client for the REST API
+    http:Client restClient = check new ("http://localhost:8080");
+    
+    // Test data setup - minimal JSON entity
+    string testId = "test-minimal-json-entity";
+    
+    // Minimal JSON payload with only required fields
+    json minimalEntityJson = {
+        "id": testId,
+        "kind": {
+            "major": "test",
+            "minor": "minimal-json"
+        },
+        "created": "2023-01-01",
+        "name": {
+            "startTime": "2023-01-01",
+            "value": "minimal-json-test-entity"
+        }
+        // No metadata, attributes, or relationships
+    };
+
+    // Create entity via REST API
+    http:Response|error response = restClient->post("/entities", minimalEntityJson);
+    
+    // Verify HTTP request was successful
+    if response is error {
+        test:assertFail("Failed to create entity via REST API: " + response.message());
+    }
+    
+    http:Response httpResponse = <http:Response>response;
+    test:assertEquals(httpResponse.statusCode, 200, "Expected 200 OK status code");
+    
+    // Parse response JSON
+    json responseJson = check httpResponse.getJsonPayload();
+    test:assertEquals(check responseJson.id, testId, "Entity ID in response doesn't match");
+    
+    // Initialize the gRPC client to verify entity was properly created
+    CrudServiceClient ep = check new ("http://localhost:50051");
+    
+    // Verify entity data
+    EntityId readEntityRequest = {id: testId};
+    Entity readEntityResponse = check ep->ReadEntity(readEntityRequest);
+    
+    // Basic entity verification
+    test:assertEquals(readEntityResponse.id, testId, "Entity ID doesn't match");
+    test:assertEquals(readEntityResponse.kind.major, "test", "Entity kind.major doesn't match");
+    test:assertEquals(readEntityResponse.kind.minor, "minimal-json", "Entity kind.minor doesn't match");
+    
+    // Verify empty collections
+    test:assertEquals(readEntityResponse.metadata.length(), 0, "Metadata should be empty");
+    test:assertEquals(readEntityResponse.attributes.length(), 0, "Attributes should be empty");
+    test:assertEquals(readEntityResponse.relationships.length(), 0, "Relationships should be empty");
+    
+    // Clean up
+    EntityId deleteEntityRequest = {id: testId};
+    Empty _ = check ep->DeleteEntity(deleteEntityRequest);
+    io:println("Test minimal JSON entity deleted");
     
     return;
 }

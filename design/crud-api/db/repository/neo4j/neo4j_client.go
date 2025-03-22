@@ -51,7 +51,7 @@ func (r *Neo4jRepository) getSession(ctx context.Context) neo4j.SessionWithConte
 	})
 }
 
-// CreateGraphEntity checks if an entity exists and creates it if it doesn’t
+// CreateGraphEntity checks if an entity exists and creates it if it doesn't
 func (r *Neo4jRepository) CreateGraphEntity(ctx context.Context, entityMap map[string]interface{}) (map[string]interface{}, error) {
 	id, ok := entityMap["Id"].(string)
 	if !ok {

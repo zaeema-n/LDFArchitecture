@@ -15,6 +15,8 @@ import (
 	neo4jrepository "lk/datafoundation/crud-api/db/repository/neo4j"
 
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/types/known/anypb"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 )
 
 // Server implements the CrudService
@@ -49,9 +51,10 @@ func (s *Server) validateGraphEntityCreation(entity *pb.Entity) bool {
 
 // CreateEntity handles entity creation with metadata
 func (s *Server) CreateEntity(ctx context.Context, req *pb.Entity) (*pb.Entity, error) {
-	log.Printf("Creating Entity with metadata: %s", req.Id)
+	log.Printf("Creating Entity: %s", req.Id)
 
-	// Save metadata in MongoDB
+	// Always save the entity in MongoDB, even if it has no metadata
+	// The HandleMetadata function will only process it if it has metadata
 	err := s.mongoRepo.HandleMetadata(ctx, req.Id, req)
 	if err != nil {
 		log.Printf("Error saving metadata in MongoDB: %v", err)
@@ -59,25 +62,42 @@ func (s *Server) CreateEntity(ctx context.Context, req *pb.Entity) (*pb.Entity, 
 	}
 	log.Printf("Successfully saved metadata in MongoDB for entity: %s", req.Id)
 
-	// Prepare data for Neo4j
-	entityMap := map[string]interface{}{
-		"Id":         req.Id,
-		"Kind":       req.Kind.GetMajor(),          // Assuming Kind is a nested message
-		"Name":       req.Name.GetValue().String(), // Assuming Name is a TimeBasedValue
-		"Created":    req.Created,
-		"Terminated": req.Terminated,
-	}
-
 	// Validate required fields for Neo4j entity creation
-	if !s.validateGraphEntityCreation(req) {
-		// Save entity in Neo4j
-		log.Printf("Entity %s saved in MongoDB only, skipping Neo4j due to missing required fields", req.Id)
+	if s.validateGraphEntityCreation(req) {
+		// Prepare data for Neo4j with safety checks
+		entityMap := map[string]interface{}{
+			"Id": req.Id,
+		}
+
+		// Handle Kind field safely
+		if req.Kind != nil {
+			entityMap["Kind"] = req.Kind.GetMajor()
+		}
+
+		// Handle Name field safely
+		if req.Name != nil && req.Name.GetValue() != nil {
+			entityMap["Name"] = req.Name.GetValue().String()
+		}
+
+		// Handle other fields
+		if req.Created != "" {
+			entityMap["Created"] = req.Created
+		}
+
+		if req.Terminated != "" {
+			entityMap["Terminated"] = req.Terminated
+		}
+
+		// Save entity in Neo4j only if validation passes
 		_, err = s.neo4jRepo.CreateGraphEntity(ctx, entityMap)
 		if err != nil {
 			log.Printf("Error saving entity in Neo4j: %v", err)
-			return nil, err
+			// Don't return error here so MongoDB storage is still successful
+		} else {
+			log.Printf("Successfully saved entity in Neo4j for entity: %s", req.Id)
 		}
-		log.Printf("Successfully saved entity in Neo4j for entity: %s", req.Id)
+	} else {
+		log.Printf("Entity %s saved in MongoDB only, skipping Neo4j due to missing required fields", req.Id)
 	}
 
 	return req, nil
@@ -87,15 +107,66 @@ func (s *Server) CreateEntity(ctx context.Context, req *pb.Entity) (*pb.Entity, 
 func (s *Server) ReadEntity(ctx context.Context, req *pb.Entity) (*pb.Entity, error) {
 	log.Printf("Reading Entity metadata: %s", req.Id)
 	debugMetadata(req)
+
+	// Get the entity from MongoDB
 	metadata, err := s.mongoRepo.GetMetadata(ctx, req.Id)
 	if err != nil {
 		return nil, err
 	}
-	// Convert back to Any
 
+	// Try to get additional entity information from Neo4j
+	var kind *pb.Kind
+	var name *pb.TimeBasedValue
+	var created string
+	var terminated string
+
+	// Attempt to read from Neo4j, but don't fail if it's not available
+	entityMap, err := s.neo4jRepo.ReadGraphEntity(ctx, req.Id)
+	if err == nil && entityMap != nil {
+		// Entity found in Neo4j, extract information
+		if kindValue, ok := entityMap["Kind"]; ok {
+			kind = &pb.Kind{
+				Major: kindValue.(string),
+				Minor: "", // Neo4j doesn't store Minor
+			}
+		}
+
+		if nameValue, ok := entityMap["Name"]; ok {
+			// Create a TimeBasedValue with string value
+			value, _ := anypb.New(&wrapperspb.StringValue{
+				Value: nameValue.(string),
+			})
+
+			name = &pb.TimeBasedValue{
+				StartTime: entityMap["Created"].(string),
+				Value:     value,
+			}
+
+			// Add EndTime if available
+			if termValue, ok := entityMap["Terminated"]; ok {
+				name.EndTime = termValue.(string)
+			}
+		}
+
+		if createdValue, ok := entityMap["Created"]; ok {
+			created = createdValue.(string)
+		}
+
+		if termValue, ok := entityMap["Terminated"]; ok {
+			terminated = termValue.(string)
+		}
+	}
+
+	// Return entity with all available fields
 	return &pb.Entity{
-		Id:       req.Id,
-		Metadata: metadata,
+		Id:            req.Id,
+		Kind:          kind,
+		Name:          name,
+		Created:       created,
+		Terminated:    terminated,
+		Metadata:      metadata,
+		Attributes:    make(map[string]*pb.TimeBasedValueList), // Empty attributes
+		Relationships: make(map[string]*pb.Relationship),       // Empty relationships
 	}, nil
 }
 

@@ -55,6 +55,43 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
+// TestEmptyEntity tests creating an entity with empty metadata, attributes, and relationships
+// TODO: Think more about what is an empty entity, how empty it can be, define empty entity
+// func TestEmptyEntity(t *testing.T) {
+// 	// Create an entity with only ID field and empty data
+// 	emptyEntity := &pb.Entity{
+// 		Id: "empty-entity-test-001",
+
+// 		// All other fields (metadata, attributes, relationships) are nil/empty
+// 	}
+
+// 	// Call CreateEntity
+// 	ctx := context.Background()
+// 	resp, err := server.CreateEntity(ctx, emptyEntity)
+
+// 	// Validation should fail for Neo4j but MongoDB should succeed
+// 	// The function should not return an error since MongoDB storage worked
+// 	assert.NoError(t, err, "Expected no error even though Neo4j validation fails")
+// 	assert.NotNil(t, resp, "Response should not be nil")
+// 	assert.Equal(t, emptyEntity.Id, resp.Id, "Entity ID should match")
+
+// 	// Now read back the entity from MongoDB to verify it was stored
+// 	readEntity := &pb.Entity{
+// 		Id: emptyEntity.Id,
+// 	}
+// 	readResp, err := server.ReadEntity(ctx, readEntity)
+// 	assert.NoError(t, err, "Expected no error when reading back the entity")
+// 	assert.NotNil(t, readResp, "Read response should not be nil")
+// 	assert.Equal(t, emptyEntity.Id, readResp.Id, "Read entity ID should match")
+
+// 	// Clean up - delete the test entity
+// 	deleteReq := &pb.EntityId{
+// 		Id: emptyEntity.Id,
+// 	}
+// 	_, err = server.DeleteEntity(ctx, deleteReq)
+// 	assert.NoError(t, err, "Error deleting test entity")
+// }
+
 // TestCreateEntity tests the CreateEntity function
 // TODO: FIX BUG @zaeema-n there is a bug in the CreateEntity function
 func TestCreateEntity(t *testing.T) {
