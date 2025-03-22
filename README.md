@@ -88,7 +88,17 @@ curl -X DELETE http://localhost:8080/entities/12345
 
 Make sure the CRUD server and the API server are running. 
 
+### Run Update API Tests
+
 ```bash
 cd design/tests/e2e
 python basic_crud_tests.py
 ```
+
+### Run Query API Tests
+
+```bash
+cd design/tests/e2e
+python basic_query_tests.py
+```
+
