@@ -13,7 +13,9 @@ Read about running the [CRUD Service](design/crud-api/README.md)
 
 Read about running the [Update API](design/update-api/README.md)
 
-### Run a sample query
+## Run a sample query with CURL
+
+### Update API
 
 **Create**
 
@@ -82,7 +84,13 @@ curl -X PUT http://localhost:8080/entities/12345 \
 curl -X DELETE http://localhost:8080/entities/12345
 ```
 
+### Query API 
 
+**Retrieve Metadata**
+
+```bash
+curl -X GET "http://localhost:8081/v1/entities/12345/metadata"
+```
 
 ## Run E2E Tests
 
