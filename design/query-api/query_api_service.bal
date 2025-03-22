@@ -33,10 +33,25 @@ service /v1 on ep0 {
     # Get entity attribute
     #
     # + return - Attribute value(s) 
-    resource function get entities/[string entityId]/attributes/[string attributeName](string? startTime, string? endTime) returns inline_response_200_1|error {
+    resource function get entities/[string entityId]/attributes/[string attributeName](string? startTime, string? endTime) returns inline_response_200_1|http:NotFound|error {
         // Create entity filter with specific attribute and time range
         Entity entityFilter = {
             id: entityId,
+            kind: {
+                major: "",
+                minor: ""
+            },
+            created: "",
+            terminated: "",
+            name: {
+                startTime: "",
+                endTime: "",
+                value: {
+                    typeUrl: "type.googleapis.com/google.protobuf.StringValue",
+                    value: ""
+                }
+            },
+            metadata: [],
             attributes: [
                 {
                     key: attributeName,
@@ -45,12 +60,16 @@ service /v1 on ep0 {
                             {
                                 startTime: startTime ?: "",
                                 endTime: endTime ?: "",
-                                value: {}  // Empty value placeholder, we're just using this for filtering
+                                value: {
+                                    typeUrl: "type.googleapis.com/google.protobuf.StringValue",
+                                    value: ""
+                                }
                             }
                         ]
                     }
                 }
-            ]
+            ],
+            relationships: []
         };
         
         // Read the entity using the crud service with attribute filter
@@ -63,7 +82,8 @@ service /v1 on ep0 {
                 
                 // If we have time parameters, filter the results
                 if tbvList.values.length() == 0 {
-                    return null; // No values found
+                    // Return empty array instead of null
+                    return []; 
                 } else if (tbvList.values.length() == 1) {
                     // Return single value
                     TimeBasedValue tbv = tbvList.values[0];
@@ -88,7 +108,14 @@ service /v1 on ep0 {
             }
         }
         
-        return null; // Attribute not found
+        // Return 404 with a message instead of null
+        return <http:NotFound> {
+            body: {
+                "error": "Attribute not found",
+                "attribute": attributeName,
+                "entityId": entityId
+            }
+        };
     }
 
     # Get metadata of an entity
@@ -98,7 +125,23 @@ service /v1 on ep0 {
         // Create entity filter
         Entity entityFilter = {
             id: entityId,
-            metadata: []  // Empty metadata array to indicate we want metadata
+            kind: {
+                major: "",
+                minor: ""
+            },
+            created: "",
+            terminated: "",
+            name: {
+                startTime: "",
+                endTime: "",
+                value: {
+                    typeUrl: "",
+                    value: ""
+                }
+            },
+            metadata: [],  // Empty metadata array to indicate we want metadata
+            attributes: [],
+            relationships: []
         };
         
         // Read the entity using the crud service
@@ -130,6 +173,22 @@ service /v1 on ep0 {
         // Create entity filter with embedded relationship criteria
         Entity entityFilter = {
             id: entityId,
+            kind: {
+                major: "",
+                minor: ""
+            },
+            created: "",
+            terminated: "",
+            name: {
+                startTime: "",
+                endTime: "",
+                value: {
+                    typeUrl: "type.googleapis.com/google.protobuf.StringValue",
+                    value: ""
+                }
+            },
+            metadata: [],
+            attributes: [],
             relationships: [
                 {
                     key: entityId,  // Using name as the relationship type

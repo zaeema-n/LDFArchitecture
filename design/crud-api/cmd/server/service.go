@@ -34,6 +34,7 @@ func (s *Server) CreateEntity(ctx context.Context, req *pb.Entity) (*pb.Entity, 
 // ReadEntity retrieves an entity's metadata
 func (s *Server) ReadEntity(ctx context.Context, req *pb.Entity) (*pb.Entity, error) {
 	log.Printf("Reading Entity metadata: %s", req.Id)
+	debugMetadata(req)
 	metadata, err := s.repo.GetMetadata(ctx, req.Id)
 	if err != nil {
 		return nil, err
