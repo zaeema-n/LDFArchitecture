@@ -25,29 +25,6 @@ type Server struct {
 	neo4jRepo *neo4jrepository.Neo4jRepository
 }
 
-// validateGraphEntityCreation checks if an entity has all required fields for Neo4j storage
-func (s *Server) validateGraphEntityCreation(entity *pb.Entity) bool {
-	// Check if Kind is present and has a Major value
-	if entity.Kind == nil || entity.Kind.GetMajor() == "" {
-		log.Printf("Skipping Neo4j entity creation for %s: Missing or empty Kind.Major", entity.Id)
-		return false
-	}
-
-	// Check if Name is present and has a Value
-	if entity.Name == nil || entity.Name.GetValue() == nil {
-		log.Printf("Skipping Neo4j entity creation for %s: Missing or empty Name.Value", entity.Id)
-		return false
-	}
-
-	// Check if Created date is present
-	if entity.Created == "" {
-		log.Printf("Skipping Neo4j entity creation for %s: Missing Created date", entity.Id)
-		return false
-	}
-
-	return true
-}
-
 // CreateEntity handles entity creation with metadata
 func (s *Server) CreateEntity(ctx context.Context, req *pb.Entity) (*pb.Entity, error) {
 	log.Printf("Creating Entity: %s", req.Id)
@@ -62,42 +39,12 @@ func (s *Server) CreateEntity(ctx context.Context, req *pb.Entity) (*pb.Entity, 
 	log.Printf("Successfully saved metadata in MongoDB for entity: %s", req.Id)
 
 	// Validate required fields for Neo4j entity creation
-	if s.validateGraphEntityCreation(req) {
-		// Prepare data for Neo4j with safety checks
-		entityMap := map[string]interface{}{
-			"Id": req.Id,
-		}
-
-		// Handle Kind field safely
-		if req.Kind != nil {
-			entityMap["Kind"] = req.Kind.GetMajor()
-		}
-
-		// Handle Name field safely
-		if req.Name != nil && req.Name.GetValue() != nil {
-			entityMap["Name"] = req.Name.GetValue().String()
-		}
-
-		// Handle other fields
-		if req.Created != "" {
-			entityMap["Created"] = req.Created
-		}
-
-		if req.Terminated != "" {
-			entityMap["Terminated"] = req.Terminated
-		}
-
-		// Save entity in Neo4j only if validation passes
-		_, err = s.neo4jRepo.CreateGraphEntity(ctx, entityMap)
-		if err != nil {
-			log.Printf("Error saving entity in Neo4j: %v", err)
-			// Don't return error here so MongoDB storage is still successful
-		} else {
-			log.Printf("Successfully saved entity in Neo4j for entity: %s", req.Id)
-		}
-	} else {
-		log.Printf("Entity %s saved in MongoDB only, skipping Neo4j due to missing required fields", req.Id)
+	err = s.neo4jRepo.HandleGraphEntity(ctx, req)
+	if err != nil {
+		log.Printf("Error saving entity in Neo4j: %v", err)
+		return nil, err
 	}
+	log.Printf("Successfully saved entity in Neo4j for entity: %s", req.Id)
 
 	return req, nil
 }
@@ -111,7 +58,10 @@ func (s *Server) ReadEntity(ctx context.Context, req *pb.Entity) (*pb.Entity, er
 	metadata, _ := s.mongoRepo.GetMetadata(ctx, req.Id)
 
 	// Try to get additional entity information from Neo4j
-	kind, name, created, terminated, _ := s.neo4jRepo.GetEntityDetailsFromNeo4j(ctx, req.Id)
+	kind, name, created, terminated, _ := s.neo4jRepo.GetGraphEntity(ctx, req.Id)
+
+	// Try to get relationships from Neo4j
+	relationships, _ := s.neo4jRepo.GetGraphRelationships(ctx, req.Id)
 
 	// Return entity with all available fields
 	return &pb.Entity{
@@ -122,7 +72,7 @@ func (s *Server) ReadEntity(ctx context.Context, req *pb.Entity) (*pb.Entity, er
 		Terminated:    terminated,
 		Metadata:      metadata,
 		Attributes:    make(map[string]*pb.TimeBasedValueList), // Empty attributes
-		Relationships: make(map[string]*pb.Relationship),       // Empty relationships
+		Relationships: relationships,                           // Include relationships from Neo4j
 	}, nil
 }
 
