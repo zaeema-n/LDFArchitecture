@@ -430,3 +430,141 @@ function testCreateMinimalGraphEntityViaRest() returns error? {
     
     return;
 }
+
+@test:Config {
+    groups: ["entity", "relationship"]
+}
+function testEntityWithRelationship() returns error? {
+    // Test IDs for entities
+    string sourceEntityId = "test-entity-with-relationship-source";
+    string targetEntityId = "test-entity-with-relationship-target";
+    
+    // Initialize REST client
+    http:Client restClient = check new ("http://localhost:8080");
+    
+    // Create source entity
+    json sourceEntityJson = {
+        "id": sourceEntityId,
+        "kind": {
+            "major": "test",
+            "minor": "relationship-source"
+        },
+        "created": "2023-01-01",
+        "terminated": "",
+        "name": {
+            "startTime": "2023-01-01",
+            "endTime": "",
+            "value": "source-entity"
+        },
+        "metadata": [],
+        "attributes": [],
+        "relationships": []
+    };
+    
+    // Create target entity
+    json targetEntityJson = {
+        "id": targetEntityId,
+        "kind": {
+            "major": "test",
+            "minor": "relationship-target"
+        },
+        "created": "2023-01-01", 
+        "terminated": "",
+        "name": {
+            "startTime": "2023-01-01",
+            "endTime": "",
+            "value": "target-entity"
+        },
+        "metadata": [],
+        "attributes": [],
+        "relationships": []
+    };
+    
+    // Create both entities via REST API
+    http:Response|error sourceResponse = restClient->post("/entities", sourceEntityJson);
+    http:Response|error targetResponse = restClient->post("/entities", targetEntityJson);
+    
+    // Verify HTTP requests were successful
+    if sourceResponse is error {
+        test:assertFail("Failed to create source entity: " + sourceResponse.message());
+    }
+    if targetResponse is error {
+        test:assertFail("Failed to create target entity: " + targetResponse.message());
+    }
+    
+    http:Response sourceHttpResponse = <http:Response>sourceResponse;
+    http:Response targetHttpResponse = <http:Response>targetResponse;
+    test:assertEquals(sourceHttpResponse.statusCode, 201, "Expected 201 status code for source entity");
+    test:assertEquals(targetHttpResponse.statusCode, 201, "Expected 201 status code for target entity");
+    
+    // Create relationship between entities - include full entity structure
+    json relationshipJson = {
+        "id": sourceEntityId,
+        "kind": {
+        },
+        "created": "",
+        "terminated": "",
+        "name": {
+        },
+        "metadata": [],
+        "attributes": [],
+        "relationships": {
+            "CONNECTS_TO": {
+                "relatedEntityId": targetEntityId,
+                "startTime": "2023-01-01",
+                "endTime": "",
+                "id": "rel-" + sourceEntityId + "-" + targetEntityId,
+                "name": "CONNECTS_TO"
+            }
+        }
+    };
+    
+    // Update source entity with relationship
+    http:Response|error updateResponse = restClient->put("/entities/" + sourceEntityId, relationshipJson);
+    
+    // Verify update was successful
+    if updateResponse is error {
+        test:assertFail("Failed to update entity with relationship: " + updateResponse.message());
+    }
+    
+    http:Response updateHttpResponse = <http:Response>updateResponse;
+    test:assertEquals(updateHttpResponse.statusCode, 200, "Expected 200 status code for relationship update");
+    
+    // Initialize the gRPC client to verify relationship was properly created
+    CrudServiceClient ep = check new ("http://localhost:50051");
+    
+    // Read source entity to verify relationship
+    EntityId readEntityRequest = {id: sourceEntityId};
+    Entity readEntityResponse = check ep->ReadEntity(readEntityRequest);
+    
+    // Verify relationship data
+    test:assertEquals(readEntityResponse.relationships.length(), 1, "Entity should have one relationship");
+    
+    // Find the relationship by iterating through the array
+    Relationship? targetRelationship = ();
+    foreach var rel in readEntityResponse.relationships {
+        if rel.key == "CONNECTS_TO" {
+            targetRelationship = rel.value;
+            break;
+        }
+    }
+    
+    io:println("Target relationship: " + targetRelationship.toJsonString());
+    test:assertFalse(targetRelationship is (), "Relationship with key 'CONNECTS_TO' not found");
+    Relationship relationship = <Relationship>targetRelationship;
+    test:assertEquals(relationship.relatedEntityId, targetEntityId, "Related entity ID doesn't match");
+    test:assertEquals(relationship.name, "CONNECTS_TO", "Relationship name doesn't match");
+    test:assertEquals(relationship.startTime, "2023-01-01", "Relationship start time doesn't match");
+    test:assertEquals(relationship.id, "rel-" + sourceEntityId + "-" + targetEntityId, "Relationship ID doesn't match");
+    
+    // Clean up
+    EntityId deleteSourceRequest = {id: sourceEntityId};
+    EntityId deleteTargetRequest = {id: targetEntityId};
+    Empty _ = check ep->DeleteEntity(deleteSourceRequest);
+    Empty _ = check ep->DeleteEntity(deleteTargetRequest);
+    io:println("Test entities with relationship deleted");
+    
+    return;
+}
+
+

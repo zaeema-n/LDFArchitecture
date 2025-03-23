@@ -197,12 +197,19 @@ function convertJsonToEntity(json jsonPayload) returns Entity|error {
         } else if jsonPayload?.relationships is map<json> {
             map<json> relationshipsMap = <map<json>>check jsonPayload.relationships;
             foreach var [key, val] in relationshipsMap.entries() {
+                // Ensure all required relationship fields are present and have default values if missing
+                string relatedEntityId = val?.relatedEntityId is () ? "" : (check val.relatedEntityId).toString();
+                string startTime = val?.startTime is () ? "" : (check val.startTime).toString();
+                string endTime = val?.endTime is () ? "" : (check val.endTime).toString();
+                string id = val?.id is () ? "" : (check val.id).toString();
+                string name = val?.name is () ? key : (check val.name).toString(); // Default to key if name is missing
+                
                 Relationship relationship = {
-                    relatedEntityId: (check val.relatedEntityId).toString(),
-                    startTime: (check val.startTime).toString(),
-                    endTime: val?.endTime is () ? "" : (check val.endTime).toString(),
-                    id: (check val.id).toString(),
-                    name: (check val.name).toString()
+                    relatedEntityId: relatedEntityId,
+                    startTime: startTime,
+                    endTime: endTime,
+                    id: id,
+                    name: name
                 };
                 
                 relationshipsArray.push({key: key, value: relationship});
@@ -210,19 +217,48 @@ function convertJsonToEntity(json jsonPayload) returns Entity|error {
         }
     }
     
-    // Create the entity with proper type reference
+    // Handle missing kind values
+    json kindJson = {};
+    if jsonPayload?.kind is () {
+        kindJson = {"major": "", "minor": ""};
+    } else {
+        kindJson = check jsonPayload.kind;
+    }
+    string majorValue = kindJson?.major is () ? "" : (check kindJson.major).toString();
+    string minorValue = kindJson?.minor is () ? "" : (check kindJson.minor).toString();
+    
+    // Handle missing name values
+    json nameJson = {};
+    if jsonPayload?.name is () {
+        nameJson = {"startTime": "", "endTime": "", "value": ""};
+    } else {
+        nameJson = check jsonPayload.name;
+    }
+    string startTimeValue = nameJson?.startTime is () ? "" : (check nameJson.startTime).toString();
+    string endTimeValue = nameJson?.endTime is () ? "" : (check nameJson.endTime).toString();
+    string nameValue = nameJson?.value is () ? "" : (check nameJson.value).toString();
+    
+    // Pack name value using safe approach
+    pbAny:Any namePackedValue;
+    if nameValue == "" {
+        namePackedValue = check pbAny:pack("");
+    } else {
+        namePackedValue = check pbAny:pack(nameValue);
+    }
+    
+    // Create the entity with proper type reference and safe handling
     Entity entity = {
-        id: (check jsonPayload.id).toString(),
+        id: jsonPayload?.id is () ? "" : (check jsonPayload.id).toString(),
         kind: {
-            major: (check jsonPayload.kind.major).toString(),
-            minor: (check jsonPayload.kind.minor).toString()
+            major: majorValue,
+            minor: minorValue
         },
-        created: (check jsonPayload.created).toString(),
+        created: jsonPayload?.created is () ? "" : (check jsonPayload.created).toString(),
         terminated: jsonPayload?.terminated is () ? "" : (check jsonPayload.terminated).toString(),
         name: {
-            startTime: (check jsonPayload.name.startTime).toString(),
-            endTime: jsonPayload?.name?.endTime is () ? "" : (check jsonPayload.name.endTime).toString(),
-            value: check pbAny:pack((check jsonPayload.name.value).toString())
+            startTime: startTimeValue,
+            endTime: endTimeValue,
+            value: namePackedValue
         },
         metadata: metadataArray,
         attributes: attributesArray,

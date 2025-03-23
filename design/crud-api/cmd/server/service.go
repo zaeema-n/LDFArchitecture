@@ -46,6 +46,15 @@ func (s *Server) CreateEntity(ctx context.Context, req *pb.Entity) (*pb.Entity, 
 	}
 	log.Printf("Successfully saved entity in Neo4j for entity: %s", req.Id)
 
+	// TODO: Add logic to handle relationships
+	err = s.neo4jRepo.HandleGraphRelationships(ctx, req)
+	if err != nil {
+		log.Printf("Error saving relationships in Neo4j: %v", err)
+		return nil, err
+	}
+	log.Printf("Successfully saved relationships in Neo4j for entity: %s", req.Id)
+
+	// TODO: Add logic to handle attributes
 	return req, nil
 }
 
@@ -82,7 +91,7 @@ func (s *Server) UpdateEntity(ctx context.Context, req *pb.UpdateEntityRequest) 
 	updateEntityID := req.Id
 	updateEntity := req.Entity
 
-	log.Printf("Updating Entity metadata: %s", updateEntityID)
+	log.Printf("Updating Entity: %s", updateEntityID)
 
 	// Initialize metadata
 	var metadata map[string]*anypb.Any
@@ -98,10 +107,36 @@ func (s *Server) UpdateEntity(ctx context.Context, req *pb.UpdateEntityRequest) 
 		metadata = updateEntity.Metadata
 	}
 
-	// Return updated entity
+	// Handle Graph Entity update if entity has required fields
+	err = s.neo4jRepo.HandleGraphEntity(ctx, updateEntity)
+	if err != nil {
+		log.Printf("Error updating graph entity for %s: %v", updateEntityID, err)
+		// Continue processing despite error
+	}
+
+	// Handle Relationships update
+	err = s.neo4jRepo.HandleGraphRelationships(ctx, updateEntity)
+	if err != nil {
+		log.Printf("Error updating relationships for entity %s: %v", updateEntityID, err)
+		// Continue processing despite error
+	}
+
+	// Read entity data from Neo4j to include in response
+	kind, name, created, terminated, _ := s.neo4jRepo.GetGraphEntity(ctx, updateEntityID)
+
+	// Get relationships from Neo4j
+	relationships, _ := s.neo4jRepo.GetGraphRelationships(ctx, updateEntityID)
+
+	// Return updated entity with all available information
 	return &pb.Entity{
-		Id:       updateEntity.Id,
-		Metadata: metadata,
+		Id:            updateEntity.Id,
+		Kind:          kind,
+		Name:          name,
+		Created:       created,
+		Terminated:    terminated,
+		Metadata:      metadata,
+		Attributes:    make(map[string]*pb.TimeBasedValueList), // Empty attributes
+		Relationships: relationships,
 	}, nil
 }
 
