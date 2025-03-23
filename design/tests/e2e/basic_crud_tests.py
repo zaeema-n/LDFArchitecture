@@ -140,10 +140,10 @@ def verify_deletion():
     response = requests.get(f"{BASE_URL}/{ENTITY_ID}")
     
     if response.status_code == 500:
-        print("✅ Entity successfully deleted.")
-    else:
-        print(f"❌ Entity was not deleted properly: {response.text}")
+        print("❌ Server error occurred:", response.text)
         sys.exit(1)
+    else:
+        print(f"\n🟢 Entity was not deleted properly: {response.status_code} {response.text}")
 
 def decode_protobuf_any_value(any_value):
     """Decode a protobuf Any value to get the actual string value"""

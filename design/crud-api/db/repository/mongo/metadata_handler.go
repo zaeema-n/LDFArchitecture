@@ -2,6 +2,7 @@ package mongorepository
 
 import (
 	"context"
+	"log"
 
 	pb "lk/datafoundation/crud-api/lk/datafoundation/crud-api"
 
@@ -13,6 +14,11 @@ import (
 
 // Add this function to handle metadata operations
 func (repo *MongoRepository) HandleMetadata(ctx context.Context, entityId string, entity *pb.Entity) error {
+	// Skip operations if no metadata is provided
+	if entity == nil || entity.GetMetadata() == nil || len(entity.GetMetadata()) == 0 {
+		return nil
+	}
+
 	// Check if entity exists
 	existingEntity, err := repo.ReadEntity(ctx, entityId)
 	if err != nil && err != mongo.ErrNoDocuments {
@@ -20,10 +26,16 @@ func (repo *MongoRepository) HandleMetadata(ctx context.Context, entityId string
 	}
 
 	if existingEntity == nil {
-		// Create new entity with metadata
+		// Create new entity with all fields including metadata
 		newEntity := &pb.Entity{
-			Id:       entityId,
-			Metadata: entity.GetMetadata(),
+			Id:            entityId,
+			Metadata:      entity.GetMetadata(),
+			Kind:          entity.Kind,
+			Created:       entity.Created,
+			Terminated:    entity.Terminated,
+			Name:          entity.Name,
+			Attributes:    entity.Attributes,
+			Relationships: entity.Relationships,
 		}
 		_, err = repo.CreateEntity(ctx, newEntity)
 	} else {
@@ -41,7 +53,16 @@ func (repo *MongoRepository) GetMetadata(ctx context.Context, entityId string) (
 	// Use the existing ReadEntity method for consistency
 	entity, err := repo.ReadEntity(ctx, entityId)
 	if err != nil {
-		return nil, err
+		// Log error and return empty metadata map
+		log.Printf("Error retrieving metadata for entity %s: %v", entityId, err)
+		metadata := make(map[string]*anypb.Any)
+		return metadata, nil
+	}
+
+	// Handle nil metadata (this shouldn't happen given our HandleMetadata implementation,
+	// but adding as a safeguard)
+	if entity.Metadata == nil {
+		return make(map[string]*anypb.Any), nil
 	}
 
 	// Return the original protobuf Any metadata

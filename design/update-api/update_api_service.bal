@@ -79,21 +79,134 @@ service / on ep0 {
 
 // Helper function to convert JSON to Entity
 function convertJsonToEntity(json jsonPayload) returns Entity|error {
-    // Check if metadata is an array or an object
+    // Check if metadata is present and handle accordingly
     record {| string key; pbAny:Any value; |}[] metadataArray = [];
 
-    if jsonPayload?.metadata is json[] {
-        json[] metadataJsonArray = <json[]>check jsonPayload.metadata;
-        foreach json item in metadataJsonArray {
-            string key = (check item.key).toString();
-            pbAny:Any packedValue = check pbAny:pack((check item.value).toString());
-            metadataArray.push({key: key, value: packedValue});
+    if jsonPayload.metadata != () {
+        if jsonPayload?.metadata is json[] {
+            json[] metadataJsonArray = <json[]>check jsonPayload.metadata;
+            foreach json item in metadataJsonArray {
+                string key = (check item.key).toString();
+                pbAny:Any packedValue = check pbAny:pack((check item.value).toString());
+                metadataArray.push({key: key, value: packedValue});
+            }
+        } else if jsonPayload?.metadata is map<json> {
+            map<json> metadataMap = <map<json>>check jsonPayload.metadata;
+            foreach var [key, val] in metadataMap.entries() {
+                pbAny:Any packedValue = check pbAny:pack(val.toString());
+                metadataArray.push({key: key, value: packedValue});
+            }
         }
-    } else {
-        map<json> metadataMap = <map<json>>check jsonPayload.metadata;
-        foreach var [key, val] in metadataMap.entries() {
-            pbAny:Any packedValue = check pbAny:pack(val.toString());
-            metadataArray.push({key: key, value: packedValue});
+    }
+    
+    // Process attributes if present
+    record {| string key; TimeBasedValueList value; |}[] attributesArray = [];
+    
+    if jsonPayload.attributes != () {
+        if jsonPayload?.attributes is json[] {
+            json[] attributesJsonArray = <json[]>check jsonPayload.attributes;
+            foreach json item in attributesJsonArray {
+                string key = (check item.key).toString();
+                
+                // Add safe type checking for value
+                json valueJson = check item.value;
+                TimeBasedValue[] timeBasedValues = [];
+                
+                if valueJson is json[] {
+                    json[] valuesJson = <json[]>valueJson;
+                    foreach json valueItem in valuesJson {
+                        TimeBasedValue tbv = {
+                            startTime: (check valueItem.startTime).toString(),
+                            endTime: valueItem?.endTime is () ? "" : (check valueItem.endTime).toString(),
+                            value: check pbAny:pack((check valueItem.value).toString())
+                        };
+                        timeBasedValues.push(tbv);
+                    }
+                } else {
+                    // Handle the case when value is not an array (could be a single object)
+                    // Create a single TimeBasedValue object
+                    TimeBasedValue tbv = {
+                        startTime: valueJson?.startTime is () ? "" : (check valueJson.startTime).toString(),
+                        endTime: valueJson?.endTime is () ? "" : (check valueJson.endTime).toString(),
+                        value: check pbAny:pack(valueJson?.value is () ? "" : (check valueJson.value).toString())
+                    };
+                    timeBasedValues.push(tbv);
+                }
+                
+                TimeBasedValueList tbvList = {
+                    values: timeBasedValues
+                };
+                
+                attributesArray.push({key: key, value: tbvList});
+            }
+        } else if jsonPayload?.attributes is map<json> {
+            map<json> attributesMap = <map<json>>check jsonPayload.attributes;
+            foreach var [key, val] in attributesMap.entries() {
+                TimeBasedValue[] timeBasedValues = [];
+                
+                // Add safe type checking for val
+                if val is json[] {
+                    json[] valuesJson = <json[]>val;
+                    foreach json valueItem in valuesJson {
+                        TimeBasedValue tbv = {
+                            startTime: (check valueItem.startTime).toString(),
+                            endTime: valueItem?.endTime is () ? "" : (check valueItem.endTime).toString(),
+                            value: check pbAny:pack((check valueItem.value).toString())
+                        };
+                        timeBasedValues.push(tbv);
+                    }
+                } else {
+                    // Handle the case when val is not an array
+                    TimeBasedValue tbv = {
+                        startTime: val?.startTime is () ? "" : (check val.startTime).toString(),
+                        endTime: val?.endTime is () ? "" : (check val.endTime).toString(),
+                        value: check pbAny:pack(val?.value is () ? "" : (check val.value).toString())
+                    };
+                    timeBasedValues.push(tbv);
+                }
+                
+                TimeBasedValueList tbvList = {
+                    values: timeBasedValues
+                };
+                
+                attributesArray.push({key: key, value: tbvList});
+            }
+        }
+    }
+    
+    // Process relationships if present
+    record {| string key; Relationship value; |}[] relationshipsArray = [];
+    
+    if jsonPayload.relationships != () {
+        if jsonPayload?.relationships is json[] {
+            json[] relationshipsJsonArray = <json[]>check jsonPayload.relationships;
+            foreach json item in relationshipsJsonArray {
+                string key = (check item.key).toString();
+                json relJson = check item.value;
+                
+                Relationship relationship = {
+                    relatedEntityId: (check relJson.relatedEntityId).toString(),
+                    startTime: (check relJson.startTime).toString(),
+                    endTime: relJson?.endTime is () ? "" : (check relJson.endTime).toString(),
+                    id: (check relJson.id).toString(),
+                    name: (check relJson.name).toString()
+                };
+                
+                relationshipsArray.push({key: key, value: relationship});
+            }
+        } else if jsonPayload?.relationships is map<json> {
+            map<json> relationshipsMap = <map<json>>check jsonPayload.relationships;
+            foreach var [key, val] in relationshipsMap.entries() {
+                Relationship relationship = {
+                    relatedEntityId: (check val.relatedEntityId).toString(),
+                    startTime: (check val.startTime).toString(),
+                    endTime: val?.endTime is () ? "" : (check val.endTime).toString(),
+                    id: (check val.id).toString(),
+                    name: (check val.name).toString()
+                };
+                
+                relationshipsArray.push({key: key, value: relationship});
+            }
         }
     }
     
@@ -112,8 +225,8 @@ function convertJsonToEntity(json jsonPayload) returns Entity|error {
             value: check pbAny:pack((check jsonPayload.name.value).toString())
         },
         metadata: metadataArray,
-        attributes: [],
-        relationships: []
+        attributes: attributesArray,
+        relationships: relationshipsArray
     };
     
     return entity;
