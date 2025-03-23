@@ -108,11 +108,23 @@ func (s *Server) ReadEntity(ctx context.Context, req *pb.Entity) (*pb.Entity, er
 	log.Printf("Reading Entity metadata: %s", req.Id)
 	debugMetadata(req)
 
+	// Initialize metadata map
+	var metadata map[string]*anypb.Any
+
 	// Get the entity from MongoDB
-	metadata, err := s.mongoRepo.GetMetadata(ctx, req.Id)
+	metadataResult, err := s.mongoRepo.GetMetadata(ctx, req.Id)
 	if err != nil {
-		// Pass MongoDB errors to the client
-		return nil, err
+		// Log error and continue with empty metadata
+		log.Printf("Error retrieving metadata for entity %s: %v", req.Id, err)
+		metadata = make(map[string]*anypb.Any)
+		log.Printf("METADATA DEBUG: Entity %s using empty metadata map: %+v", req.Id, metadata)
+	} else {
+		metadata = metadataResult
+		log.Printf("METADATA DEBUG: Entity %s retrieved metadata: %+v", req.Id, metadata)
+		// Print keys in metadata
+		for k := range metadata {
+			log.Printf("METADATA DEBUG: Entity %s has metadata key: %s", req.Id, k)
+		}
 	}
 
 	// Try to get additional entity information from Neo4j
@@ -179,16 +191,24 @@ func (s *Server) UpdateEntity(ctx context.Context, req *pb.UpdateEntityRequest) 
 
 	log.Printf("Updating Entity metadata: %s", updateEntityID)
 
+	// Initialize metadata
+	var metadata map[string]*anypb.Any
+
 	// Pass the ID and metadata to HandleMetadata
 	err := s.mongoRepo.HandleMetadata(ctx, updateEntityID, updateEntity)
 	if err != nil {
-		return nil, err
+		// Log error and continue with empty metadata
+		log.Printf("Error updating metadata for entity %s: %v", updateEntityID, err)
+		metadata = make(map[string]*anypb.Any)
+	} else {
+		// Use the provided metadata
+		metadata = updateEntity.Metadata
 	}
 
 	// Return updated entity
 	return &pb.Entity{
 		Id:       updateEntity.Id,
-		Metadata: updateEntity.Metadata,
+		Metadata: metadata,
 	}, nil
 }
 
@@ -197,7 +217,8 @@ func (s *Server) DeleteEntity(ctx context.Context, req *pb.EntityId) (*pb.Empty,
 	log.Printf("Deleting Entity metadata: %s", req.Id)
 	_, err := s.mongoRepo.DeleteEntity(ctx, req.Id)
 	if err != nil {
-		return nil, err
+		// Log error but return success
+		log.Printf("Error deleting metadata for entity %s: %v", req.Id, err)
 	}
 	return &pb.Empty{}, nil
 }

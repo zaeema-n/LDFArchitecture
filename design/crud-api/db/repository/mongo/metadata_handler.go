@@ -52,7 +52,7 @@ func (repo *MongoRepository) GetMetadata(ctx context.Context, entityId string) (
 	// Use the existing ReadEntity method for consistency
 	entity, err := repo.ReadEntity(ctx, entityId)
 	if err != nil {
-		// Return the error to the caller (including ErrNoDocuments)
+		// Return the error to the caller, including when entity doesn't exist
 		return nil, err
 	}
 
