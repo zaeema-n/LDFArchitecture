@@ -7,6 +7,11 @@ UPDATE_API_URL = "http://localhost:8080/entities"
 ENTITY_ID = "query-test-entity"
 RELATED_ID = "query-related-entity"
 
+
+"""
+The current tests only contain metadata validation.
+"""
+
 def decode_protobuf_any_value(any_value):
     """Decode a protobuf Any value to get the actual string value"""
     if isinstance(any_value, dict) and 'typeUrl' in any_value and 'value' in any_value:
