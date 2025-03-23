@@ -52,15 +52,16 @@ func (r *Neo4jRepository) getSession(ctx context.Context) neo4j.SessionWithConte
 }
 
 // CreateGraphEntity checks if an entity exists and creates it if it doesn't
-func (r *Neo4jRepository) CreateGraphEntity(ctx context.Context, entityMap map[string]interface{}) (map[string]interface{}, error) {
+func (r *Neo4jRepository) CreateGraphEntity(ctx context.Context, kind *pb.Kind, entityMap map[string]interface{}) (map[string]interface{}, error) {
+	// Validate the kind parameter
+	if kind == nil || kind.Major == "" {
+		return nil, fmt.Errorf("missing or invalid 'Kind.Major' field")
+	}
+
+	// Extract the required fields from the entityMap
 	id, ok := entityMap["Id"].(string)
 	if !ok {
 		return nil, fmt.Errorf("missing or invalid 'Id' field")
-	}
-
-	kind, ok := entityMap["Kind"].(string)
-	if !ok {
-		return nil, fmt.Errorf("missing or invalid 'Kind' field")
 	}
 
 	name, ok := entityMap["Name"].(string)
@@ -73,20 +74,22 @@ func (r *Neo4jRepository) CreateGraphEntity(ctx context.Context, entityMap map[s
 		return nil, fmt.Errorf("missing or invalid 'Created' field")
 	}
 
+	// Optional field
 	var terminated *string
 	if term, ok := entityMap["Terminated"].(string); ok {
 		terminated = &term
 	}
 
+	// Open a session
 	session := r.getSession(ctx)
 	defer session.Close(ctx)
 
 	// Check if the node already exists
-	existsQuery := `MATCH (e:` + kind + ` {Id: $Id}) RETURN e`
+	existsQuery := `MATCH (e:` + kind.Major + ` {Id: $Id}) RETURN e`
 	result, err := session.Run(ctx, existsQuery, map[string]interface{}{"Id": id})
 	if err != nil {
 		return nil, fmt.Errorf("error checking if entity exists: %v", err)
-	} // If entity exists, return an error
+	}
 
 	// If entity exists, return an error
 	if result.Next(ctx) {
@@ -94,16 +97,18 @@ func (r *Neo4jRepository) CreateGraphEntity(ctx context.Context, entityMap map[s
 	}
 
 	// Create the node
-	createQuery := `CREATE (e:` + kind + ` {Id: $Id, Name: $Name, Created: date($Created)`
+	createQuery := `CREATE (e:` + kind.Major + ` {Id: $Id, Name: $Name, Created: date($Created), MinorKind: $MinorKind`
 	if terminated != nil {
 		createQuery += `, Terminated: date($Terminated)`
 	}
 	createQuery += `}) RETURN e`
 
+	// Set parameters for the query
 	params := map[string]interface{}{
-		"Id":      id,
-		"Name":    name,
-		"Created": created,
+		"Id":        id,
+		"Name":      name,
+		"Created":   created,
+		"MinorKind": kind.Minor,
 	}
 	if terminated != nil {
 		params["Terminated"] = *terminated
@@ -115,6 +120,7 @@ func (r *Neo4jRepository) CreateGraphEntity(ctx context.Context, entityMap map[s
 		return nil, fmt.Errorf("error creating entity: %v", err)
 	}
 
+	// Retrieve the created entity
 	if result.Next(ctx) {
 		createdEntity, _ := result.Record().Get("e")
 		node, ok := createdEntity.(neo4j.Node)
@@ -122,10 +128,12 @@ func (r *Neo4jRepository) CreateGraphEntity(ctx context.Context, entityMap map[s
 			return nil, fmt.Errorf("failed to cast created entity to neo4j.Node")
 		}
 
+		// Convert the node properties to a map
 		createdEntityMap := map[string]interface{}{
-			"Id":      fmt.Sprintf("%v", node.Props["Id"]),
-			"Name":    fmt.Sprintf("%v", node.Props["Name"]),
-			"Created": fmt.Sprintf("%v", node.Props["Created"]),
+			"Id":        fmt.Sprintf("%v", node.Props["Id"]),
+			"Name":      fmt.Sprintf("%v", node.Props["Name"]),
+			"Created":   fmt.Sprintf("%v", node.Props["Created"]),
+			"MinorKind": fmt.Sprintf("%v", node.Props["MinorKind"]),
 		}
 		if terminated != nil {
 			createdEntityMap["Terminated"] = fmt.Sprintf("%v", *terminated)
@@ -204,29 +212,38 @@ func (r *Neo4jRepository) ReadGraphEntity(ctx context.Context, entityID string) 
 		return nil, fmt.Errorf("entity Id cannot be empty")
 	}
 
+	// Open a session
 	session := r.getSession(ctx)
 	defer session.Close(ctx)
 
-	query := `MATCH (e {Id: $Id})
-              RETURN labels(e)[0] AS Kind, e.Id AS Id, e.Name AS Name, 
-                     toString(e.Created) AS Created, 
-                     CASE WHEN e.Terminated IS NOT NULL THEN toString(e.Terminated) ELSE NULL END AS Terminated`
+	// Cypher query to retrieve the entity with both Major and Minor kinds
+	query := `
+        MATCH (e {Id: $Id})
+        RETURN labels(e)[0] AS MajorKind, e.MinorKind AS MinorKind, e.Id AS Id, e.Name AS Name, 
+               toString(e.Created) AS Created, 
+               CASE WHEN e.Terminated IS NOT NULL THEN toString(e.Terminated) ELSE NULL END AS Terminated
+    `
 
+	// Run the query
 	result, err := session.Run(ctx, query, map[string]interface{}{"Id": entityID})
 	if err != nil {
 		return nil, fmt.Errorf("error querying entity: %v", err)
 	}
 
+	// Process the result
 	if result.Next(ctx) {
 		record := result.Record()
 
+		// Map the entity properties
 		entity := map[string]interface{}{
-			"Id":      fmt.Sprintf("%v", record.Values[1]),
-			"Kind":    fmt.Sprintf("%v", record.Values[0]),
-			"Name":    fmt.Sprintf("%v", record.Values[2]),
-			"Created": fmt.Sprintf("%v", record.Values[3]),
+			"Id":        fmt.Sprintf("%v", record.Values[2]), // e.Id
+			"Name":      fmt.Sprintf("%v", record.Values[3]), // e.Name
+			"Created":   fmt.Sprintf("%v", record.Values[4]), // e.Created
+			"MajorKind": fmt.Sprintf("%v", record.Values[0]), // labels(e)[0]
+			"MinorKind": fmt.Sprintf("%v", record.Values[1]), // e.MinorKind
 		}
 
+		// Add Terminated if it exists
 		if terminatedVal, exists := record.Get("Terminated"); exists && terminatedVal != nil {
 			entity["Terminated"] = fmt.Sprintf("%v", terminatedVal)
 		}
@@ -234,6 +251,7 @@ func (r *Neo4jRepository) ReadGraphEntity(ctx context.Context, entityID string) 
 		return entity, nil
 	}
 
+	// If no entity is found
 	return nil, fmt.Errorf("entity with Id %s not found", entityID)
 }
 
