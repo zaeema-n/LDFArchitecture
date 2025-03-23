@@ -7,6 +7,8 @@ import base64
 This file contains the end-to-end tests for the CRUD API.
 It is used to test the API's functionality by creating, reading, updating, and deleting an entity.
 
+The current tests only contain metadata validation.
+
 Running the tests:
 
 ## Run CRUD Server

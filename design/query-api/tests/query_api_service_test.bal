@@ -14,92 +14,95 @@ function unwrapAny(pbAny:Any anyValue) returns string|error {
 }
 
 // Test entity attribute retrieval
-@test:Config {}
+@test:Config {
+    groups: ["entity", "attribute"],
+    enable: false // TODO: Re-enable once attribute saving is implemented and the API supports complete entity updates
+}
 function testEntityAttributeRetrieval() returns error? {
     // TODO: Implement this test once the Data handling layer is written
     // Initialize the client
-    // CrudServiceClient ep = check new ("http://localhost:50051");
+    CrudServiceClient ep = check new ("http://localhost:50051");
     
-    // // Test data setup
-    // string testId = "test-entity-attribute";
-    // string attributeName = "temperature";
-    // string attributeValue = "25.5";
+    // Test data setup
+    string testId = "test-entity-attribute";
+    string attributeName = "temperature";
+    string attributeValue = "25.5";
     
-    // // First create an entity with the attribute
-    // // Create entity with attributes first
-    // TimeBasedValue tbv = {
-    //     startTime: "2023-01-01T00:00:00Z",
-    //     endTime: "2023-01-02T00:00:00Z",
-    //     value: check pbAny:pack(attributeValue)
-    // };
+    // First create an entity with the attribute
+    // Create entity with attributes first
+    TimeBasedValue tbv = {
+        startTime: "2023-01-01T00:00:00Z",
+        endTime: "2023-01-02T00:00:00Z",
+        value: check pbAny:pack(attributeValue)
+    };
     
-    // TimeBasedValueList tbvList = {
-    //     values: [tbv]
-    // };
+    TimeBasedValueList tbvList = {
+        values: [tbv]
+    };
     
-    // record {|string key; TimeBasedValueList value;|}[] attributes = [];
-    // attributes.push({key: attributeName, value: tbvList});
+    record {|string key; TimeBasedValueList value;|}[] attributes = [];
+    attributes.push({key: attributeName, value: tbvList});
     
-    // Entity entity = {
-    //     id: testId,
-    //     kind: {
-    //         major: "test",
-    //         minor: "attribute"
-    //     },
-    //     created: "2023-01-01",
-    //     terminated: "",
-    //     attributes: attributes
-    // };
+    Entity entity = {
+        id: testId,
+        kind: {
+            major: "test",
+            minor: "attribute"
+        },
+        created: "2023-01-01",
+        terminated: "",
+        attributes: attributes
+    };
     
-    // // Create entity
-    // Entity createResponse = check ep->CreateEntity(entity);
-    // io:println("Created entity with ID: " + createResponse.id);
+    // Create entity
+    Entity createResponse = check ep->CreateEntity(entity);
+    io:println("Created entity with ID: " + createResponse.id);
     
-    // // Now read the entity with the specific attribute filter
-    // Entity attributeFilter = {
-    //     id: testId,
-    //     attributes: [
-    //         {
-    //             key: attributeName,
-    //             value: {
-    //                 values: [
-    //                     {
-    //                         startTime: "2023-01-01T00:00:00Z",
-    //                         endTime: "2023-01-02T00:00:00Z",
-    //                         value: check pbAny:pack("")
-    //                     }
-    //                 ]
-    //             }
-    //         }
-    //     ]
-    // };
+    // Now read the entity with the specific attribute filter
+    Entity attributeFilter = {
+        id: testId,
+        attributes: [
+            {
+                key: attributeName,
+                value: {
+                    values: [
+                        {
+                            startTime: "2023-01-01T00:00:00Z",
+                            endTime: "2023-01-02T00:00:00Z",
+                            value: check pbAny:pack("")
+                        }
+                    ]
+                }
+            }
+        ]
+    };
     
-    // Entity readResponse = check ep->ReadEntity(attributeFilter);
+    Entity readResponse = check ep->ReadEntity(attributeFilter);
     
-    // // Verify the attribute was retrieved correctly
-    // boolean foundAttribute = false;
-    // foreach var attrEntry in readResponse.attributes {
-    //     if attrEntry.key == attributeName {
-    //         TimeBasedValueList tbvList = attrEntry.value;
+    // Verify the attribute was retrieved correctly
+    boolean foundAttribute = false;
+    foreach var attrEntry in readResponse.attributes {
+        if attrEntry.key == attributeName {
+            TimeBasedValueList retrievedList = attrEntry.value;
             
-    //         if tbvList.values.length() > 0 {
-    //             TimeBasedValue tbv = tbvList.values[0];
-    //             string|error unwrapped = unwrapAny(tbv.value);
+            if retrievedList.values.length() > 0 {
+                TimeBasedValue retrievedValue = retrievedList.values[0];
+                string|error unwrapped = unwrapAny(retrievedValue.value);
                 
-    //             if unwrapped is string {
-    //                 test:assertEquals(unwrapped, attributeValue, "Attribute value mismatch");
-    //                 foundAttribute = true;
-    //             }
-    //         }
-    //     }
-    // }
+                if unwrapped is string {
+                    test:assertEquals(unwrapped, attributeValue, "Attribute value mismatch");
+                    foundAttribute = true;
+                }
+            }
+        }
+    }
     
-    // test:assertTrue(foundAttribute, "Expected attribute not found");
+    test:assertTrue(foundAttribute, "Expected attribute not found");
     
-    // // Clean up
-    // EntityId deleteRequest = {id: testId};
-    // Empty _ = check ep->DeleteEntity(deleteRequest);
-    // io:println("Test entity deleted");
+    // Clean up
+    EntityId deleteRequest = {id: testId};
+    Empty _ = check ep->DeleteEntity(deleteRequest);
+    io:println("Test entity deleted");
     
     return;
 }
@@ -195,96 +198,124 @@ function testEntityMetadataRetrieval() returns error? {
 function testEntityRelationships() returns error? {
     // TODO: Implement this test once the Relationship handling layer is written
     // Initialize the client
-    // CrudServiceClient ep = check new ("http://localhost:50051");
+    CrudServiceClient ep = check new ("http://localhost:50051");
     
-    // // Test data setup
-    // string entityId = "test-entity-relationship";
-    // string relatedEntityId = "test-related-entity";
-    // string relationshipType = "contains";
+    // Test data setup
+    string entityId = "test-entity-relationship";
+    string relatedEntityId = "test-related-entity";
+    string relationshipType = "contains";
     
-    // // Create the main entity first
-    // Entity mainEntity = {
-    //     id: entityId,
-    //     kind: {
-    //         major: "test",
-    //         minor: "relationship"
-    //     },
-    //     created: "2023-01-01",
-    //     terminated: "",
-    //     relationships: [
-    //         {
-    //             key: relationshipType,
-    //             value: {
-    //                 relatedEntityId: relatedEntityId,
-    //                 startTime: "2023-01-01",
-    //                 endTime: "2023-01-31",
-    //                 id: "rel123",
-    //                 name: relationshipType
-    //             }
-    //         }
-    //     ]
-    // };
+    // Create the main entity first
+    Entity mainEntity = {
+        id: entityId,
+        kind: {
+            major: "test",
+            minor: "relationship"
+        },
+        created: "2023-01-01",
+        terminated: "",
+        name: {
+            startTime: "2023-01-01",
+            endTime: "",
+            value: check pbAny:pack("main-test-entity")
+        },
+        metadata: [],
+        attributes: [],
+        relationships: [
+            {
+                key: relationshipType,
+                value: {
+                    relatedEntityId: relatedEntityId,
+                    startTime: "2023-01-01",
+                    endTime: "2023-01-31",
+                    id: "rel123",
+                    name: relationshipType
+                }
+            }
+        ]
+    };
     
-    // // Create entity
-    // Entity createMainResponse = check ep->CreateEntity(mainEntity);
-    // io:println("Main entity created with ID: " + createMainResponse.id);
+    // Create entity
+    Entity createMainResponse = check ep->CreateEntity(mainEntity);
+    io:println("Main entity created with ID: " + createMainResponse.id);
     
-    // // Create the related entity too
-    // Entity relatedEntity = {
-    //     id: relatedEntityId,
-    //     kind: {
-    //         major: "test",
-    //         minor: "related"
-    //     },
-    //     created: "2023-01-01",
-    //     terminated: ""
-    // };
+    // Create the related entity too
+    Entity relatedEntity = {
+        id: relatedEntityId,
+        kind: {
+            major: "test",
+            minor: "related"
+        },
+        created: "2023-01-01",
+        terminated: "",
+        name: {
+            startTime: "2023-01-01",
+            endTime: "",
+            value: check pbAny:pack("related-test-entity")
+        },
+        metadata: [],
+        attributes: [],
+        relationships: []
+    };
     
-    // Entity createRelatedResponse = check ep->CreateEntity(relatedEntity);
-    // io:println("Related entity created with ID: " + createRelatedResponse.id);
+    Entity createRelatedResponse = check ep->CreateEntity(relatedEntity);
+    io:println("Related entity created with ID: " + createRelatedResponse.id);
     
-    // // Now read the main entity with relationship filter
-    // Entity relationshipFilter = {
-    //     id: entityId,
-    //     relationships: [
-    //         {
-    //             key: relationshipType,
-    //             value: {
-    //                 relatedEntityId: relatedEntityId,
-    //                 startTime: "",
-    //                 endTime: "",
-    //                 id: "",
-    //                 name: ""
-    //             }
-    //         }
-    //     ]
-    // };
+    // Now read the main entity with relationship filter
+    Entity relationshipFilter = {
+        id: entityId,
+        kind: {
+            major: "",
+            minor: ""
+        },
+        created: "",
+        terminated: "",
+        name: {
+            startTime: "",
+            endTime: "",
+            value: check pbAny:pack("")
+        },
+        metadata: [],
+        attributes: [],
+        relationships: [
+            {
+                key: relationshipType,
+                value: {
+                    relatedEntityId: relatedEntityId,
+                    startTime: "",
+                    endTime: "",
+                    id: "",
+                    name: ""
+                }
+            }
+        ]
+    };
     
-    // Entity readResponse = check ep->ReadEntity(relationshipFilter);
+    Entity readResponse = check ep->ReadEntity(relationshipFilter);
     
-    // // Verify the relationship was retrieved
-    // boolean foundRelationship = false;
+    // Verify the relationship was retrieved
+    boolean foundRelationship = false;
     
-    // foreach var relEntry in readResponse.relationships {
-    //     if relEntry.key == relationshipType {
-    //         Relationship rel = relEntry.value;
+    foreach var relEntry in readResponse.relationships {
+        if relEntry.key == relationshipType {
+            Relationship rel = relEntry.value;
             
-    //         test:assertEquals(rel.relatedEntityId, relatedEntityId, "Related entity ID mismatch");
-    //         test:assertEquals(rel.name, relationshipType, "Relationship type mismatch");
-    //         foundRelationship = true;
-    //     }
-    // }
+            test:assertEquals(rel.relatedEntityId, relatedEntityId, "Related entity ID mismatch");
+            test:assertEquals(rel.name, relationshipType, "Relationship type mismatch");
+            foundRelationship = true;
+        }
+    }
     
-    // test:assertTrue(foundRelationship, "Expected relationship not found");
+    test:assertTrue(foundRelationship, "Expected relationship not found");
     
-    // // Clean up
-    // EntityId deleteMainRequest = {id: entityId};
-    // EntityId deleteRelatedRequest = {id: relatedEntityId};
-    // Empty _ = check ep->DeleteEntity(deleteMainRequest);
-    // Empty _ = check ep->DeleteEntity(deleteRelatedRequest);
-    // io:println("Test entities deleted");
+    // Clean up
+    EntityId deleteMainRequest = {id: entityId};
+    EntityId deleteRelatedRequest = {id: relatedEntityId};
+    Empty _ = check ep->DeleteEntity(deleteMainRequest);
+    Empty _ = check ep->DeleteEntity(deleteRelatedRequest);
+    io:println("Test entities deleted");
     
-    // return;
+    return;
 }
 
 // Test entity search
