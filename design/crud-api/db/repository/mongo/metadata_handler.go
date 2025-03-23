@@ -2,6 +2,7 @@ package mongorepository
 
 import (
 	"context"
+	"log"
 
 	pb "lk/datafoundation/crud-api/lk/datafoundation/crud-api"
 
@@ -52,8 +53,10 @@ func (repo *MongoRepository) GetMetadata(ctx context.Context, entityId string) (
 	// Use the existing ReadEntity method for consistency
 	entity, err := repo.ReadEntity(ctx, entityId)
 	if err != nil {
-		// Return the error to the caller, including when entity doesn't exist
-		return nil, err
+		// Log error and return empty metadata map
+		log.Printf("Error retrieving metadata for entity %s: %v", entityId, err)
+		metadata := make(map[string]*anypb.Any)
+		return metadata, nil
 	}
 
 	// Handle nil metadata (this shouldn't happen given our HandleMetadata implementation,

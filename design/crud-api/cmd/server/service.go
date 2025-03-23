@@ -16,7 +16,6 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/anypb"
-	"google.golang.org/protobuf/types/known/wrapperspb"
 )
 
 // Server implements the CrudService
@@ -108,67 +107,11 @@ func (s *Server) ReadEntity(ctx context.Context, req *pb.Entity) (*pb.Entity, er
 	log.Printf("Reading Entity metadata: %s", req.Id)
 	debugMetadata(req)
 
-	// Initialize metadata map
-	var metadata map[string]*anypb.Any
-
-	// Get the entity from MongoDB
-	metadataResult, err := s.mongoRepo.GetMetadata(ctx, req.Id)
-	if err != nil {
-		// Log error and continue with empty metadata
-		log.Printf("Error retrieving metadata for entity %s: %v", req.Id, err)
-		metadata = make(map[string]*anypb.Any)
-		log.Printf("METADATA DEBUG: Entity %s using empty metadata map: %+v", req.Id, metadata)
-	} else {
-		metadata = metadataResult
-		log.Printf("METADATA DEBUG: Entity %s retrieved metadata: %+v", req.Id, metadata)
-		// Print keys in metadata
-		for k := range metadata {
-			log.Printf("METADATA DEBUG: Entity %s has metadata key: %s", req.Id, k)
-		}
-	}
+	// Get the entity from MongoDB - error handling and logging now in repository
+	metadata, _ := s.mongoRepo.GetMetadata(ctx, req.Id)
 
 	// Try to get additional entity information from Neo4j
-	var kind *pb.Kind
-	var name *pb.TimeBasedValue
-	var created string
-	var terminated string
-
-	// Attempt to read from Neo4j, but don't fail if it's not available
-	entityMap, err := s.neo4jRepo.ReadGraphEntity(ctx, req.Id)
-	if err == nil && entityMap != nil {
-		// Entity found in Neo4j, extract information
-		if kindValue, ok := entityMap["Kind"]; ok {
-			kind = &pb.Kind{
-				Major: kindValue.(string),
-				Minor: "", // Neo4j doesn't store Minor
-			}
-		}
-
-		if nameValue, ok := entityMap["Name"]; ok {
-			// Create a TimeBasedValue with string value
-			value, _ := anypb.New(&wrapperspb.StringValue{
-				Value: nameValue.(string),
-			})
-
-			name = &pb.TimeBasedValue{
-				StartTime: entityMap["Created"].(string),
-				Value:     value,
-			}
-
-			// Add EndTime if available
-			if termValue, ok := entityMap["Terminated"]; ok {
-				name.EndTime = termValue.(string)
-			}
-		}
-
-		if createdValue, ok := entityMap["Created"]; ok {
-			created = createdValue.(string)
-		}
-
-		if termValue, ok := entityMap["Terminated"]; ok {
-			terminated = termValue.(string)
-		}
-	}
+	kind, name, created, terminated, _ := s.neo4jRepo.GetEntityDetailsFromNeo4j(ctx, req.Id)
 
 	// Return entity with all available fields
 	return &pb.Entity{
