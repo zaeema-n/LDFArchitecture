@@ -110,7 +110,6 @@ cd design/tests/e2e
 python basic_query_tests.py
 ```
 
-## Implementation
+## Implementation Progress
 
--[ ] CRUD API Server Implementation
-
+[Track Progress](https://github.com/zaeema-n/LDFArchitecture/issues/29)
