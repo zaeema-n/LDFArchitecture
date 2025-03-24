@@ -110,3 +110,7 @@ cd design/tests/e2e
 python basic_query_tests.py
 ```
 
+## Implementation
+
+-[ ] CRUD API Server Implementation
+
