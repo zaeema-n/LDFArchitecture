@@ -19,16 +19,18 @@ type Neo4jRepository struct {
 func NewNeo4jRepository(ctx context.Context, config *config.Neo4jConfig) (*Neo4jRepository, error) {
 	client, err := neo4j.NewDriverWithContext(config.URI, neo4j.BasicAuth(config.Username, config.Password, ""))
 	if err != nil {
+		log.Printf("[neo4j_client.NewNeo4jRepository] failed to create Neo4j driver: %v", err)
 		return nil, fmt.Errorf("failed to create Neo4j driver: %w", err)
 	}
 
 	// Verify connectivity
 	if err := client.VerifyConnectivity(ctx); err != nil {
 		client.Close(ctx) // Close if connectivity check fails
+		log.Printf("[neo4j_client.NewNeo4jRepository] failed to connect to Neo4j: %v", err)
 		return nil, fmt.Errorf("failed to connect to Neo4j: %w", err)
 	}
 
-	log.Println("Connected to Neo4j successfully!")
+	log.Println("[neo4j_client.NewNeo4jRepository] Connected to Neo4j successfully!")
 
 	return &Neo4jRepository{
 		client: client,
@@ -55,23 +57,27 @@ func (r *Neo4jRepository) getSession(ctx context.Context) neo4j.SessionWithConte
 func (r *Neo4jRepository) CreateGraphEntity(ctx context.Context, kind *pb.Kind, entityMap map[string]interface{}) (map[string]interface{}, error) {
 	// Validate the kind parameter
 	if kind == nil || kind.Major == "" {
-		return nil, fmt.Errorf("missing or invalid 'Kind.Major' field")
+		log.Printf("[neo4j_client.CreateGraphEntity] missing or invalid 'Kind.Major' field")
+		return nil, fmt.Errorf("[neo4j_client.CreateGraphEntity] missing or invalid 'Kind.Major' field")
 	}
 
 	// Extract the required fields from the entityMap
 	id, ok := entityMap["Id"].(string)
 	if !ok {
-		return nil, fmt.Errorf("missing or invalid 'Id' field")
+		log.Printf("[neo4j_client.CreateGraphEntity] missing or invalid 'Id' field")
+		return nil, fmt.Errorf("[neo4j_client.CreateGraphEntity] missing or invalid 'Id' field")
 	}
 
 	name, ok := entityMap["Name"].(string)
 	if !ok {
-		return nil, fmt.Errorf("missing or invalid 'Name' field")
+		log.Printf("[neo4j_client.CreateGraphEntity] missing or invalid 'Name' field")
+		return nil, fmt.Errorf("[neo4j_client.CreateGraphEntity] missing or invalid 'Name' field")
 	}
 
 	created, ok := entityMap["Created"].(string)
 	if !ok {
-		return nil, fmt.Errorf("missing or invalid 'Created' field")
+		log.Printf("[neo4j_client.CreateGraphEntity] missing or invalid 'Created' field")
+		return nil, fmt.Errorf("[neo4j_client.CreateGraphEntity] missing or invalid 'Created' field")
 	}
 
 	// Optional field
@@ -88,12 +94,14 @@ func (r *Neo4jRepository) CreateGraphEntity(ctx context.Context, kind *pb.Kind, 
 	existsQuery := `MATCH (e:` + kind.Major + ` {Id: $Id}) RETURN e`
 	result, err := session.Run(ctx, existsQuery, map[string]interface{}{"Id": id})
 	if err != nil {
-		return nil, fmt.Errorf("error checking if entity exists: %v", err)
+		log.Printf("[neo4j_client.CreateGraphEntity] error checking if entity exists: %v", err)
+		return nil, fmt.Errorf("[neo4j_client.CreateGraphEntity] error checking if entity exists: %v", err)
 	}
 
 	// If entity exists, return an error
 	if result.Next(ctx) {
-		return nil, fmt.Errorf("entity with Id %s already exists", id)
+		log.Printf("[neo4j_client.CreateGraphEntity] entity with Id %s already exists", id)
+		return nil, fmt.Errorf("[neo4j_client.CreateGraphEntity] entity with Id %s already exists", id)
 	}
 
 	// Create the node
@@ -117,7 +125,8 @@ func (r *Neo4jRepository) CreateGraphEntity(ctx context.Context, kind *pb.Kind, 
 	// Run the query to create the entity and return it
 	result, err = session.Run(ctx, createQuery, params)
 	if err != nil {
-		return nil, fmt.Errorf("error creating entity: %v", err)
+		log.Printf("[neo4j_client.CreateGraphEntity] error creating entity: %v", err)
+		return nil, fmt.Errorf("[neo4j_client.CreateGraphEntity] error creating entity: %v", err)
 	}
 
 	// Retrieve the created entity
@@ -125,7 +134,8 @@ func (r *Neo4jRepository) CreateGraphEntity(ctx context.Context, kind *pb.Kind, 
 		createdEntity, _ := result.Record().Get("e")
 		node, ok := createdEntity.(neo4j.Node)
 		if !ok {
-			return nil, fmt.Errorf("failed to cast created entity to neo4j.Node")
+			log.Printf("[neo4j_client.CreateGraphEntity] failed to cast created entity to neo4j.Node")
+			return nil, fmt.Errorf("[neo4j_client.CreateGraphEntity] failed to cast created entity to neo4j.Node")
 		}
 
 		// Convert the node properties to a map
@@ -142,7 +152,7 @@ func (r *Neo4jRepository) CreateGraphEntity(ctx context.Context, kind *pb.Kind, 
 		return createdEntityMap, nil
 	}
 
-	return nil, fmt.Errorf("failed to create entity")
+	return nil, fmt.Errorf("[neo4j_client.CreateGraphEntity] failed to create entity")
 }
 
 // CreateRelationship creates a relationship between two entities
@@ -156,9 +166,11 @@ func (r *Neo4jRepository) CreateRelationship(ctx context.Context, entityID strin
 		"childID":  rel.RelatedEntityId,
 	})
 	if err != nil {
+		log.Printf("[neo4j_client.CreateRelationship] error checking entities: %v", err)
 		return nil, fmt.Errorf("error checking entities: %v", err)
 	}
 	if !result.Next(ctx) {
+		log.Printf("[neo4j_client.CreateRelationship] either parent or child entity does not exist")
 		return nil, fmt.Errorf("either parent or child entity does not exist")
 	}
 
@@ -181,6 +193,7 @@ func (r *Neo4jRepository) CreateRelationship(ctx context.Context, entityID strin
 
 	result, err = session.Run(ctx, createQuery, params)
 	if err != nil {
+		log.Printf("[neo4j_client.CreateRelationship] error creating relationship: %v", err)
 		return nil, fmt.Errorf("error creating relationship: %v", err)
 	}
 
@@ -188,6 +201,7 @@ func (r *Neo4jRepository) CreateRelationship(ctx context.Context, entityID strin
 		createdRel, _ := result.Record().Get("r")
 		relationship, ok := createdRel.(neo4j.Relationship)
 		if !ok {
+			log.Printf("[neo4j_client.CreateRelationship] failed to cast created relationship to neo4j.Relationship")
 			return nil, fmt.Errorf("failed to cast created relationship to neo4j.Relationship")
 		}
 
@@ -227,6 +241,7 @@ func (r *Neo4jRepository) ReadGraphEntity(ctx context.Context, entityID string) 
 	// Run the query
 	result, err := session.Run(ctx, query, map[string]interface{}{"Id": entityID})
 	if err != nil {
+		log.Printf("[neo4j_client.ReadGraphEntity] error querying entity: %v", err)
 		return nil, fmt.Errorf("error querying entity: %v", err)
 	}
 
@@ -275,6 +290,7 @@ func (r *Neo4jRepository) ReadRelatedGraphEntityIds(ctx context.Context, entityI
 		"ts":       ts,
 	})
 	if err != nil {
+		log.Printf("[neo4j_client.ReadRelatedGraphEntityIds] error querying related entities: %v", err)
 		return nil, fmt.Errorf("error querying related entities: %v", err)
 	}
 
@@ -287,6 +303,7 @@ func (r *Neo4jRepository) ReadRelatedGraphEntityIds(ctx context.Context, entityI
 	}
 
 	if err := result.Err(); err != nil {
+		log.Printf("[neo4j_client.ReadRelatedGraphEntityIds] error iterating over query result: %v", err)
 		return nil, fmt.Errorf("error iterating over query result: %v", err)
 	}
 
@@ -323,6 +340,7 @@ func (r *Neo4jRepository) ReadRelationships(ctx context.Context, entityID string
 		"entityID": entityID,
 	})
 	if err != nil {
+		log.Printf("[neo4j_client.ReadRelationships] error querying relationships: %v", err)
 		return nil, fmt.Errorf("error querying relationships: %v", err)
 	}
 
@@ -382,6 +400,7 @@ func (r *Neo4jRepository) ReadRelationship(ctx context.Context, relationshipID s
 		"relationshipID": relationshipID,
 	})
 	if err != nil {
+		log.Printf("[neo4j_client.ReadRelationship] error querying relationship: %v", err)
 		return nil, fmt.Errorf("error querying relationship: %v", err)
 	}
 
@@ -392,6 +411,7 @@ func (r *Neo4jRepository) ReadRelationship(ctx context.Context, relationshipID s
 
 		// Ensure expected values exist
 		if len(values) < 6 {
+			log.Printf("[neo4j_client.ReadRelationship] unexpected data format for relationship")
 			return nil, fmt.Errorf("unexpected data format for relationship")
 		}
 
@@ -436,10 +456,12 @@ func (r *Neo4jRepository) UpdateGraphEntity(ctx context.Context, id string, upda
 	existsQuery := `MATCH (e {Id: $Id}) RETURN e`
 	result, err := session.Run(ctx, existsQuery, params)
 	if err != nil {
+		log.Printf("[neo4j_client.UpdateGraphEntity] error checking if entity exists: %v", err)
 		return nil, fmt.Errorf("error checking if entity exists: %v", err)
 	}
 
 	if !result.Next(ctx) {
+		log.Printf("[neo4j_client.UpdateGraphEntity] entity with Id %s does not exist", id)
 		return nil, fmt.Errorf("entity with Id %s does not exist", id)
 	}
 
@@ -465,6 +487,7 @@ func (r *Neo4jRepository) UpdateGraphEntity(ctx context.Context, id string, upda
 
 	result, err = session.Run(ctx, query, params)
 	if err != nil {
+		log.Printf("[neo4j_client.UpdateGraphEntity] error updating entity: %v", err)
 		return nil, fmt.Errorf("error updating entity: %v", err)
 	}
 
@@ -472,6 +495,7 @@ func (r *Neo4jRepository) UpdateGraphEntity(ctx context.Context, id string, upda
 	if result.Next(ctx) {
 		node, ok := result.Record().Get("e")
 		if !ok {
+			log.Printf("[neo4j_client.UpdateGraphEntity] unexpected error retrieving entity")
 			return nil, fmt.Errorf("unexpected error retrieving entity")
 		}
 
@@ -491,6 +515,7 @@ func (r *Neo4jRepository) UpdateGraphEntity(ctx context.Context, id string, upda
 func (r *Neo4jRepository) UpdateRelationship(ctx context.Context, relationshipID string, updateData map[string]interface{}) (map[string]interface{}, error) {
 
 	if relationshipID == "" {
+		log.Printf("[neo4j_client.UpdateRelationship] relationship Id cannot be empty")
 		return nil, fmt.Errorf("relationship Id cannot be empty")
 	}
 
@@ -507,10 +532,12 @@ func (r *Neo4jRepository) UpdateRelationship(ctx context.Context, relationshipID
 	existsQuery := `MATCH ()-[r {Id: $relationshipID}]->() RETURN r`
 	result, err := session.Run(ctx, existsQuery, params)
 	if err != nil {
+		log.Printf("[neo4j_client.UpdateRelationship] error checking if relationship exists: %v", err)
 		return nil, fmt.Errorf("error checking if relationship exists: %v", err)
 	}
 
 	if !result.Next(ctx) {
+		log.Printf("[neo4j_client.UpdateRelationship] relationship with Id %s does not exist", relationshipID)
 		return nil, fmt.Errorf("relationship with Id %s does not exist", relationshipID)
 	}
 
@@ -530,6 +557,7 @@ func (r *Neo4jRepository) UpdateRelationship(ctx context.Context, relationshipID
 	// Execute update query and return updated relationship
 	result, err = session.Run(ctx, query, params)
 	if err != nil {
+		log.Printf("[neo4j_client.UpdateRelationship] error updating relationship: %v", err)
 		return nil, fmt.Errorf("error updating relationship: %v", err)
 	}
 
@@ -537,6 +565,7 @@ func (r *Neo4jRepository) UpdateRelationship(ctx context.Context, relationshipID
 	if result.Next(ctx) {
 		rel, ok := result.Record().Get("r")
 		if !ok {
+			log.Printf("[neo4j_client.UpdateRelationship] unexpected error retrieving relationship")
 			return nil, fmt.Errorf("unexpected error retrieving relationship")
 		}
 
@@ -571,11 +600,13 @@ func (r *Neo4jRepository) DeleteRelationship(ctx context.Context, relationshipID
 	query := `MATCH ()-[r {Id: $relationshipID}]->() RETURN r`
 	result, err := session.Run(ctx, query, params)
 	if err != nil {
+		log.Printf("[neo4j_client.DeleteRelationship] error checking if relationship exists: %v", err)
 		return fmt.Errorf("error checking if relationship exists: %v", err)
 	}
 
 	// If no relationship is found, return an error
 	if !result.Next(ctx) {
+		log.Printf("[neo4j_client.DeleteRelationship] relationship with Id %s does not exist", relationshipID)
 		return fmt.Errorf("relationship with Id %s does not exist", relationshipID)
 	}
 
@@ -583,6 +614,7 @@ func (r *Neo4jRepository) DeleteRelationship(ctx context.Context, relationshipID
 	deleteQuery := `MATCH ()-[r {Id: $relationshipID}]->() DELETE r`
 	_, err = session.Run(ctx, deleteQuery, params)
 	if err != nil {
+		log.Printf("[neo4j_client.DeleteRelationship] error deleting relationship: %v", err)
 		return fmt.Errorf("error deleting relationship: %v", err)
 	}
 
@@ -592,6 +624,7 @@ func (r *Neo4jRepository) DeleteRelationship(ctx context.Context, relationshipID
 // DeleteGraphEntity deletes an entity by its ID
 func (r *Neo4jRepository) DeleteGraphEntity(ctx context.Context, entityID string) error {
 	if entityID == "" {
+		log.Printf("[neo4j_client.DeleteGraphEntity] entity Id cannot be empty")
 		return fmt.Errorf("entity Id cannot be empty")
 	}
 
@@ -605,21 +638,25 @@ func (r *Neo4jRepository) DeleteGraphEntity(ctx context.Context, entityID string
 
 	result, err := session.Run(ctx, query, params)
 	if err != nil {
+		log.Printf("[neo4j_client.DeleteGraphEntity] error checking if entity exists: %v", err)
 		return fmt.Errorf("error checking if entity exists: %v", err)
 	}
 
 	if !result.Next(ctx) {
+		log.Printf("[neo4j_client.DeleteGraphEntity] entity with Id %s does not exist", entityID)
 		return fmt.Errorf("entity with Id %s does not exist", entityID)
 	}
 
 	// Get the relationships of the entity
 	relationships, err := r.ReadRelationships(ctx, entityID)
 	if err != nil {
+		log.Printf("[neo4j_client.DeleteGraphEntity] error getting relationships: %v", err)
 		return fmt.Errorf("error getting relationships: %v", err)
 	}
 
 	// If there are relationships, return an error with relationship details
 	if len(relationships) > 0 {
+		log.Printf("[neo4j_client.DeleteGraphEntity] entity has relationships and cannot be deleted. Relationships: %v", relationships)
 		return fmt.Errorf("entity has relationships and cannot be deleted. Relationships: %v", relationships)
 	}
 
@@ -627,6 +664,7 @@ func (r *Neo4jRepository) DeleteGraphEntity(ctx context.Context, entityID string
 	deleteQuery := `MATCH (e {Id: $entityID}) DELETE e`
 	_, err = session.Run(ctx, deleteQuery, params)
 	if err != nil {
+		log.Printf("[neo4j_client.DeleteGraphEntity] error deleting entity: %v", err)
 		return fmt.Errorf("error deleting entity: %v", err)
 	}
 

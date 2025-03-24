@@ -285,7 +285,7 @@ function testEntityRelationships() returns error? {
                     startTime: "",
                     endTime: "",
                     id: "",
-                    name: ""
+                    name: relationshipType
                 }
             }
         ]

@@ -33,26 +33,29 @@ func (s *Server) CreateEntity(ctx context.Context, req *pb.Entity) (*pb.Entity, 
 	// The HandleMetadata function will only process it if it has metadata
 	err := s.mongoRepo.HandleMetadata(ctx, req.Id, req)
 	if err != nil {
-		log.Printf("Error saving metadata in MongoDB: %v", err)
+		log.Printf("[server.CreateEntity] Error saving metadata in MongoDB: %v", err)
 		return nil, err
+	} else {
+		log.Printf("[server.CreateEntity] Successfully saved metadata in MongoDB for entity: %s", req.Id)
 	}
-	log.Printf("Successfully saved metadata in MongoDB for entity: %s", req.Id)
 
 	// Validate required fields for Neo4j entity creation
-	err = s.neo4jRepo.HandleGraphEntity(ctx, req)
-	if err != nil {
-		log.Printf("Error saving entity in Neo4j: %v", err)
+	success, err := s.neo4jRepo.HandleGraphEntity(ctx, req)
+	if !success {
+		log.Printf("[server.CreateEntity] Error saving entity in Neo4j: %v", err)
 		return nil, err
+	} else {
+		log.Printf("[server.CreateEntity] Successfully saved entity in Neo4j for entity: %s", req.Id)
 	}
-	log.Printf("Successfully saved entity in Neo4j for entity: %s", req.Id)
 
 	// TODO: Add logic to handle relationships
-	err = s.neo4jRepo.HandleGraphRelationships(ctx, req)
-	if err != nil {
-		log.Printf("Error saving relationships in Neo4j: %v", err)
+	success, err = s.neo4jRepo.HandleGraphRelationships(ctx, req)
+	if !success {
+		log.Printf("[server.CreateEntity] Error saving relationships in Neo4j: %v", err)
 		return nil, err
+	} else {
+		log.Printf("[server.CreateEntity] Successfully saved relationships in Neo4j for entity: %s", req.Id)
 	}
-	log.Printf("Successfully saved relationships in Neo4j for entity: %s", req.Id)
 
 	// TODO: Add logic to handle attributes
 	return req, nil
@@ -91,7 +94,7 @@ func (s *Server) UpdateEntity(ctx context.Context, req *pb.UpdateEntityRequest) 
 	updateEntityID := req.Id
 	updateEntity := req.Entity
 
-	log.Printf("Updating Entity: %s", updateEntityID)
+	log.Printf("[server.UpdateEntity] Updating Entity: %s", updateEntityID)
 
 	// Initialize metadata
 	var metadata map[string]*anypb.Any
@@ -100,7 +103,7 @@ func (s *Server) UpdateEntity(ctx context.Context, req *pb.UpdateEntityRequest) 
 	err := s.mongoRepo.HandleMetadata(ctx, updateEntityID, updateEntity)
 	if err != nil {
 		// Log error and continue with empty metadata
-		log.Printf("Error updating metadata for entity %s: %v", updateEntityID, err)
+		log.Printf("[server.UpdateEntity] Error updating metadata for entity %s: %v", updateEntityID, err)
 		metadata = make(map[string]*anypb.Any)
 	} else {
 		// Use the provided metadata
@@ -108,16 +111,16 @@ func (s *Server) UpdateEntity(ctx context.Context, req *pb.UpdateEntityRequest) 
 	}
 
 	// Handle Graph Entity update if entity has required fields
-	err = s.neo4jRepo.HandleGraphEntity(ctx, updateEntity)
-	if err != nil {
-		log.Printf("Error updating graph entity for %s: %v", updateEntityID, err)
+	success, err := s.neo4jRepo.HandleGraphEntity(ctx, updateEntity)
+	if !success {
+		log.Printf("[server.UpdateEntity] Error updating graph entity for %s: %v", updateEntityID, err)
 		// Continue processing despite error
 	}
 
 	// Handle Relationships update
-	err = s.neo4jRepo.HandleGraphRelationships(ctx, updateEntity)
-	if err != nil {
-		log.Printf("Error updating relationships for entity %s: %v", updateEntityID, err)
+	success, err = s.neo4jRepo.HandleGraphRelationships(ctx, updateEntity)
+	if !success {
+		log.Printf("[server.UpdateEntity] Error updating relationships for entity %s: %v", updateEntityID, err)
 		// Continue processing despite error
 	}
 
@@ -142,11 +145,11 @@ func (s *Server) UpdateEntity(ctx context.Context, req *pb.UpdateEntityRequest) 
 
 // DeleteEntity removes metadata
 func (s *Server) DeleteEntity(ctx context.Context, req *pb.EntityId) (*pb.Empty, error) {
-	log.Printf("Deleting Entity metadata: %s", req.Id)
+	log.Printf("[server.DeleteEntity] Deleting Entity metadata: %s", req.Id)
 	_, err := s.mongoRepo.DeleteEntity(ctx, req.Id)
 	if err != nil {
 		// Log error but return success
-		log.Printf("Error deleting metadata for entity %s: %v", req.Id, err)
+		log.Printf("[server.DeleteEntity] Error deleting metadata for entity %s: %v", req.Id, err)
 	}
 	// TODO: Implement Relationship Deletion in Neo4j
 	// TODO: Implement Entity Deletion in Neo4j
@@ -182,13 +185,13 @@ func main() {
 	// Create Neo4j repository
 	neo4jRepo, err := neo4jrepository.NewNeo4jRepository(ctx, neo4jConfig)
 	if err != nil {
-		log.Fatalf("Failed to create Neo4j repository: %v", err)
+		log.Fatalf("[service.main] Failed to create Neo4j repository: %v", err)
 	}
 	defer neo4jRepo.Close(ctx)
 
 	listener, err := net.Listen("tcp", ":50051")
 	if err != nil {
-		log.Fatalf("Failed to listen: %v", err)
+		log.Fatalf("[service.main] Failed to listen: %v", err)
 	}
 
 	grpcServer := grpc.NewServer()
@@ -199,8 +202,8 @@ func main() {
 
 	pb.RegisterCrudServiceServer(grpcServer, server)
 
-	log.Println("CRUD Service is running on port 50051...")
+	log.Println("[service.main] CRUD Service is running on port 50051...")
 	if err := grpcServer.Serve(listener); err != nil {
-		log.Fatalf("Failed to serve: %v", err)
+		log.Fatalf("[service.main] Failed to serve: %v", err)
 	}
 }
