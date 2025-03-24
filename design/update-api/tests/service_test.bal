@@ -299,6 +299,9 @@ function testEntityReading() returns error? {
     test:assertEquals(nonExistentEntity.metadata.length(), 0, "Non-existent entity should have empty metadata");
     
     // Assert that we get an error for non-existent entity
+    // For non-existence entities, we send a response with an empty data
+    // But once the Result API is integrated this can be tested. 
+    // FIXME: https://github.com/zaeema-n/LDFArchitecture/issues/23
     // test:assertTrue(nonExistentResponse is error, "Expected error for non-existent entity ID");
     
     // Clean up
@@ -346,9 +349,7 @@ function testCreateMinimalGraphEntity() returns error? {
     // Basic entity verification
     test:assertEquals(readEntityResponse.id, testId, "Entity ID doesn't match");
     test:assertEquals(readEntityResponse.kind.major, "test", "Entity kind.major doesn't match");
-    
-    // TODO: https://github.com/zaeema-n/LDFArchitecture/issues/24
-    //test:assertEquals(readEntityResponse.kind.minor, "minimal", "Entity kind.minor doesn't match");
+    test:assertEquals(readEntityResponse.kind.minor, "minimal", "Entity kind.minor doesn't match");
     
     // Verify empty collections
     test:assertEquals(readEntityResponse.metadata.length(), 0, "Metadata should be empty");
@@ -415,8 +416,7 @@ function testCreateMinimalGraphEntityViaRest() returns error? {
     // Basic entity verification
     test:assertEquals(readEntityResponse.id, testId, "Entity ID doesn't match");
     test:assertEquals(readEntityResponse.kind.major, "test", "Entity kind.major doesn't match");
-    // TODO: https://github.com/zaeema-n/LDFArchitecture/issues/24
-    //test:assertEquals(readEntityResponse.kind.minor, "minimal-json", "Entity kind.minor doesn't match");
+    test:assertEquals(readEntityResponse.kind.minor, "minimal-json", "Entity kind.minor doesn't match");
     
     // Verify empty collections
     test:assertEquals(readEntityResponse.metadata.length(), 0, "Metadata should be empty");
@@ -432,8 +432,7 @@ function testCreateMinimalGraphEntityViaRest() returns error? {
 }
 
 @test:Config {
-    groups: ["entity", "relationship"],
-    enable: false // TODO: Re-enable once attribute saving is implemented and the API supports complete entity updates
+    groups: ["entity", "relationship"]
 }
 function testEntityWithRelationship() returns error? {
     // Test IDs for entities
