@@ -148,6 +148,9 @@ func (s *Server) DeleteEntity(ctx context.Context, req *pb.EntityId) (*pb.Empty,
 		// Log error but return success
 		log.Printf("Error deleting metadata for entity %s: %v", req.Id, err)
 	}
+	// TODO: Implement Relationship Deletion in Neo4j
+	// TODO: Implement Entity Deletion in Neo4j
+	// TODO: Implement Attribute Deletion in Neo4j
 	return &pb.Empty{}, nil
 }
 
