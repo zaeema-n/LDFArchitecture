@@ -59,6 +59,8 @@ func (r *Neo4jRepository) CreateGraphEntity(ctx context.Context, kind *pb.Kind, 
 	if kind == nil || kind.Major == "" {
 		log.Printf("[neo4j_client.CreateGraphEntity] missing or invalid 'Kind.Major' field")
 		return nil, fmt.Errorf("[neo4j_client.CreateGraphEntity] missing or invalid 'Kind.Major' field")
+	} else {
+		log.Printf("[neo4j_client.CreateGraphEntity] Kind.Major: %v", kind.Major)
 	}
 
 	// Extract the required fields from the entityMap
@@ -66,24 +68,32 @@ func (r *Neo4jRepository) CreateGraphEntity(ctx context.Context, kind *pb.Kind, 
 	if !ok {
 		log.Printf("[neo4j_client.CreateGraphEntity] missing or invalid 'Id' field")
 		return nil, fmt.Errorf("[neo4j_client.CreateGraphEntity] missing or invalid 'Id' field")
+	} else {
+		log.Printf("[neo4j_client.CreateGraphEntity] Id: %v", id)
 	}
 
 	name, ok := entityMap["Name"].(string)
 	if !ok {
 		log.Printf("[neo4j_client.CreateGraphEntity] missing or invalid 'Name' field")
 		return nil, fmt.Errorf("[neo4j_client.CreateGraphEntity] missing or invalid 'Name' field")
+	} else {
+		log.Printf("[neo4j_client.CreateGraphEntity] Name: %v", name)
 	}
 
 	created, ok := entityMap["Created"].(string)
 	if !ok {
 		log.Printf("[neo4j_client.CreateGraphEntity] missing or invalid 'Created' field")
 		return nil, fmt.Errorf("[neo4j_client.CreateGraphEntity] missing or invalid 'Created' field")
+	} else {
+		log.Printf("[neo4j_client.CreateGraphEntity] Created: %v", created)
 	}
 
 	// Optional field
 	var terminated *string
 	if term, ok := entityMap["Terminated"].(string); ok {
 		terminated = &term
+	} else {
+		log.Printf("[neo4j_client.CreateGraphEntity] Terminated: %v", terminated)
 	}
 
 	// Open a session
@@ -96,12 +106,16 @@ func (r *Neo4jRepository) CreateGraphEntity(ctx context.Context, kind *pb.Kind, 
 	if err != nil {
 		log.Printf("[neo4j_client.CreateGraphEntity] error checking if entity exists: %v", err)
 		return nil, fmt.Errorf("[neo4j_client.CreateGraphEntity] error checking if entity exists: %v", err)
+	} else {
+		log.Printf("[neo4j_client.CreateGraphEntity] existsQuery: %v", existsQuery)
 	}
 
 	// If entity exists, return an error
 	if result.Next(ctx) {
 		log.Printf("[neo4j_client.CreateGraphEntity] entity with Id %s already exists", id)
 		return nil, fmt.Errorf("[neo4j_client.CreateGraphEntity] entity with Id %s already exists", id)
+	} else {
+		log.Printf("[neo4j_client.CreateGraphEntity] entity with Id %s does not exist", id)
 	}
 
 	// Create the node
@@ -127,6 +141,8 @@ func (r *Neo4jRepository) CreateGraphEntity(ctx context.Context, kind *pb.Kind, 
 	if err != nil {
 		log.Printf("[neo4j_client.CreateGraphEntity] error creating entity: %v", err)
 		return nil, fmt.Errorf("[neo4j_client.CreateGraphEntity] error creating entity: %v", err)
+	} else {
+		log.Printf("[neo4j_client.CreateGraphEntity] created entity: %v", params)
 	}
 
 	// Retrieve the created entity
@@ -136,6 +152,8 @@ func (r *Neo4jRepository) CreateGraphEntity(ctx context.Context, kind *pb.Kind, 
 		if !ok {
 			log.Printf("[neo4j_client.CreateGraphEntity] failed to cast created entity to neo4j.Node")
 			return nil, fmt.Errorf("[neo4j_client.CreateGraphEntity] failed to cast created entity to neo4j.Node")
+		} else {
+			log.Printf("[neo4j_client.CreateGraphEntity] created entity: %v", createdEntity)
 		}
 
 		// Convert the node properties to a map
@@ -147,11 +165,14 @@ func (r *Neo4jRepository) CreateGraphEntity(ctx context.Context, kind *pb.Kind, 
 		}
 		if terminated != nil {
 			createdEntityMap["Terminated"] = fmt.Sprintf("%v", *terminated)
+		} else {
+			log.Printf("[neo4j_client.CreateGraphEntity] Terminated: %v", terminated)
 		}
-
+		log.Printf("[neo4j_client.CreateGraphEntity] created entity: %v", createdEntityMap)
 		return createdEntityMap, nil
 	}
 
+	log.Printf("[neo4j_client.CreateGraphEntity] failed to create entity")
 	return nil, fmt.Errorf("[neo4j_client.CreateGraphEntity] failed to create entity")
 }
 
@@ -168,10 +189,14 @@ func (r *Neo4jRepository) CreateRelationship(ctx context.Context, entityID strin
 	if err != nil {
 		log.Printf("[neo4j_client.CreateRelationship] error checking entities: %v", err)
 		return nil, fmt.Errorf("error checking entities: %v", err)
+	} else {
+		log.Printf("[neo4j_client.CreateRelationship] existsQuery: %v", existsQuery)
 	}
 	if !result.Next(ctx) {
 		log.Printf("[neo4j_client.CreateRelationship] either parent or child entity does not exist")
 		return nil, fmt.Errorf("either parent or child entity does not exist")
+	} else {
+		log.Printf("[neo4j_client.CreateRelationship] either parent or child entity does not exist")
 	}
 
 	createQuery := `MATCH (p {Id: $parentID}), (c {Id: $childID})
@@ -195,6 +220,8 @@ func (r *Neo4jRepository) CreateRelationship(ctx context.Context, entityID strin
 	if err != nil {
 		log.Printf("[neo4j_client.CreateRelationship] error creating relationship: %v", err)
 		return nil, fmt.Errorf("error creating relationship: %v", err)
+	} else {
+		log.Printf("[neo4j_client.CreateRelationship] createQuery: %v", createQuery)
 	}
 
 	if result.Next(ctx) {
@@ -203,6 +230,8 @@ func (r *Neo4jRepository) CreateRelationship(ctx context.Context, entityID strin
 		if !ok {
 			log.Printf("[neo4j_client.CreateRelationship] failed to cast created relationship to neo4j.Relationship")
 			return nil, fmt.Errorf("failed to cast created relationship to neo4j.Relationship")
+		} else {
+			log.Printf("[neo4j_client.CreateRelationship] created relationship: %v", createdRel)
 		}
 
 		relationshipMap := map[string]interface{}{
@@ -213,7 +242,7 @@ func (r *Neo4jRepository) CreateRelationship(ctx context.Context, entityID strin
 		if rel.EndTime != "" {
 			relationshipMap["Terminated"] = fmt.Sprintf("%v", relationship.Props["Terminated"])
 		}
-
+		log.Printf("[neo4j_client.CreateRelationship] created relationship: %v", relationshipMap)
 		return relationshipMap, nil
 	}
 

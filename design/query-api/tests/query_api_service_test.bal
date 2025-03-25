@@ -205,7 +205,29 @@ function testEntityRelationships() returns error? {
     string relatedEntityId = "test-related-entity";
     string relationshipType = "contains";
     
-    // Create the main entity first
+    // Create the related entity first
+    Entity relatedEntity = {
+        id: relatedEntityId,
+        kind: {
+            major: "test",
+            minor: "related"
+        },
+        created: "2023-01-01",
+        terminated: "",
+        name: {
+            startTime: "2023-01-01",
+            endTime: "",
+            value: check pbAny:pack("related-test-entity")
+        },
+        metadata: [],
+        attributes: [],
+        relationships: []
+    };
+    
+    Entity createRelatedResponse = check ep->CreateEntity(relatedEntity);
+    io:println("Related entity created with ID: " + createRelatedResponse.id);
+    
+    // Create the main entity with the relationship
     Entity mainEntity = {
         id: entityId,
         kind: {
@@ -235,31 +257,8 @@ function testEntityRelationships() returns error? {
         ]
     };
     
-    // Create entity
     Entity createMainResponse = check ep->CreateEntity(mainEntity);
     io:println("Main entity created with ID: " + createMainResponse.id);
-    
-    // Create the related entity too
-    Entity relatedEntity = {
-        id: relatedEntityId,
-        kind: {
-            major: "test",
-            minor: "related"
-        },
-        created: "2023-01-01",
-        terminated: "",
-        name: {
-            startTime: "2023-01-01",
-            endTime: "",
-            value: check pbAny:pack("related-test-entity")
-        },
-        metadata: [],
-        attributes: [],
-        relationships: []
-    };
-    
-    Entity createRelatedResponse = check ep->CreateEntity(relatedEntity);
-    io:println("Related entity created with ID: " + createRelatedResponse.id);
     
     // Now read the main entity with relationship filter
     Entity relationshipFilter = {
