@@ -216,7 +216,6 @@ class GraphEntityTests(BasicCRUDTests):
                     "value": "Minister of Education"
                 }
             },
-<<<<<<< HEAD
             "metadata": [],
             "attributes": [],
             "relationships": []
@@ -225,19 +224,11 @@ class GraphEntityTests(BasicCRUDTests):
         res = requests.post(self.base_url, json=payload)
         print(res.status_code, res.json())
         assert res.status_code in [201], f"Failed to create Minister: {res.text}"
-=======
-            "metadata": []
-        }
-        
-        res = requests.post(self.base_url, json=payload)
-        assert res.status_code in [200, 201], f"Failed to create Minister: {res.text}"
->>>>>>> 535e1c5 (Fix neo4j client - Addons (#28))
 
         print(f"Response: {res.status_code} - {res.text}")
         print("✅ Created Minister entity.")
 
 
-<<<<<<< HEAD
     def read_minister(self):
         """Read the Minister entity."""
         print("\n🟢 Reading Minister entity...")
@@ -273,35 +264,6 @@ class GraphEntityTests(BasicCRUDTests):
             print(f"✅ Created {dept['name']} entity.")
 
 
-=======
-    def create_departments(self):
-        """Create Department entities."""
-        print("\n🟢 Creating Department entities...")
-        
-        for dept in self.DEPARTMENTS:
-            payload = {
-                "id": dept["id"],
-                "kind": {"major": "Organization", "minor": "Department"},
-                "created": self.START_DATE,
-                "terminated": "",
-                "name": {
-                    "startTime": self.START_DATE,
-                    "endTime": "",
-                    "value": {
-                        "typeUrl": "type.googleapis.com/google.protobuf.StringValue",
-                        "value": dept["name"]
-                    }
-                },
-                "metadata": []
-            }
-            
-            res = requests.post(self.base_url, json=payload)
-            assert res.status_code in [200, 201], f"Failed to create {dept['name']}: {res.text}"
-            print(f"Response: {res.status_code} - {res.text}")
-            print(f"✅ Created {dept['name']} entity.")
-
-
->>>>>>> 535e1c5 (Fix neo4j client - Addons (#28))
     def create_relationships(self):
         """Create HAS_DEPARTMENT relationships from Minister to Departments."""
         print("\n🔗 Creating relationships...")
@@ -337,7 +299,6 @@ if __name__ == "__main__":
     print("🚀 Running End-to-End API Test Suite...")
     
     try:
-<<<<<<< HEAD
         # print("🟢 Running Metadata Validation Tests...")
         # metadata_validation_tests = MetadataValidationTests(entity_id="123")
         # metadata_validation_tests.create_entity()
@@ -347,35 +308,16 @@ if __name__ == "__main__":
         # metadata_validation_tests.delete_entity()
         # metadata_validation_tests.verify_deletion()
         # print("\n🟢 Running Metadata Validation Tests... Done")
-=======
-        print("🟢 Running Metadata Validation Tests...")
-        metadata_validation_tests = MetadataValidationTests(entity_id="123")
-        metadata_validation_tests.create_entity()
-        metadata_validation_tests.read_entity()
-        metadata_validation_tests.update_entity()
-        metadata_validation_tests.validate_update()
-        metadata_validation_tests.delete_entity()
-        metadata_validation_tests.verify_deletion()
-        print("\n🟢 Running Metadata Validation Tests... Done")
->>>>>>> 535e1c5 (Fix neo4j client - Addons (#28))
 
         print("\n🟢 Running Graph Entity Tests...")
         graph_entity_tests = GraphEntityTests()
         graph_entity_tests.create_minister()
-<<<<<<< HEAD
         graph_entity_tests.read_minister()
         # graph_entity_tests.create_departments()
         # graph_entity_tests.create_relationships()
         # print("\n🟢 Running Graph Entity Tests... Done")
 
         # print("\n🎉 All tests passed successfully!")
-=======
-        graph_entity_tests.create_departments()
-        graph_entity_tests.create_relationships()
-        print("\n🟢 Running Graph Entity Tests... Done")
-
-        print("\n🎉 All tests passed successfully!")
->>>>>>> 535e1c5 (Fix neo4j client - Addons (#28))
     
     except AssertionError as e:
         print(f"\n❌ Test failed: {e}")
