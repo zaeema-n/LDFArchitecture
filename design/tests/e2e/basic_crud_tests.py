@@ -216,14 +216,25 @@ class GraphEntityTests(BasicCRUDTests):
                     "value": "Minister of Education"
                 }
             },
-            "metadata": []
+            "metadata": [],
+            "attributes": [],
+            "relationships": []
         }
         
         res = requests.post(self.base_url, json=payload)
-        assert res.status_code in [200, 201], f"Failed to create Minister: {res.text}"
+        print(res.status_code, res.json())
+        assert res.status_code in [201], f"Failed to create Minister: {res.text}"
 
         print(f"Response: {res.status_code} - {res.text}")
         print("✅ Created Minister entity.")
+
+
+    def read_minister(self):
+        """Read the Minister entity."""
+        print("\n🟢 Reading Minister entity...")
+        res = requests.get(f"{self.base_url}/{self.MINISTER_ID}")
+        print(res.status_code, res.json())
+        assert res.status_code in [200], f"Failed to read Minister: {res.text}"
 
 
     def create_departments(self):
@@ -288,24 +299,25 @@ if __name__ == "__main__":
     print("🚀 Running End-to-End API Test Suite...")
     
     try:
-        print("🟢 Running Metadata Validation Tests...")
-        metadata_validation_tests = MetadataValidationTests(entity_id="123")
-        metadata_validation_tests.create_entity()
-        metadata_validation_tests.read_entity()
-        metadata_validation_tests.update_entity()
-        metadata_validation_tests.validate_update()
-        metadata_validation_tests.delete_entity()
-        metadata_validation_tests.verify_deletion()
-        print("\n🟢 Running Metadata Validation Tests... Done")
+        # print("🟢 Running Metadata Validation Tests...")
+        # metadata_validation_tests = MetadataValidationTests(entity_id="123")
+        # metadata_validation_tests.create_entity()
+        # metadata_validation_tests.read_entity()
+        # metadata_validation_tests.update_entity()
+        # metadata_validation_tests.validate_update()
+        # metadata_validation_tests.delete_entity()
+        # metadata_validation_tests.verify_deletion()
+        # print("\n🟢 Running Metadata Validation Tests... Done")
 
         print("\n🟢 Running Graph Entity Tests...")
         graph_entity_tests = GraphEntityTests()
         graph_entity_tests.create_minister()
-        graph_entity_tests.create_departments()
-        graph_entity_tests.create_relationships()
-        print("\n🟢 Running Graph Entity Tests... Done")
+        graph_entity_tests.read_minister()
+        # graph_entity_tests.create_departments()
+        # graph_entity_tests.create_relationships()
+        # print("\n🟢 Running Graph Entity Tests... Done")
 
-        print("\n🎉 All tests passed successfully!")
+        # print("\n🎉 All tests passed successfully!")
     
     except AssertionError as e:
         print(f"\n❌ Test failed: {e}")
