@@ -197,18 +197,15 @@ func (repo *Neo4jRepository) HandleGraphEntity(ctx context.Context, entity *pb.E
 	}
 }
 
-// Update HandleGraphRelationships to also return success/failure status
-func (repo *Neo4jRepository) HandleGraphRelationships(ctx context.Context, entity *pb.Entity) (bool, error) {
+// Handle Graph Relationships in Neo4j
+func (repo *Neo4jRepository) HandleGraphRelationships(ctx context.Context, entity *pb.Entity) error {
 	// Check if entity has relationships
 	if len(entity.Relationships) == 0 {
 		log.Printf("[neo4j_handler.HandleGraphRelationships] No relationships to process for entity: %s", entity.Id)
-		return true, nil // Success but nothing to do
+		return nil
 	}
 
 	log.Printf("[neo4j_handler.HandleGraphRelationships] Processing %d relationships for entity: %s", len(entity.Relationships), entity.Id)
-
-	// Track overall success
-	allSuccessful := true
 
 	// First, process all child entities
 	for _, relationship := range entity.Relationships {
@@ -222,10 +219,9 @@ func (repo *Neo4jRepository) HandleGraphRelationships(ctx context.Context, entit
 			// Child entity doesn't exist, log this information
 			log.Printf("[neo4j_handler.HandleGraphRelationships] Child entity %s does not exist in Neo4j. Make sure to create it first.",
 				relationship.RelatedEntityId)
-			allSuccessful = false
-		} else {
-			log.Printf("[neo4j_handler.HandleGraphRelationships] Child entity %s already exists in Neo4j", relationship.RelatedEntityId)
+			return fmt.Errorf("[neo4j_handler.HandleGraphRelationships] child entity %s does not exist", relationship.RelatedEntityId)
 		}
+		log.Printf("[neo4j_handler.HandleGraphRelationships] Child entity %s exists in Neo4j", relationship.RelatedEntityId)
 	}
 
 	// Now that child entities are handled, create or update relationships from parent to children
@@ -254,43 +250,35 @@ func (repo *Neo4jRepository) HandleGraphRelationships(ctx context.Context, entit
 			}
 
 			// Try to update the relationship
-			result, err := repo.UpdateRelationship(ctx, relationship.Id, relationshipData)
+			_, err := repo.UpdateRelationship(ctx, relationship.Id, relationshipData)
 			if err != nil {
 				log.Printf("Error updating relationship %s from %s to %s: %v",
 					relationship.Id, entity.Id, relationship.RelatedEntityId, err)
-				allSuccessful = false
 
 				// If update fails (perhaps relationship doesn't exist despite having ID),
 				// try to create it instead
-				createResult, createErr := repo.CreateRelationship(ctx, entity.Id, relationship)
+				_, createErr := repo.CreateRelationship(ctx, entity.Id, relationship)
 				if createErr != nil {
 					log.Printf("[neo4j_handler.HandleGraphRelationships] Also failed to create relationship: %v", createErr)
 				} else {
 					log.Printf("[neo4j_handler.HandleGraphRelationships] Successfully created relationship %s after update failure", relationship.Id)
-					allSuccessful = allSuccessful && (createResult != nil) // Success if we got a non-nil result
 				}
 			} else {
 				log.Printf("[neo4j_handler.HandleGraphRelationships] Successfully updated relationship %s from %s to %s of type %s",
 					relationship.Id, entity.Id, relationship.RelatedEntityId, relationshipType)
-				allSuccessful = allSuccessful && (result != nil) // Success if we got a non-nil result
 			}
 		} else {
 			// No ID, so create a new relationship
-			result, err := repo.CreateRelationship(ctx, entity.Id, relationship)
+			_, err := repo.CreateRelationship(ctx, entity.Id, relationship)
 			if err != nil {
 				log.Printf("[neo4j_handler.HandleGraphRelationships] Error creating relationship from %s to %s of type %s: %v",
 					entity.Id, relationship.RelatedEntityId, relationshipType, err)
-				allSuccessful = false
 			} else {
 				log.Printf("[neo4j_handler.HandleGraphRelationships] Successfully created relationship from %s to %s of type %s",
 					entity.Id, relationship.RelatedEntityId, relationshipType)
-				allSuccessful = allSuccessful && (result != nil) // Success if we got a non-nil result
 			}
 		}
 	}
 
-	if !allSuccessful {
-		return false, fmt.Errorf("[neo4j_handler.HandleGraphRelationships] some relationships could not be processed correctly")
-	}
-	return true, nil
+	return nil
 }

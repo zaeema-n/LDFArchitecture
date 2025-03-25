@@ -49,8 +49,8 @@ func (s *Server) CreateEntity(ctx context.Context, req *pb.Entity) (*pb.Entity, 
 	}
 
 	// TODO: Add logic to handle relationships
-	success, err = s.neo4jRepo.HandleGraphRelationships(ctx, req)
-	if !success {
+	err = s.neo4jRepo.HandleGraphRelationships(ctx, req)
+	if err != nil {
 		log.Printf("[server.CreateEntity] Error saving relationships in Neo4j: %v", err)
 		return nil, err
 	} else {
@@ -118,8 +118,8 @@ func (s *Server) UpdateEntity(ctx context.Context, req *pb.UpdateEntityRequest) 
 	}
 
 	// Handle Relationships update
-	success, err = s.neo4jRepo.HandleGraphRelationships(ctx, updateEntity)
-	if !success {
+	err = s.neo4jRepo.HandleGraphRelationships(ctx, updateEntity)
+	if err != nil {
 		log.Printf("[server.UpdateEntity] Error updating relationships for entity %s: %v", updateEntityID, err)
 		// Continue processing despite error
 	}
