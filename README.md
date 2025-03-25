@@ -106,7 +106,7 @@ python basic_crud_tests.py
 ### Run Query API Tests
 
 ```bash
-cd design/tests/e2e
+cd src/tests/e2e
 python basic_query_tests.py
 ```
 
