@@ -119,9 +119,9 @@ func (r *Neo4jRepository) CreateGraphEntity(ctx context.Context, kind *pb.Kind, 
 	}
 
 	// Create the node
-	createQuery := `CREATE (e:` + kind.Major + ` {Id: $Id, Name: $Name, Created: date($Created), MinorKind: $MinorKind`
+	createQuery := `CREATE (e:` + kind.Major + ` {Id: $Id, Name: $Name, Created: datetime($Created), MinorKind: $MinorKind`
 	if terminated != nil {
-		createQuery += `, Terminated: date($Terminated)`
+		createQuery += `, Terminated: datetime($Terminated)`
 	}
 	createQuery += `}) RETURN e`
 
@@ -142,7 +142,7 @@ func (r *Neo4jRepository) CreateGraphEntity(ctx context.Context, kind *pb.Kind, 
 		log.Printf("[neo4j_client.CreateGraphEntity] error creating entity: %v", err)
 		return nil, fmt.Errorf("[neo4j_client.CreateGraphEntity] error creating entity: %v", err)
 	} else {
-		log.Printf("[neo4j_client.CreateGraphEntity] created entity: %v", params)
+		log.Printf("[neo4j_client.CreateGraphEntity] created entity(run query): %v", params)
 	}
 
 	// Retrieve the created entity
@@ -153,7 +153,7 @@ func (r *Neo4jRepository) CreateGraphEntity(ctx context.Context, kind *pb.Kind, 
 			log.Printf("[neo4j_client.CreateGraphEntity] failed to cast created entity to neo4j.Node")
 			return nil, fmt.Errorf("[neo4j_client.CreateGraphEntity] failed to cast created entity to neo4j.Node")
 		} else {
-			log.Printf("[neo4j_client.CreateGraphEntity] created entity: %v", createdEntity)
+			log.Printf("[neo4j_client.CreateGraphEntity] created entity(retrieved-initial): %v", createdEntity)
 		}
 
 		// Convert the node properties to a map
@@ -168,7 +168,7 @@ func (r *Neo4jRepository) CreateGraphEntity(ctx context.Context, kind *pb.Kind, 
 		} else {
 			log.Printf("[neo4j_client.CreateGraphEntity] Terminated: %v", terminated)
 		}
-		log.Printf("[neo4j_client.CreateGraphEntity] created entity: %v", createdEntityMap)
+		log.Printf("[neo4j_client.CreateGraphEntity] created entity(retrieved-final): %v", createdEntityMap)
 		return createdEntityMap, nil
 	}
 

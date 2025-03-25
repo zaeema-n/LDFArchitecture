@@ -158,7 +158,15 @@ func (repo *Neo4jRepository) HandleGraphEntity(ctx context.Context, entity *pb.E
 
 	// Handle Name field safely
 	if entity.Name != nil && entity.Name.GetValue() != nil {
-		entityMap["Name"] = entity.Name.GetValue().String()
+		// Unpack the Any value to get the actual string
+		var stringValue wrapperspb.StringValue
+		err := entity.Name.GetValue().UnmarshalTo(&stringValue)
+		if err != nil {
+			log.Printf("[neo4j_handler.HandleGraphEntity] Error unpacking Name value for entity %s: %v", entity.Id, err)
+			return false, fmt.Errorf("[neo4j_handler.HandleGraphEntity] error unpacking Name value: %v", err)
+		}
+		// Get the actual string value from the StringValue
+		entityMap["Name"] = stringValue.Value
 	}
 
 	// Handle other fields

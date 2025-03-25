@@ -52,7 +52,7 @@ func TestCreateEntity(t *testing.T) {
 	entity := map[string]interface{}{
 		"Id":         "1",
 		"Name":       "John Doe",
-		"Created":    "2025-03-18",
+		"Created":    "2025-03-18T00:00:00Z",
 		"Terminated": nil,
 	}
 
@@ -66,7 +66,7 @@ func TestCreateEntity(t *testing.T) {
 	// Verify that the returned entity has the correct values
 	assert.Equal(t, "1", createdEntity["Id"], "Expected entity to have the correct Id")
 	assert.Equal(t, "John Doe", createdEntity["Name"], "Expected entity to have the correct Name")
-	assert.Equal(t, "2025-03-18", createdEntity["Created"], "Expected entity to have the correct Created date")
+	assert.Equal(t, "2025-03-18 00:00:00 +0000 Offset", createdEntity["Created"], "Expected entity to have the correct Created date")
 	assert.Equal(t, "Minister", createdEntity["MinorKind"], "Expected entity to have the correct MinorKind")
 	assert.Nil(t, createdEntity["Terminated"], "Expected entity to have no Terminated field")
 }
@@ -131,7 +131,7 @@ func TestReadEntity(t *testing.T) {
 	entity := map[string]interface{}{
 		"Id":      "6",
 		"Name":    "Charlie",
-		"Created": "2025-03-18",
+		"Created": "2025-03-18T00:00:00Z",
 	}
 
 	// Create the entity
@@ -139,7 +139,7 @@ func TestReadEntity(t *testing.T) {
 	assert.Nil(t, err, "Expected no error when creating the entity")
 	assert.Equal(t, entity["Id"], createdEntity["Id"], "Expected created entity to have the correct Id")
 	assert.Equal(t, entity["Name"], createdEntity["Name"], "Expected created entity to have the correct Name")
-	assert.Equal(t, entity["Created"], createdEntity["Created"], "Expected created entity to have the correct Created date")
+	assert.Equal(t, "2025-03-18 00:00:00 +0000 Offset", createdEntity["Created"], "Expected created entity to have the correct Created date")
 
 	// Read the entity by Id
 	readEntity, err := repository.ReadGraphEntity(context.Background(), "6")
@@ -148,7 +148,7 @@ func TestReadEntity(t *testing.T) {
 	// Verify the content of the entity
 	assert.Equal(t, entity["Id"], readEntity["Id"], "Expected entity to have the correct Id")
 	assert.Equal(t, entity["Name"], readEntity["Name"], "Expected entity to have the correct Name")
-	assert.Equal(t, entity["Created"], readEntity["Created"], "Expected entity to have the correct Created date")
+	assert.Equal(t, "2025-03-18T00:00:00Z", readEntity["Created"], "Expected entity to have the correct Created date")
 }
 
 // TestReadRelatedEntityIds tests the ReadRelatedGraphEntityIds method of the Neo4jRepository

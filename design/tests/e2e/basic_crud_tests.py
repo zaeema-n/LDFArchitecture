@@ -79,10 +79,7 @@ class BasicCRUDTests:
                 "name": {
                     "startTime": "2024-03-17T10:00:00Z",
                     "endTime": "",
-                    "value": {
-                        "typeUrl": "type.googleapis.com/google.protobuf.StringValue",
-                        "value": "entity-name"
-                    }
+                    "value": "entity-name"
                 },
                 "metadata": [
                     {"key": "owner", "value": "test-user"},
@@ -211,10 +208,7 @@ class GraphEntityTests(BasicCRUDTests):
             "name": {
                 "startTime": self.START_DATE,
                 "endTime": "",
-                "value": {
-                    "typeUrl": "type.googleapis.com/google.protobuf.StringValue",
-                    "value": "Minister of Education"
-                }
+                "value": "Minister of Education"
             },
             "metadata": [],
             "attributes": [],
@@ -250,10 +244,7 @@ class GraphEntityTests(BasicCRUDTests):
                 "name": {
                     "startTime": self.START_DATE,
                     "endTime": "",
-                    "value": {
-                        "typeUrl": "type.googleapis.com/google.protobuf.StringValue",
-                        "value": dept["name"]
-                    }
+                    "value": dept["name"]
                 },
                 "metadata": []
             }
@@ -312,7 +303,7 @@ if __name__ == "__main__":
         print("\n🟢 Running Graph Entity Tests...")
         graph_entity_tests = GraphEntityTests()
         graph_entity_tests.create_minister()
-        graph_entity_tests.read_minister()
+        # graph_entity_tests.read_minister()
         # graph_entity_tests.create_departments()
         # graph_entity_tests.create_relationships()
         # print("\n🟢 Running Graph Entity Tests... Done")
