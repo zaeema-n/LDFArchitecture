@@ -237,6 +237,7 @@ func (r *Neo4jRepository) ReadGraphEntity(ctx context.Context, entityID string) 
 	return nil, fmt.Errorf("entity with Id %s not found", entityID)
 }
 
+// NOT USED IN graph_entity_handler.go
 // ReadRelatedGraphEntityIds retrieves related entity IDs based on a given relationship
 func (r *Neo4jRepository) ReadRelatedGraphEntityIds(ctx context.Context, entityID string, relationship string, ts string) ([]string, error) {
 	if entityID == "" {

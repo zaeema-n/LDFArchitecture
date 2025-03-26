@@ -7,11 +7,11 @@
 
 ### Run CRUD API Service
 
-Read about running the [CRUD Service](design/crud-api/README.md)
+Read about running the [CRUD Service](src/core-api-server/crud-api/README.md)
 
 ### Run Update API Service
 
-Read about running the [Update API](design/update-api/README.md)
+Read about running the [Update API](src/update-api/README.md)
 
 ## Run a sample query with CURL
 

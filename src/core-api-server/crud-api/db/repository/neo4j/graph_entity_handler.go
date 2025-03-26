@@ -70,16 +70,17 @@ func (repo *Neo4jRepository) GetGraphRelationships(ctx context.Context, entityId
 	}
 
 	// Process each relationship
-	// TODO: Holding relationship and defining the content needs to be 
-	//  revalidated. Discuss and confirm. 
+	// TODO: Holding relationship and defining the content needs to be
+	//  revalidated. Discuss and confirm.
 	//  Also build a rule based validation for the relationship content.
 	for _, rel := range relData {
 		relType, ok1 := rel["type"].(string)
 		relatedID, ok2 := rel["relatedID"].(string)
 		created, ok3 := rel["Created"].(string)
 		relID, ok4 := rel["relationshipID"].(string)
+		direction, ok5 := rel["direction"].(string)
 
-		if !ok1 || !ok2 || !ok3 || !ok4 {
+		if !ok1 || !ok2 || !ok3 || !ok4 || !ok5 || direction != "OUTGOING" {
 			continue // Skip if any required field is missing
 		}
 
