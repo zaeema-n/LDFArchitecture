@@ -229,6 +229,17 @@ class GraphEntityTests(BasicCRUDTests):
         res = requests.get(f"{self.base_url}/{self.MINISTER_ID}")
         print(res.status_code, res.json())
         assert res.status_code in [200], f"Failed to read Minister: {res.text}"
+        
+        # Verify the response data
+        response_data = res.json()
+        assert response_data["id"] == self.MINISTER_ID, f"Expected ID {self.MINISTER_ID}, got {response_data['id']}"
+        assert response_data["kind"]["major"] == "Organization", f"Expected major kind 'Organization', got {response_data['kind']['major']}"
+        assert response_data["kind"]["minor"] == "Minister", f"Expected minor kind 'Minister', got {response_data['kind']['minor']}"
+        assert response_data["created"] == self.START_DATE, f"Expected created date {self.START_DATE}, got {response_data['created']}"
+        # The name value is a protobuf Any that needs to be decoded
+        name_value = response_data["name"]["value"]
+        decoded_name = CrudTestUtils.decode_protobuf_any_value(name_value)
+        assert decoded_name == "Minister of Education", f"Expected name 'Minister of Education', got {name_value}"
 
 
     def create_departments(self):
@@ -303,7 +314,7 @@ if __name__ == "__main__":
         print("\n🟢 Running Graph Entity Tests...")
         graph_entity_tests = GraphEntityTests()
         graph_entity_tests.create_minister()
-        # graph_entity_tests.read_minister()
+        graph_entity_tests.read_minister()
         # graph_entity_tests.create_departments()
         # graph_entity_tests.create_relationships()
         # print("\n🟢 Running Graph Entity Tests... Done")
