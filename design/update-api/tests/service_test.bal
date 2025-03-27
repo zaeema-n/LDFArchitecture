@@ -554,7 +554,7 @@ function testEntityWithRelationship() returns error? {
     Relationship relationship = <Relationship>targetRelationship;
     test:assertEquals(relationship.relatedEntityId, targetEntityId, "Related entity ID doesn't match");
     test:assertEquals(relationship.name, "CONNECTS_TO", "Relationship name doesn't match");
-    test:assertEquals(relationship.startTime, "2023-01-01", "Relationship start time doesn't match");
+    test:assertEquals(relationship.startTime, "2023-01-01T00:00:00Z", "Relationship start time doesn't match");
     test:assertEquals(relationship.id, "rel-" + sourceEntityId + "-" + targetEntityId, "Relationship ID doesn't match");
     
     // Clean up

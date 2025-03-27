@@ -6,6 +6,7 @@ import (
 	"lk/datafoundation/crud-api/db/config"
 	pb "lk/datafoundation/crud-api/lk/datafoundation/crud-api"
 	"log"
+	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
@@ -160,11 +161,22 @@ func (r *Neo4jRepository) CreateGraphEntity(ctx context.Context, kind *pb.Kind, 
 		createdEntityMap := map[string]interface{}{
 			"Id":        fmt.Sprintf("%v", node.Props["Id"]),
 			"Name":      fmt.Sprintf("%v", node.Props["Name"]),
-			"Created":   fmt.Sprintf("%v", node.Props["Created"]),
 			"MinorKind": fmt.Sprintf("%v", node.Props["MinorKind"]),
 		}
+
+		// Handle date fields with proper formatting
+		if created, ok := node.Props["Created"].(time.Time); ok {
+			createdEntityMap["Created"] = created.Format(time.RFC3339)
+		} else {
+			createdEntityMap["Created"] = fmt.Sprintf("%v", node.Props["Created"])
+		}
+
 		if terminated != nil {
-			createdEntityMap["Terminated"] = fmt.Sprintf("%v", *terminated)
+			if term, ok := node.Props["Terminated"].(time.Time); ok {
+				createdEntityMap["Terminated"] = term.Format(time.RFC3339)
+			} else {
+				createdEntityMap["Terminated"] = fmt.Sprintf("%v", *terminated)
+			}
 		} else {
 			log.Printf("[neo4j_client.CreateGraphEntity] Terminated: %v", terminated)
 		}
@@ -201,7 +213,7 @@ func (r *Neo4jRepository) CreateRelationship(ctx context.Context, entityID strin
 
 	createQuery := `MATCH (p {Id: $parentID}), (c {Id: $childID})
                     MERGE (p)-[r:` + rel.Name + ` {Id: $relationshipID}]->(c)
-                    SET r.Created = date($startDate)
+                    SET r.Created = datetime($startDate)
                     RETURN r`
 
 	params := map[string]interface{}{
@@ -212,7 +224,7 @@ func (r *Neo4jRepository) CreateRelationship(ctx context.Context, entityID strin
 	}
 
 	if rel.EndTime != "" {
-		createQuery += `, r.Terminated = date($endDate)`
+		createQuery += `, r.Terminated = datetime($endDate)`
 		params["endDate"] = rel.EndTime
 	}
 
@@ -222,6 +234,7 @@ func (r *Neo4jRepository) CreateRelationship(ctx context.Context, entityID strin
 		return nil, fmt.Errorf("error creating relationship: %v", err)
 	} else {
 		log.Printf("[neo4j_client.CreateRelationship] createQuery: %v", createQuery)
+		log.Printf("[neo4j_client.CreateRelationship] params: %v", params)
 	}
 
 	if result.Next(ctx) {
@@ -237,12 +250,24 @@ func (r *Neo4jRepository) CreateRelationship(ctx context.Context, entityID strin
 
 		relationshipMap := map[string]interface{}{
 			"Id":               fmt.Sprintf("%v", relationship.Props["Id"]),
-			"Created":          fmt.Sprintf("%v", relationship.Props["Created"]),
 			"relationshipType": rel.Name,
 		}
-		if rel.EndTime != "" {
-			relationshipMap["Terminated"] = fmt.Sprintf("%v", relationship.Props["Terminated"])
+
+		// Handle date fields with proper formatting
+		if created, ok := relationship.Props["Created"].(time.Time); ok {
+			relationshipMap["Created"] = created.Format(time.RFC3339)
+		} else {
+			relationshipMap["Created"] = fmt.Sprintf("%v", relationship.Props["Created"])
 		}
+
+		if rel.EndTime != "" {
+			if terminated, ok := relationship.Props["Terminated"].(time.Time); ok {
+				relationshipMap["Terminated"] = terminated.Format(time.RFC3339)
+			} else {
+				relationshipMap["Terminated"] = fmt.Sprintf("%v", relationship.Props["Terminated"])
+			}
+		}
+
 		log.Printf("[neo4j_client.CreateRelationship] created relationship: %v", relationshipMap)
 		return relationshipMap, nil
 	} else {
@@ -313,7 +338,7 @@ func (r *Neo4jRepository) ReadRelatedGraphEntityIds(ctx context.Context, entityI
 
 	query := fmt.Sprintf(`
         MATCH (e {Id: $entityID})-[r:%s]->(related)
-        WHERE r.Created <= date($ts) AND (r.Terminated IS NULL OR r.Terminated > date($ts))
+        WHERE r.Created <= datetime($ts) AND (r.Terminated IS NULL OR r.Terminated > datetime($ts))
         RETURN related.Id AS relatedID
     `, relationship)
 
@@ -511,7 +536,7 @@ func (r *Neo4jRepository) UpdateGraphEntity(ctx context.Context, id string, upda
 	// Add `Terminated` if provided
 	if terminated, exists := updateData["Terminated"]; exists {
 		params["Terminated"] = terminated
-		query += `SET e.Terminated = date($Terminated) `
+		query += `SET e.Terminated = datetime($Terminated) `
 	}
 
 	// Execute update query and return updated entity
@@ -535,7 +560,15 @@ func (r *Neo4jRepository) UpdateGraphEntity(ctx context.Context, id string, upda
 		entityNode := node.(neo4j.Node)
 		updatedEntity := make(map[string]interface{})
 		for key, value := range entityNode.Props {
-			updatedEntity[key] = fmt.Sprintf("%v", value)
+			if key == "Created" || key == "Terminated" {
+				if timeValue, ok := value.(time.Time); ok {
+					updatedEntity[key] = timeValue.Format(time.RFC3339)
+				} else {
+					updatedEntity[key] = fmt.Sprintf("%v", value)
+				}
+			} else {
+				updatedEntity[key] = fmt.Sprintf("%v", value)
+			}
 		}
 
 		return updatedEntity, nil
@@ -584,7 +617,7 @@ func (r *Neo4jRepository) UpdateRelationship(ctx context.Context, relationshipID
 		return nil, fmt.Errorf("terminated is required")
 	}
 	params["Terminated"] = terminated
-	query += `SET r.Terminated = date($Terminated) RETURN r`
+	query += `SET r.Terminated = datetime($Terminated) RETURN r`
 
 	// Execute update query and return updated relationship
 	result, err = session.Run(ctx, query, params)
@@ -605,7 +638,15 @@ func (r *Neo4jRepository) UpdateRelationship(ctx context.Context, relationshipID
 		relationship := rel.(neo4j.Relationship)
 		updatedRelationship := make(map[string]interface{})
 		for key, value := range relationship.Props {
-			updatedRelationship[key] = fmt.Sprintf("%v", value) // Convert everything to string
+			if key == "Created" || key == "Terminated" {
+				if timeValue, ok := value.(time.Time); ok {
+					updatedRelationship[key] = timeValue.Format(time.RFC3339)
+				} else {
+					updatedRelationship[key] = fmt.Sprintf("%v", value)
+				}
+			} else {
+				updatedRelationship[key] = fmt.Sprintf("%v", value)
+			}
 		}
 
 		return updatedRelationship, nil

@@ -297,13 +297,10 @@ class GraphEntityTests(BasicCRUDTests):
         for dept in self.DEPARTMENTS:
             payload = {
                 "id": self.MINISTER_ID,
-                "kind": {"major": "Organization", "minor": "Minister"},
-                "created": self.START_DATE,
+                "kind": {},
+                "created": "",
                 "terminated": "",
                 "name": {
-                    "startTime": self.START_DATE,
-                    "endTime": "",
-                    "value": "Minister of Education"
                 },
                 "metadata": [],
                 "attributes": [],
