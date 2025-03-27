@@ -196,7 +196,7 @@ func (r *Neo4jRepository) CreateRelationship(ctx context.Context, entityID strin
 		log.Printf("[neo4j_client.CreateRelationship] either parent or child entity does not exist")
 		return nil, fmt.Errorf("either parent or child entity does not exist")
 	} else {
-		log.Printf("[neo4j_client.CreateRelationship] either parent or child entity does not exist")
+		log.Printf("[neo4j_client.CreateRelationship] either parent or child entity exist")
 	}
 
 	createQuery := `MATCH (p {Id: $parentID}), (c {Id: $childID})
@@ -225,6 +225,7 @@ func (r *Neo4jRepository) CreateRelationship(ctx context.Context, entityID strin
 	}
 
 	if result.Next(ctx) {
+		log.Printf("[neo4j_client.CreateRelationship] result.Next(ctx)")
 		createdRel, _ := result.Record().Get("r")
 		relationship, ok := createdRel.(neo4j.Relationship)
 		if !ok {
@@ -244,6 +245,8 @@ func (r *Neo4jRepository) CreateRelationship(ctx context.Context, entityID strin
 		}
 		log.Printf("[neo4j_client.CreateRelationship] created relationship: %v", relationshipMap)
 		return relationshipMap, nil
+	} else {
+		log.Printf("[neo4j_client.CreateRelationship] failed to retrieve created relationship: %v", result)
 	}
 
 	return nil, fmt.Errorf("failed to retrieve created relationship")

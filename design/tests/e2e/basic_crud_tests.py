@@ -240,6 +240,7 @@ class GraphEntityTests(BasicCRUDTests):
         name_value = response_data["name"]["value"]
         decoded_name = CrudTestUtils.decode_protobuf_any_value(name_value)
         assert decoded_name == "Minister of Education", f"Expected name 'Minister of Education', got {name_value}"
+        print(f"✅ Validated {decoded_name} entity.")
 
 
     def create_departments(self):
@@ -266,34 +267,68 @@ class GraphEntityTests(BasicCRUDTests):
             print(f"✅ Created {dept['name']} entity.")
 
 
+    def read_departments(self):
+        """Validate the Department entities in Neo4j."""
+        print("\n🟢 Validating Department entities in Neo4j...")
+        
+        for dept in self.DEPARTMENTS:
+            res = requests.get(f"{self.base_url}/{dept['id']}")
+            assert res.status_code == 200, f"Failed to read {dept['name']}: {res.text}"
+            
+            # Verify the response data
+            response_data = res.json()
+            assert response_data["id"] == dept["id"], f"Expected ID {dept['id']}, got {response_data['id']}"
+            assert response_data["kind"]["major"] == "Organization", f"Expected major kind 'Organization', got {response_data['kind']['major']}"
+            assert response_data["kind"]["minor"] == "Department", f"Expected minor kind 'Department', got {response_data['kind']['minor']}"
+            assert response_data["created"] == self.START_DATE, f"Expected created date {self.START_DATE}, got {response_data['created']}"
+            
+            # The name value is a protobuf Any that needs to be decoded
+            name_value = response_data["name"]["value"]
+            decoded_name = CrudTestUtils.decode_protobuf_any_value(name_value)
+            assert decoded_name == dept["name"], f"Expected name '{dept['name']}', got {decoded_name}"
+            
+            print(f"✅ Validated {dept['name']} entity.")
+    
+    
     def create_relationships(self):
         """Create HAS_DEPARTMENT relationships from Minister to Departments."""
         print("\n🔗 Creating relationships...")
         
         for dept in self.DEPARTMENTS:
             payload = {
+                "id": self.MINISTER_ID,
+                "kind": {"major": "Organization", "minor": "Minister"},
+                "created": self.START_DATE,
+                "terminated": "",
+                "name": {
+                    "startTime": self.START_DATE,
+                    "endTime": "",
+                    "value": "Minister of Education"
+                },
+                "metadata": [],
+                "attributes": [],
                 "relationships": [
                     {
-                    "key": "HAS_DEPARTMENT",
-                    "value": {
-                        "relatedEntityId": dept["id"],
-                        "startTime": self.START_DATE,
-                        "endTime": "",
-                        "id": f"rel_{dept['id']}",
-                        "name": "HAS_DEPARTMENT"
+                        "key": "HAS_DEPARTMENT",
+                        "value": {
+                            "relatedEntityId": dept["id"],
+                            "startTime": self.START_DATE,
+                            "endTime": "",
+                            "id": f"rel_{dept['id']}",
+                            "name": "HAS_DEPARTMENT"
+                        }
                     }
-                }
-            ]
-        }
-        
-        url = f"{self.base_url}/{self.MINISTER_ID}"  # Using PUT with ID in the path
-        res = requests.put(url, json=payload)
+                ]
+            }
+            
+            url = f"{self.base_url}/{self.MINISTER_ID}"
+            res = requests.put(url, json=payload)
 
-        if res.status_code in [200, 204]:  # 204 for successful updates with no content
-            print(f"Response: {res.status_code} - {res.text}")
-            print(f"✅ Created relationship between Minister and {dept['name']}.")
-        else:
-            print(f"❌ Failed to create relationship for {dept['name']}: {res.status_code} - {res.text}")
+            if res.status_code in [200]:
+                print(f"✅ Created relationship between Minister and {dept['name']}.")
+            else:
+                print(f"❌ Failed to create relationship for {dept['name']}: {res.status_code} - {res.text}")
+                sys.exit(1)
 
 
 
@@ -315,8 +350,9 @@ if __name__ == "__main__":
         graph_entity_tests = GraphEntityTests()
         graph_entity_tests.create_minister()
         graph_entity_tests.read_minister()
-        # graph_entity_tests.create_departments()
-        # graph_entity_tests.create_relationships()
+        graph_entity_tests.create_departments()
+        graph_entity_tests.read_departments()
+        graph_entity_tests.create_relationships()
         # print("\n🟢 Running Graph Entity Tests... Done")
 
         # print("\n🎉 All tests passed successfully!")

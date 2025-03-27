@@ -40,7 +40,7 @@ func (s *Server) CreateEntity(ctx context.Context, req *pb.Entity) (*pb.Entity, 
 	}
 
 	// Validate required fields for Neo4j entity creation
-	success, err := s.neo4jRepo.HandleGraphEntity(ctx, req)
+	success, err := s.neo4jRepo.HandleGraphEntityCreation(ctx, req)
 	if !success {
 		log.Printf("[server.CreateEntity] Error saving entity in Neo4j: %v", err)
 		return nil, err
@@ -49,7 +49,7 @@ func (s *Server) CreateEntity(ctx context.Context, req *pb.Entity) (*pb.Entity, 
 	}
 
 	// TODO: Add logic to handle relationships
-	err = s.neo4jRepo.HandleGraphRelationships(ctx, req)
+	err = s.neo4jRepo.HandleGraphRelationshipsCreate(ctx, req)
 	if err != nil {
 		log.Printf("[server.CreateEntity] Error saving relationships in Neo4j: %v", err)
 		return nil, err
@@ -111,14 +111,14 @@ func (s *Server) UpdateEntity(ctx context.Context, req *pb.UpdateEntityRequest) 
 	}
 
 	// Handle Graph Entity update if entity has required fields
-	success, err := s.neo4jRepo.HandleGraphEntity(ctx, updateEntity)
+	success, err := s.neo4jRepo.HandleGraphEntityUpdate(ctx, updateEntity)
 	if !success {
 		log.Printf("[server.UpdateEntity] Error updating graph entity for %s: %v", updateEntityID, err)
 		// Continue processing despite error
 	}
 
 	// Handle Relationships update
-	err = s.neo4jRepo.HandleGraphRelationships(ctx, updateEntity)
+	err = s.neo4jRepo.HandleGraphRelationshipsUpdate(ctx, updateEntity)
 	if err != nil {
 		log.Printf("[server.UpdateEntity] Error updating relationships for entity %s: %v", updateEntityID, err)
 		// Continue processing despite error
