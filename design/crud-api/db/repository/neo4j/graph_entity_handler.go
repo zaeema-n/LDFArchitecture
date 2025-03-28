@@ -22,12 +22,19 @@ func (repo *Neo4jRepository) GetGraphEntity(ctx context.Context, entityId string
 	// Attempt to read from Neo4j, but don't fail if it's not available
 	entityMap, err := repo.ReadGraphEntity(ctx, entityId)
 	if err == nil && entityMap != nil {
+
 		// Entity found in Neo4j, extract information
-		if kindValue, ok := entityMap["Kind"]; ok {
+		if majorKindValue, ok := entityMap["MajorKind"]; ok {
 			kind = &pb.Kind{
-				Major: kindValue.(string),
-				Minor: "", // Neo4j doesn't store Minor
+				Major: majorKindValue.(string),
 			}
+		}
+
+		if minorKindValue, ok := entityMap["MinorKind"]; ok {
+			if kind == nil {
+				kind = &pb.Kind{}
+			}
+			kind.Minor = minorKindValue.(string)
 		}
 
 		if nameValue, ok := entityMap["Name"]; ok {
@@ -65,8 +72,8 @@ func (repo *Neo4jRepository) GetGraphRelationships(ctx context.Context, entityId
 	// Retrieve relationships from Neo4j
 	relData, err := repo.ReadRelationships(ctx, entityId)
 	if err != nil {
-		log.Printf("Error reading relationships for entity %s: %v", entityId, err)
-		return relationships, fmt.Errorf("error reading relationships: %v", err)
+		log.Printf("[neo4j_handler.GetGraphRelationships] Error reading relationships for entity %s: %v", entityId, err)
+		return relationships, fmt.Errorf("[neo4j_handler.GetGraphRelationships] error reading relationships: %v", err)
 	}
 
 	// Process each relationship
@@ -97,7 +104,7 @@ func (repo *Neo4jRepository) GetGraphRelationships(ctx context.Context, entityId
 			relationship.EndTime = terminated
 		}
 
-		// Store in map with unique key-relTypenotunique, change to relID
+		// Store in map with unique key
 		relationships[relID] = relationship
 	}
 
@@ -131,91 +138,139 @@ func (repo *Neo4jRepository) GetEntityIdsByRelationship(ctx context.Context, ent
 func validateGraphEntityCreation(entity *pb.Entity) bool {
 	// Check if Kind is present and has a Major value
 	if entity.Kind == nil || entity.Kind.GetMajor() == "" {
-		log.Printf("Skipping Neo4j entity creation for %s: Missing or empty Kind.Major", entity.Id)
+		log.Printf("[neo4j_handler.validateGraphEntityCreation] Skipping Neo4j entity creation for %s: Missing or empty Kind.Major", entity.Id)
 		return false
 	}
 
 	// Check if Name is present and has a Value
 	if entity.Name == nil || entity.Name.GetValue() == nil {
-		log.Printf("Skipping Neo4j entity creation for %s: Missing or empty Name.Value", entity.Id)
+		log.Printf("[neo4j_handler.validateGraphEntityCreation] Skipping Neo4j entity creation for %s: Missing or empty Name.Value", entity.Id)
 		return false
 	}
 
 	// Check if Created date is present
 	if entity.Created == "" {
-		log.Printf("Skipping Neo4j entity creation for %s: Missing Created date", entity.Id)
+		log.Printf("[neo4j_handler.validateGraphEntityCreation] Skipping Neo4j entity creation for %s: Missing Created date", entity.Id)
 		return false
 	}
 
 	return true
 }
 
-// Create Graph Entity in Neo4j
-func (repo *Neo4jRepository) HandleGraphEntity(ctx context.Context, entity *pb.Entity) error {
+// HandleGraphEntityCreation creates a new entity in Neo4j
+func (repo *Neo4jRepository) HandleGraphEntityCreation(ctx context.Context, entity *pb.Entity) (bool, error) {
 	// Validate required fields for Neo4j entity creation
-	if validateGraphEntityCreation(entity) {
-		// Prepare data for Neo4j with safety checks
-		entityMap := map[string]interface{}{
-			"Id": entity.Id,
-		}
-
-		// Handle Kind field safely
-		if entity.Kind != nil {
-			entityMap["Kind"] = entity.Kind.GetMajor()
-		}
-
-		// Handle Name field safely
-		if entity.Name != nil && entity.Name.GetValue() != nil {
-			entityMap["Name"] = entity.Name.GetValue().String()
-		}
-
-		// Handle other fields
-		if entity.Created != "" {
-			entityMap["Created"] = entity.Created
-		}
-
-		if entity.Terminated != "" {
-			entityMap["Terminated"] = entity.Terminated
-		}
-
-		// First check if entity exists
-		existingEntity, err := repo.ReadGraphEntity(ctx, entity.Id)
-		if err == nil && existingEntity != nil {
-			// Entity exists, update it
-			log.Printf("Updating existing entity in Neo4j: %s", entity.Id)
-			_, err = repo.UpdateGraphEntity(ctx, entity.Id, entityMap)
-			if err != nil {
-				log.Printf("Error updating entity in Neo4j: %v", err)
-				// Don't return error to continue processing
-			} else {
-				log.Printf("Successfully updated entity in Neo4j: %s", entity.Id)
-			}
-		} else {
-			// Entity doesn't exist, create it
-			log.Printf("Creating new entity in Neo4j: %s", entity.Id)
-			_, err = repo.CreateGraphEntity(ctx, entityMap)
-			if err != nil {
-				log.Printf("Error creating entity in Neo4j: %v", err)
-				// Don't return error here so MongoDB storage is still successful
-			} else {
-				log.Printf("Successfully created entity in Neo4j: %s", entity.Id)
-			}
-		}
-	} else {
-		log.Printf("Entity %s saved in MongoDB only, skipping Neo4j due to missing required fields", entity.Id)
+	if !validateGraphEntityCreation(entity) {
+		log.Printf("[neo4j_handler.HandleGraphEntityCreation] Entity %s saved in MongoDB only, skipping Neo4j due to missing required fields", entity.Id)
+		return false, fmt.Errorf("[neo4j_handler.HandleGraphEntityCreation] missing required fields for Neo4j entity creation")
 	}
 
-	return nil
+	log.Printf("[neo4j_handler.HandleGraphEntityCreation] Creating new entity in Neo4j: %s", entity.Id)
+
+	// Prepare data for Neo4j with safety checks
+	entityMap := map[string]interface{}{
+		"Id": entity.Id,
+	}
+
+	// Validate and extract the Kind field
+	if entity.Kind == nil || entity.Kind.GetMajor() == "" || entity.Kind.GetMinor() == "" {
+		return false, fmt.Errorf("[neo4j_handler.HandleGraphEntityCreation] missing or invalid Kind.Major or Kind.Minor for entity %s", entity.Id)
+	}
+
+	kind := &pb.Kind{
+		Major: entity.Kind.GetMajor(),
+		Minor: entity.Kind.GetMinor(),
+	}
+
+	// Handle Name field safely
+	if entity.Name != nil && entity.Name.GetValue() != nil {
+		// Unpack the Any value to get the actual string
+		var stringValue wrapperspb.StringValue
+		err := entity.Name.GetValue().UnmarshalTo(&stringValue)
+		if err != nil {
+			log.Printf("[neo4j_handler.HandleGraphEntityCreation] Error unpacking Name value for entity %s: %v", entity.Id, err)
+			return false, fmt.Errorf("[neo4j_handler.HandleGraphEntityCreation] error unpacking Name value: %v", err)
+		}
+		// Get the actual string value from the StringValue
+		entityMap["Name"] = stringValue.Value
+	}
+
+	// Handle other fields
+	if entity.Created != "" {
+		entityMap["Created"] = entity.Created
+	}
+
+	if entity.Terminated != "" {
+		entityMap["Terminated"] = entity.Terminated
+	}
+
+	// Create the entity
+	result, err := repo.CreateGraphEntity(ctx, kind, entityMap)
+	if err != nil {
+		log.Printf("[neo4j_handler.HandleGraphEntityCreation] Error creating entity in Neo4j: %v", err)
+		return false, err
+	} else {
+		log.Printf("[neo4j_handler.HandleGraphEntityCreation] Successfully created entity in Neo4j: %s", entity.Id)
+		return result != nil, nil // Success if we got a non-nil result
+	}
 }
 
-func (repo *Neo4jRepository) HandleGraphRelationships(ctx context.Context, entity *pb.Entity) error {
-	// Check if entity has relationships
+// HandleGraphEntityUpdate updates an existing entity in Neo4j
+func (repo *Neo4jRepository) HandleGraphEntityUpdate(ctx context.Context, entity *pb.Entity) (bool, error) {
+	// Validate required fields for Neo4j entity update
+	if !validateGraphEntityCreation(entity) {
+		log.Printf("[neo4j_handler.HandleGraphEntityUpdate] Entity %s saved in MongoDB only, skipping Neo4j due to missing required fields", entity.Id)
+		return false, fmt.Errorf("[neo4j_handler.HandleGraphEntityUpdate] missing required fields for Neo4j entity update")
+	}
+
+	log.Printf("[neo4j_handler.HandleGraphEntityUpdate] Updating existing entity in Neo4j: %s", entity.Id)
+
+	// Prepare data for Neo4j with safety checks
+	entityMap := map[string]interface{}{
+		"Id": entity.Id,
+	}
+
+	// Handle Name field safely
+	if entity.Name != nil && entity.Name.GetValue() != nil {
+		// Unpack the Any value to get the actual string
+		var stringValue wrapperspb.StringValue
+		err := entity.Name.GetValue().UnmarshalTo(&stringValue)
+		if err != nil {
+			log.Printf("[neo4j_handler.HandleGraphEntityUpdate] Error unpacking Name value for entity %s: %v", entity.Id, err)
+			return false, fmt.Errorf("[neo4j_handler.HandleGraphEntityUpdate] error unpacking Name value: %v", err)
+		}
+		// Get the actual string value from the StringValue
+		entityMap["Name"] = stringValue.Value
+	}
+
+	// Handle other fields
+	if entity.Created != "" {
+		entityMap["Created"] = entity.Created
+	}
+
+	if entity.Terminated != "" {
+		entityMap["Terminated"] = entity.Terminated
+	}
+
+	// Update the entity
+	result, err := repo.UpdateGraphEntity(ctx, entity.Id, entityMap)
+	if err != nil {
+		log.Printf("[neo4j_handler.HandleGraphEntityUpdate] Error updating entity in Neo4j: %v", err)
+		return false, err
+	} else {
+		log.Printf("[neo4j_handler.HandleGraphEntityUpdate] Successfully updated entity in Neo4j: %s", entity.Id)
+		return result != nil, nil // Success if we got a non-nil result
+	}
+}
+
+// HandleGraphRelationshipsCreate handles creating new relationships
+func (repo *Neo4jRepository) HandleGraphRelationshipsCreate(ctx context.Context, entity *pb.Entity) error {
 	if len(entity.Relationships) == 0 {
-		log.Printf("No relationships to process for entity: %s", entity.Id)
+		log.Printf("[neo4j_handler.HandleGraphRelationshipsCreate] No relationships to process for entity: %s", entity.Id)
 		return nil
 	}
 
-	log.Printf("Processing %d relationships for entity: %s", len(entity.Relationships), entity.Id)
+	log.Printf("[neo4j_handler.HandleGraphRelationshipsCreate] Processing %d relationships for entity: %s", len(entity.Relationships), entity.Id)
 
 	// First, process all child entities
 	for _, relationship := range entity.Relationships {
@@ -226,77 +281,88 @@ func (repo *Neo4jRepository) HandleGraphRelationships(ctx context.Context, entit
 		// Check if the child entity exists
 		childEntityMap, err := repo.ReadGraphEntity(ctx, relationship.RelatedEntityId)
 		if err != nil || childEntityMap == nil {
-			// Child entity doesn't exist, log this information
-			log.Printf("Child entity %s does not exist in Neo4j. Make sure to create it first.",
+			log.Printf("[neo4j_handler.HandleGraphRelationshipsCreate] Child entity %s does not exist in Neo4j. Make sure to create it first.",
 				relationship.RelatedEntityId)
-
-			// Note: In a real-world scenario, you might want to:
-			// 1. Either create a placeholder child entity, or
-			// 2. Skip this relationship, or
-			// 3. Return an error depending on your business logic
-
-			// For now, we'll continue but note that the relationship might fail
-			// to be created if Neo4j enforces referential integrity
-		} else {
-			log.Printf("Child entity %s already exists in Neo4j", relationship.RelatedEntityId)
+			return fmt.Errorf("[neo4j_handler.HandleGraphRelationshipsCreate] child entity %s does not exist", relationship.RelatedEntityId)
 		}
+		log.Printf("[neo4j_handler.HandleGraphRelationshipsCreate] Child entity %s exists in Neo4j", relationship.RelatedEntityId)
+
+		// Create the relationship
+		_, err = repo.CreateRelationship(ctx, entity.Id, relationship)
+		if err != nil {
+			log.Printf("[neo4j_handler.HandleGraphRelationshipsCreate] Error creating relationship from %s to %s: %v",
+				entity.Id, relationship.RelatedEntityId, err)
+			return err
+		}
+		log.Printf("[neo4j_handler.HandleGraphRelationshipsCreate] Successfully created relationship from %s to %s",
+			entity.Id, relationship.RelatedEntityId)
 	}
 
-	// Now that child entities are handled, create or update relationships from parent to children
-	for relationshipType, relationship := range entity.Relationships {
-		if relationship == nil {
+	return nil
+}
+
+// HandleGraphRelationshipsUpdate handles updating existing relationships
+func (repo *Neo4jRepository) HandleGraphRelationshipsUpdate(ctx context.Context, entity *pb.Entity) error {
+	if len(entity.Relationships) == 0 {
+		log.Printf("[neo4j_handler.HandleGraphRelationshipsUpdate] No relationships to process for entity: %s", entity.Id)
+		return nil
+	}
+
+	log.Printf("[neo4j_handler.HandleGraphRelationshipsUpdate] Processing %d relationships for entity: %s", len(entity.Relationships), entity.Id)
+
+	// First verify the parent entity exists
+	parentEntity, err := repo.ReadGraphEntity(ctx, entity.Id)
+	if err != nil || parentEntity == nil {
+		log.Printf("[neo4j_handler.HandleGraphRelationshipsUpdate] Parent entity %s does not exist in Neo4j", entity.Id)
+		return fmt.Errorf("[neo4j_handler.HandleGraphRelationshipsUpdate] parent entity %s does not exist", entity.Id)
+	}
+
+	for _, relationship := range entity.Relationships {
+		if relationship == nil || relationship.RelatedEntityId == "" {
 			continue
 		}
 
-		// Skip if related entity ID is empty
-		if relationship.RelatedEntityId == "" {
-			log.Printf("Skipping relationship with empty related entity ID for entity: %s", entity.Id)
-			continue
+		// Check if the child entity exists
+		childEntityMap, err := repo.ReadGraphEntity(ctx, relationship.RelatedEntityId)
+		if err != nil || childEntityMap == nil {
+			log.Printf("[neo4j_handler.HandleGraphRelationshipsUpdate] Child entity %s does not exist in Neo4j. Make sure to create it first.",
+				relationship.RelatedEntityId)
+			return fmt.Errorf("[neo4j_handler.HandleGraphRelationshipsUpdate] child entity %s does not exist", relationship.RelatedEntityId)
+		}
+		log.Printf("[neo4j_handler.HandleGraphRelationshipsUpdate] Child entity %s exists in Neo4j", relationship.RelatedEntityId)
+
+		// Prepare relationship data
+		relationshipData := map[string]interface{}{
+			"relatedEntityId": relationship.RelatedEntityId,
+			"name":            relationship.Name,
+			"startTime":       relationship.StartTime,
 		}
 
-		// Check if this relationship already exists (if it has an ID)
+		if relationship.EndTime != "" {
+			relationshipData["endTime"] = relationship.EndTime
+		}
+
+		var createErr error
 		if relationship.Id != "" {
-			// Prepare relationship data for update
-			relationshipData := map[string]interface{}{
-				"relatedEntityId": relationship.RelatedEntityId,
-				"name":            relationship.Name,
-				"startTime":       relationship.StartTime,
+			// Try to update if we have an ID
+			_, err = repo.UpdateRelationship(ctx, relationship.Id, relationshipData)
+			if err == nil {
+				log.Printf("[neo4j_handler.HandleGraphRelationshipsUpdate] Successfully updated relationship %s from %s to %s",
+					relationship.Id, entity.Id, relationship.RelatedEntityId)
+				continue
 			}
-
-			if relationship.EndTime != "" {
-				relationshipData["endTime"] = relationship.EndTime
-			}
-
-			// Try to update the relationship
-			_, err := repo.UpdateRelationship(ctx, relationship.Id, relationshipData)
-			if err != nil {
-				log.Printf("Error updating relationship %s from %s to %s: %v",
-					relationship.Id, entity.Id, relationship.RelatedEntityId, err)
-
-				// If update fails (perhaps relationship doesn't exist despite having ID),
-				// try to create it instead
-				_, createErr := repo.CreateRelationship(ctx, entity.Id, relationship)
-				if createErr != nil {
-					log.Printf("Also failed to create relationship: %v", createErr)
-				} else {
-					log.Printf("Successfully created relationship %s after update failure", relationship.Id)
-				}
-			} else {
-				log.Printf("Successfully updated relationship %s from %s to %s of type %s",
-					relationship.Id, entity.Id, relationship.RelatedEntityId, relationshipType)
-			}
-		} else {
-			// No ID, so create a new relationship
-			_, err := repo.CreateRelationship(ctx, entity.Id, relationship)
-			if err != nil {
-				log.Printf("Error creating relationship from %s to %s of type %s: %v",
-					entity.Id, relationship.RelatedEntityId, relationshipType, err)
-				// Continue processing other relationships even if one fails
-			} else {
-				log.Printf("Successfully created relationship from %s to %s of type %s",
-					entity.Id, relationship.RelatedEntityId, relationshipType)
-			}
+			log.Printf("[neo4j_handler.HandleGraphRelationshipsUpdate] Failed to update relationship, attempting to create: %v", err)
 		}
+
+		// Either no ID or update failed, try to create
+		_, createErr = repo.CreateRelationship(ctx, entity.Id, relationship)
+		if createErr != nil {
+			log.Printf("[neo4j_handler.HandleGraphRelationshipsUpdate] Error creating relationship from %s to %s: %v",
+				entity.Id, relationship.RelatedEntityId, createErr)
+			return createErr
+		}
+		log.Printf("[neo4j_handler.HandleGraphRelationshipsUpdate] Successfully created new relationship from %s to %s",
+			entity.Id, relationship.RelatedEntityId)
 	}
 
 	return nil

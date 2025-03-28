@@ -205,41 +205,7 @@ function testEntityRelationships() returns error? {
     string relatedEntityId = "test-related-entity";
     string relationshipType = "contains";
     
-    // Create the main entity first
-    Entity mainEntity = {
-        id: entityId,
-        kind: {
-            major: "test",
-            minor: "relationship"
-        },
-        created: "2023-01-01",
-        terminated: "",
-        name: {
-            startTime: "2023-01-01",
-            endTime: "",
-            value: check pbAny:pack("main-test-entity")
-        },
-        metadata: [],
-        attributes: [],
-        relationships: [
-            {
-                key: relationshipType,
-                value: {
-                    relatedEntityId: relatedEntityId,
-                    startTime: "2023-01-01",
-                    endTime: "2023-01-31",
-                    id: "rel123",
-                    name: relationshipType
-                }
-            }
-        ]
-    };
-    
-    // Create entity
-    Entity createMainResponse = check ep->CreateEntity(mainEntity);
-    io:println("Main entity created with ID: " + createMainResponse.id);
-    
-    // Create the related entity too
+    // Create the related entity first
     Entity relatedEntity = {
         id: relatedEntityId,
         kind: {
@@ -260,6 +226,39 @@ function testEntityRelationships() returns error? {
     
     Entity createRelatedResponse = check ep->CreateEntity(relatedEntity);
     io:println("Related entity created with ID: " + createRelatedResponse.id);
+    string relationshipId = "rel-" + entityId + "-" + relatedEntityId;
+    // Create the main entity with the relationship
+    Entity mainEntity = {
+        id: entityId,
+        kind: {
+            major: "test",
+            minor: "relationship"
+        },
+        created: "2023-01-01",
+        terminated: "",
+        name: {
+            startTime: "2023-01-01",
+            endTime: "",
+            value: check pbAny:pack("main-test-entity")
+        },
+        metadata: [],
+        attributes: [],
+        relationships: [
+            {
+                key: relationshipId,
+                value: {
+                    relatedEntityId: relatedEntityId,
+                    startTime: "2023-01-01",
+                    endTime: "2023-01-31",
+                    id: relationshipId,
+                    name: relationshipType
+                }
+            }
+        ]
+    };
+    
+    Entity createMainResponse = check ep->CreateEntity(mainEntity);
+    io:println("Main entity created with ID: " + createMainResponse.id);
     
     // Now read the main entity with relationship filter
     Entity relationshipFilter = {
@@ -279,13 +278,13 @@ function testEntityRelationships() returns error? {
         attributes: [],
         relationships: [
             {
-                key: relationshipType,
+                key: relationshipId,
                 value: {
                     relatedEntityId: relatedEntityId,
                     startTime: "",
                     endTime: "",
-                    id: "",
-                    name: ""
+                    id: relationshipId,
+                    name: relationshipType
                 }
             }
         ]
@@ -297,7 +296,7 @@ function testEntityRelationships() returns error? {
     boolean foundRelationship = false;
     
     foreach var relEntry in readResponse.relationships {
-        if relEntry.key == relationshipType {
+        if relEntry.key == relationshipId {
             Relationship rel = relEntry.value;
             
             test:assertEquals(rel.relatedEntityId, relatedEntityId, "Related entity ID mismatch");
