@@ -226,7 +226,7 @@ function testEntityRelationships() returns error? {
     
     Entity createRelatedResponse = check ep->CreateEntity(relatedEntity);
     io:println("Related entity created with ID: " + createRelatedResponse.id);
-    
+    string relationshipId = "rel-" + entityId + "-" + relatedEntityId;
     // Create the main entity with the relationship
     Entity mainEntity = {
         id: entityId,
@@ -245,12 +245,12 @@ function testEntityRelationships() returns error? {
         attributes: [],
         relationships: [
             {
-                key: relationshipType,
+                key: relationshipId,
                 value: {
                     relatedEntityId: relatedEntityId,
                     startTime: "2023-01-01",
                     endTime: "2023-01-31",
-                    id: "rel123",
+                    id: relationshipId,
                     name: relationshipType
                 }
             }
@@ -278,12 +278,12 @@ function testEntityRelationships() returns error? {
         attributes: [],
         relationships: [
             {
-                key: relationshipType,
+                key: relationshipId,
                 value: {
                     relatedEntityId: relatedEntityId,
                     startTime: "",
                     endTime: "",
-                    id: "",
+                    id: relationshipId,
                     name: relationshipType
                 }
             }
@@ -296,7 +296,7 @@ function testEntityRelationships() returns error? {
     boolean foundRelationship = false;
     
     foreach var relEntry in readResponse.relationships {
-        if relEntry.key == relationshipType {
+        if relEntry.key == relationshipId {
             Relationship rel = relEntry.value;
             
             test:assertEquals(rel.relatedEntityId, relatedEntityId, "Related entity ID mismatch");

@@ -295,6 +295,7 @@ class GraphEntityTests(BasicCRUDTests):
         print("\n🔗 Creating relationships...")
         
         for dept in self.DEPARTMENTS:
+            rel_id = f"rel_{dept['id']}"
             payload = {
                 "id": self.MINISTER_ID,
                 "kind": {},
@@ -311,7 +312,7 @@ class GraphEntityTests(BasicCRUDTests):
                             "relatedEntityId": dept["id"],
                             "startTime": self.START_DATE,
                             "endTime": "",
-                            "id": f"rel_{dept['id']}",
+                            "id": rel_id,
                             "name": "HAS_DEPARTMENT"
                         }
                     }

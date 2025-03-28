@@ -498,6 +498,7 @@ function testEntityWithRelationship() returns error? {
     test:assertEquals(targetHttpResponse.statusCode, 201, "Expected 201 status code for target entity");
     
     // Create relationship between entities - include full entity structure
+    string relationshipId = "rel-" + sourceEntityId + "-" + targetEntityId;
     json relationshipJson = {
         "id": sourceEntityId,
         "kind": {
@@ -509,11 +510,11 @@ function testEntityWithRelationship() returns error? {
         "metadata": [],
         "attributes": [],
         "relationships": {
-            "CONNECTS_TO": {
+            relationshipId: {
                 "relatedEntityId": targetEntityId,
                 "startTime": "2023-01-01",
                 "endTime": "",
-                "id": "rel-" + sourceEntityId + "-" + targetEntityId,
+                "id": relationshipId,
                 "name": "CONNECTS_TO"
             }
         }
@@ -543,7 +544,7 @@ function testEntityWithRelationship() returns error? {
     // Find the relationship by iterating through the array
     Relationship? targetRelationship = ();
     foreach var rel in readEntityResponse.relationships {
-        if rel.key == "CONNECTS_TO" {
+        if rel.key == relationshipId {
             targetRelationship = rel.value;
             break;
         }
@@ -555,7 +556,7 @@ function testEntityWithRelationship() returns error? {
     test:assertEquals(relationship.relatedEntityId, targetEntityId, "Related entity ID doesn't match");
     test:assertEquals(relationship.name, "CONNECTS_TO", "Relationship name doesn't match");
     test:assertEquals(relationship.startTime, "2023-01-01T00:00:00Z", "Relationship start time doesn't match");
-    test:assertEquals(relationship.id, "rel-" + sourceEntityId + "-" + targetEntityId, "Relationship ID doesn't match");
+    test:assertEquals(relationship.id, relationshipId, "Relationship ID doesn't match");
     
     // Clean up
     EntityId deleteSourceRequest = {id: sourceEntityId};

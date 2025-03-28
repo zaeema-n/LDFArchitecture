@@ -238,7 +238,6 @@ func (r *Neo4jRepository) CreateRelationship(ctx context.Context, entityID strin
 	}
 
 	if result.Next(ctx) {
-		log.Printf("[neo4j_client.CreateRelationship] result.Next(ctx)")
 		createdRel, _ := result.Record().Get("r")
 		relationship, ok := createdRel.(neo4j.Relationship)
 		if !ok {

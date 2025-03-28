@@ -104,7 +104,7 @@ func (repo *Neo4jRepository) GetGraphRelationships(ctx context.Context, entityId
 		}
 
 		// Store in map with unique key
-		relationships[relType] = relationship
+		relationships[relID] = relationship
 	}
 
 	return relationships, nil
