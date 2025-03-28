@@ -299,6 +299,9 @@ function testEntityReading() returns error? {
     test:assertEquals(nonExistentEntity.metadata.length(), 0, "Non-existent entity should have empty metadata");
     
     // Assert that we get an error for non-existent entity
+    // For non-existence entities, we send a response with an empty data
+    // But once the Result API is integrated this can be tested. 
+    // FIXME: https://github.com/zaeema-n/LDFArchitecture/issues/23
     // test:assertTrue(nonExistentResponse is error, "Expected error for non-existent entity ID");
     
     // Clean up
@@ -346,9 +349,7 @@ function testCreateMinimalGraphEntity() returns error? {
     // Basic entity verification
     test:assertEquals(readEntityResponse.id, testId, "Entity ID doesn't match");
     test:assertEquals(readEntityResponse.kind.major, "test", "Entity kind.major doesn't match");
-    
-    // TODO: https://github.com/zaeema-n/LDFArchitecture/issues/24
-    //test:assertEquals(readEntityResponse.kind.minor, "minimal", "Entity kind.minor doesn't match");
+    test:assertEquals(readEntityResponse.kind.minor, "minimal", "Entity kind.minor doesn't match");
     
     // Verify empty collections
     test:assertEquals(readEntityResponse.metadata.length(), 0, "Metadata should be empty");
@@ -415,8 +416,7 @@ function testCreateMinimalGraphEntityViaRest() returns error? {
     // Basic entity verification
     test:assertEquals(readEntityResponse.id, testId, "Entity ID doesn't match");
     test:assertEquals(readEntityResponse.kind.major, "test", "Entity kind.major doesn't match");
-    // TODO: https://github.com/zaeema-n/LDFArchitecture/issues/24
-    //test:assertEquals(readEntityResponse.kind.minor, "minimal-json", "Entity kind.minor doesn't match");
+    test:assertEquals(readEntityResponse.kind.minor, "minimal-json", "Entity kind.minor doesn't match");
     
     // Verify empty collections
     test:assertEquals(readEntityResponse.metadata.length(), 0, "Metadata should be empty");
@@ -432,8 +432,7 @@ function testCreateMinimalGraphEntityViaRest() returns error? {
 }
 
 @test:Config {
-    groups: ["entity", "relationship"],
-    enable: false // TODO: Re-enable once attribute saving is implemented and the API supports complete entity updates
+    groups: ["entity", "relationship"]
 }
 function testEntityWithRelationship() returns error? {
     // Test IDs for entities
@@ -499,6 +498,7 @@ function testEntityWithRelationship() returns error? {
     test:assertEquals(targetHttpResponse.statusCode, 201, "Expected 201 status code for target entity");
     
     // Create relationship between entities - include full entity structure
+    string relationshipId = "rel-" + sourceEntityId + "-" + targetEntityId;
     json relationshipJson = {
         "id": sourceEntityId,
         "kind": {
@@ -510,11 +510,11 @@ function testEntityWithRelationship() returns error? {
         "metadata": [],
         "attributes": [],
         "relationships": {
-            "CONNECTS_TO": {
+            relationshipId: {
                 "relatedEntityId": targetEntityId,
                 "startTime": "2023-01-01",
                 "endTime": "",
-                "id": "rel-" + sourceEntityId + "-" + targetEntityId,
+                "id": relationshipId,
                 "name": "CONNECTS_TO"
             }
         }
@@ -544,7 +544,7 @@ function testEntityWithRelationship() returns error? {
     // Find the relationship by iterating through the array
     Relationship? targetRelationship = ();
     foreach var rel in readEntityResponse.relationships {
-        if rel.key == "CONNECTS_TO" {
+        if rel.key == relationshipId {
             targetRelationship = rel.value;
             break;
         }
@@ -555,8 +555,8 @@ function testEntityWithRelationship() returns error? {
     Relationship relationship = <Relationship>targetRelationship;
     test:assertEquals(relationship.relatedEntityId, targetEntityId, "Related entity ID doesn't match");
     test:assertEquals(relationship.name, "CONNECTS_TO", "Relationship name doesn't match");
-    test:assertEquals(relationship.startTime, "2023-01-01", "Relationship start time doesn't match");
-    test:assertEquals(relationship.id, "rel-" + sourceEntityId + "-" + targetEntityId, "Relationship ID doesn't match");
+    test:assertEquals(relationship.startTime, "2023-01-01T00:00:00Z", "Relationship start time doesn't match");
+    test:assertEquals(relationship.id, relationshipId, "Relationship ID doesn't match");
     
     // Clean up
     EntityId deleteSourceRequest = {id: sourceEntityId};

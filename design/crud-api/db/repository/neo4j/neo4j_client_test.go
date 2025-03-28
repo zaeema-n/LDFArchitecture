@@ -42,17 +42,22 @@ func TestMain(m *testing.M) {
 
 // TestCreateEntity tests the CreateGraphEntity method of the Neo4jRepository
 func TestCreateEntity(t *testing.T) {
+	// Prepare the kind parameter
+	kind := &pb.Kind{
+		Major: "Person",
+		Minor: "Minister",
+	}
+
 	// Prepare the entity data as a map
 	entity := map[string]interface{}{
 		"Id":         "1",
-		"Kind":       "Person",
 		"Name":       "John Doe",
-		"Created":    "2025-03-18",
+		"Created":    "2025-03-18T00:00:00Z",
 		"Terminated": nil,
 	}
 
 	// Call the CreateGraphEntity method and capture the returned entity
-	createdEntity, err := repository.CreateGraphEntity(context.Background(), entity)
+	createdEntity, err := repository.CreateGraphEntity(context.Background(), kind, entity)
 	log.Printf("Created entity: %v", createdEntity)
 
 	// Verify that no error occurred during creation
@@ -61,7 +66,8 @@ func TestCreateEntity(t *testing.T) {
 	// Verify that the returned entity has the correct values
 	assert.Equal(t, "1", createdEntity["Id"], "Expected entity to have the correct Id")
 	assert.Equal(t, "John Doe", createdEntity["Name"], "Expected entity to have the correct Name")
-	assert.Equal(t, "2025-03-18", createdEntity["Created"], "Expected entity to have the correct Created date")
+	assert.Equal(t, "2025-03-18T00:00:00Z", createdEntity["Created"], "Expected entity to have the correct Created date")
+	assert.Equal(t, "Minister", createdEntity["MinorKind"], "Expected entity to have the correct MinorKind")
 	assert.Nil(t, createdEntity["Terminated"], "Expected entity to have no Terminated field")
 }
 
@@ -70,25 +76,28 @@ func TestCreateRelationship(t *testing.T) {
 	// Prepare the context
 	ctx := context.Background()
 
+	kind := &pb.Kind{
+		Major: "Person",
+		Minor: "Minister",
+	}
+
 	// Create two entities first
 	entity1 := map[string]interface{}{
 		"Id":      "2",
-		"Kind":    "Person",
 		"Name":    "Alice",
 		"Created": "2025-03-18",
 	}
 	entity2 := map[string]interface{}{
 		"Id":      "3",
-		"Kind":    "Person",
 		"Name":    "Bob",
 		"Created": "2025-03-18",
 	}
 
 	// Create entities
-	_, err := repository.CreateGraphEntity(ctx, entity1)
+	_, err := repository.CreateGraphEntity(ctx, kind, entity1)
 	assert.Nil(t, err, "Expected no error when creating first entity")
 
-	_, err = repository.CreateGraphEntity(ctx, entity2)
+	_, err = repository.CreateGraphEntity(ctx, kind, entity2)
 	assert.Nil(t, err, "Expected no error when creating second entity")
 
 	// Prepare relationship data
@@ -106,26 +115,31 @@ func TestCreateRelationship(t *testing.T) {
 
 	// Verify that the returned relationship has the correct values
 	assert.Equal(t, "101", createdRelationship["Id"], "Expected relationship to have the correct Id")
-	assert.Equal(t, "2025-03-18", createdRelationship["Created"], "Expected relationship to have the correct Created date")
+	assert.Equal(t, "2025-03-18T00:00:00Z", createdRelationship["Created"], "Expected relationship to have the correct Created date")
 	assert.Equal(t, "KNOWS", createdRelationship["relationshipType"], "Expected relationship to have the correct type")
 }
 
 // TestReadEntity tests the ReadGraphEntity method of the Neo4jRepository
 func TestReadEntity(t *testing.T) {
+
+	kind := &pb.Kind{
+		Major: "Person",
+		Minor: "Minister",
+	}
+
 	// Create an entity for testing
 	entity := map[string]interface{}{
 		"Id":      "6",
-		"Kind":    "Person",
 		"Name":    "Charlie",
-		"Created": "2025-03-18",
+		"Created": "2025-03-18T00:00:00Z",
 	}
 
 	// Create the entity
-	createdEntity, err := repository.CreateGraphEntity(context.Background(), entity)
+	createdEntity, err := repository.CreateGraphEntity(context.Background(), kind, entity)
 	assert.Nil(t, err, "Expected no error when creating the entity")
 	assert.Equal(t, entity["Id"], createdEntity["Id"], "Expected created entity to have the correct Id")
 	assert.Equal(t, entity["Name"], createdEntity["Name"], "Expected created entity to have the correct Name")
-	assert.Equal(t, entity["Created"], createdEntity["Created"], "Expected created entity to have the correct Created date")
+	assert.Equal(t, "2025-03-18T00:00:00Z", createdEntity["Created"], "Expected created entity to have the correct Created date")
 
 	// Read the entity by Id
 	readEntity, err := repository.ReadGraphEntity(context.Background(), "6")
@@ -133,32 +147,35 @@ func TestReadEntity(t *testing.T) {
 
 	// Verify the content of the entity
 	assert.Equal(t, entity["Id"], readEntity["Id"], "Expected entity to have the correct Id")
-	assert.Equal(t, entity["Kind"], readEntity["Kind"], "Expected entity to have the correct Kind")
 	assert.Equal(t, entity["Name"], readEntity["Name"], "Expected entity to have the correct Name")
-	assert.Equal(t, entity["Created"], readEntity["Created"], "Expected entity to have the correct Created date")
+	assert.Equal(t, "2025-03-18T00:00:00Z", readEntity["Created"], "Expected entity to have the correct Created date")
 }
 
 // TestReadRelatedEntityIds tests the ReadRelatedGraphEntityIds method of the Neo4jRepository
 func TestReadRelatedEntityIds(t *testing.T) {
+
+	kind := &pb.Kind{
+		Major: "Person",
+		Minor: "Minister",
+	}
+
 	// Create two entities
 	entity1 := map[string]interface{}{
 		"Id":      "4",
-		"Kind":    "Person",
 		"Name":    "Alice",
 		"Created": "2025-03-18",
 	}
 	entity2 := map[string]interface{}{
 		"Id":      "5",
-		"Kind":    "Person",
 		"Name":    "Bob",
 		"Created": "2025-03-18",
 	}
 
 	// Create entities
-	_, err := repository.CreateGraphEntity(context.Background(), entity1)
+	_, err := repository.CreateGraphEntity(context.Background(), kind, entity1)
 	assert.Nil(t, err, "Expected no error when creating the first entity")
 
-	_, err = repository.CreateGraphEntity(context.Background(), entity2)
+	_, err = repository.CreateGraphEntity(context.Background(), kind, entity2)
 	assert.Nil(t, err, "Expected no error when creating the second entity")
 
 	// Create a relationship between the entities
@@ -188,25 +205,28 @@ func TestReadRelatedEntityIds(t *testing.T) {
 }
 
 func TestReadRelationships(t *testing.T) {
+	kind := &pb.Kind{
+		Major: "Person",
+		Minor: "Minister",
+	}
+
 	// Create two entities
 	entityMap1 := map[string]interface{}{
 		"Id":      "7",
-		"Kind":    "Person",
 		"Name":    "David",
 		"Created": "2025-03-18",
 	}
 	entityMap2 := map[string]interface{}{
 		"Id":      "8",
-		"Kind":    "Person",
 		"Name":    "Eve",
 		"Created": "2025-03-18",
 	}
 
 	// Create entities in the repository
-	_, err := repository.CreateGraphEntity(context.Background(), entityMap1)
+	_, err := repository.CreateGraphEntity(context.Background(), kind, entityMap1)
 	assert.Nil(t, err, "Expected no error when creating first entity")
 
-	_, err = repository.CreateGraphEntity(context.Background(), entityMap2)
+	_, err = repository.CreateGraphEntity(context.Background(), kind, entityMap2)
 	assert.Nil(t, err, "Expected no error when creating second entity")
 
 	// Create a relationship between the entities
@@ -238,6 +258,11 @@ func TestReadRelationships(t *testing.T) {
 }
 
 func TestReadRelationship(t *testing.T) {
+	kind := &pb.Kind{
+		Major: "Person",
+		Minor: "Minister",
+	}
+
 	// Create two entities
 	entityMap1 := map[string]interface{}{
 		"Id":      "9",
@@ -253,10 +278,10 @@ func TestReadRelationship(t *testing.T) {
 	}
 
 	// Create entities in the repository
-	_, err := repository.CreateGraphEntity(context.Background(), entityMap1)
+	_, err := repository.CreateGraphEntity(context.Background(), kind, entityMap1)
 	assert.Nil(t, err, "Expected no error when creating first entity")
 
-	_, err = repository.CreateGraphEntity(context.Background(), entityMap2)
+	_, err = repository.CreateGraphEntity(context.Background(), kind, entityMap2)
 	assert.Nil(t, err, "Expected no error when creating second entity")
 
 	// Create a relationship between the entities
@@ -278,13 +303,18 @@ func TestReadRelationship(t *testing.T) {
 	assert.Equal(t, "KNOWS", relationshipMap["type"], "Expected relationship type to be KNOWS")
 	assert.Equal(t, "7", relationshipMap["startEntityID"], "Expected start entity ID to be 7 (David's ID)")
 	assert.Equal(t, "8", relationshipMap["endEntityID"], "Expected end entity ID to be 8 (Eve's ID)")
-	assert.Equal(t, "2025-03-18", relationshipMap["Created"], "Expected start date to be 2025-03-18")
+	assert.Equal(t, "2025-03-18T00:00:00Z", relationshipMap["Created"], "Expected start date to be 2025-03-18T00:00:00Z")
 
 	// Optional: Assert the endDate is nil (since it wasn't set in the creation)
 	assert.Nil(t, relationshipMap["Terminated"], "Expected end date to be nil")
 }
 
 func TestUpdateEntity(t *testing.T) {
+	kind := &pb.Kind{
+		Major: "Person",
+		Minor: "Minister",
+	}
+
 	// Create a test entity
 	entityData := map[string]interface{}{
 		"Id":      "11",
@@ -292,13 +322,13 @@ func TestUpdateEntity(t *testing.T) {
 		"Name":    "Mary",
 		"Created": "2025-03-18",
 	}
-	_, err := repository.CreateGraphEntity(context.Background(), entityData)
+	_, err := repository.CreateGraphEntity(context.Background(), kind, entityData)
 	assert.Nil(t, err, "Expected no error when creating entity")
 
 	// Update the entity
 	updateData := map[string]interface{}{
 		"Name":       "Mary Updated",
-		"Terminated": "2025-12-31",
+		"Terminated": "2025-12-31T00:00:00Z",
 	}
 
 	updatedEntity, err := repository.UpdateGraphEntity(context.Background(), "11", updateData)
@@ -308,20 +338,20 @@ func TestUpdateEntity(t *testing.T) {
 
 	// Verify that the entity was updated correctly in the return value
 	assert.Equal(t, "Mary Updated", updatedEntity["Name"], "Expected updated name")
-	assert.Equal(t, "2025-12-31", updatedEntity["Terminated"], "Expected updated dateEnded")
+	assert.Equal(t, "2025-12-31T00:00:00Z", updatedEntity["Terminated"], "Expected updated dateEnded")
 
 	// Fetch the entity from the database and verify
 	entity, err := repository.ReadGraphEntity(context.Background(), "11")
 	log.Printf("Fetched entity: %v", entity)
 	assert.Nil(t, err, "Expected no error when reading updated entity")
 	assert.Equal(t, "Mary Updated", entity["Name"], "Expected database to have updated name")
-	assert.Equal(t, "2025-12-31", entity["Terminated"], "Expected database to have updated dateEnded")
+	assert.Equal(t, "2025-12-31T00:00:00Z", entity["Terminated"], "Expected database to have updated dateEnded")
 }
 
 func TestUpdateRelationship(t *testing.T) {
 	// Update the relationship
 	updateData := map[string]interface{}{
-		"Terminated": "2025-12-31",
+		"Terminated": "2025-12-31T00:00:00Z",
 	}
 
 	// Call the function to update the relationship
@@ -331,7 +361,7 @@ func TestUpdateRelationship(t *testing.T) {
 	assert.NotNil(t, updatedRelationship, "Expected updated relationship to be returned")
 
 	// Verify that the relationship was updated correctly in the return value
-	assert.Equal(t, "2025-12-31", updatedRelationship["Terminated"], "Expected updated endDate")
+	assert.Equal(t, "2025-12-31T00:00:00Z", updatedRelationship["Terminated"], "Expected updated endDate")
 
 	// Fetch the relationship from the database using getRelationship
 	relationship, err := repository.ReadRelationship(context.Background(), "101")
@@ -339,7 +369,7 @@ func TestUpdateRelationship(t *testing.T) {
 	assert.Nil(t, err, "Expected no error when reading updated relationship")
 
 	// Check if the relationship has the updated endDate
-	assert.Equal(t, "2025-12-31", relationship["Terminated"], "Expected relationship to have updated endDate")
+	assert.Equal(t, "2025-12-31T00:00:00Z", relationship["Terminated"], "Expected relationship to have updated endDate")
 }
 
 func TestDeleteRelationship(t *testing.T) {
@@ -358,14 +388,18 @@ func TestDeleteRelationship(t *testing.T) {
 }
 
 func TestDeleteEntity(t *testing.T) {
+	kind := &pb.Kind{
+		Major: "Person",
+		Minor: "Minister",
+	}
+
 	// Create a test entity
 	entity := map[string]interface{}{
 		"Id":      "12",
-		"Kind":    "Person",
 		"Name":    "John Smith",
 		"Created": "2025-03-18",
 	}
-	_, err := repository.CreateGraphEntity(context.Background(), entity)
+	_, err := repository.CreateGraphEntity(context.Background(), kind, entity)
 	assert.Nil(t, err, "Expected no error when creating entity")
 
 	// Step 2: Verify that the entity was deleted by attempting to fetch it
@@ -440,17 +474,27 @@ func TestAddMinistriesAndDepartments(t *testing.T) {
 	// Start time for the relationships
 	startTime := "2022-07-22"
 
+	kindMinistry := &pb.Kind{
+		Major: "Organization",
+		Minor: "Ministry",
+	}
+
+	kindDept := &pb.Kind{
+		Major: "Organization",
+		Minor: "Department",
+	}
+
 	// Create ministries and departments, and establish relationships
 	for _, ministry := range ministries {
+
 		// Create the ministry
 		ministryEntity := map[string]interface{}{
 			"Id":      ministry.id,
-			"Kind":    "Ministry",
 			"Name":    ministry.name,
 			"Created": "2022-07-22",
 		}
 
-		_, err := repository.CreateGraphEntity(context.Background(), ministryEntity)
+		_, err := repository.CreateGraphEntity(context.Background(), kindMinistry, ministryEntity)
 		assert.Nil(t, err, "Failed to create ministry: %s", ministry.name)
 
 		// Create departments and relationships
@@ -458,12 +502,11 @@ func TestAddMinistriesAndDepartments(t *testing.T) {
 			// Create the department
 			departmentEntity := map[string]interface{}{
 				"Id":      department.id,
-				"Kind":    "Department",
 				"Name":    department.name,
 				"Created": "2022-07-22",
 			}
 
-			_, err := repository.CreateGraphEntity(context.Background(), departmentEntity)
+			_, err := repository.CreateGraphEntity(context.Background(), kindDept, departmentEntity)
 			assert.Nil(t, err, "Failed to create department: %s", department.name)
 
 			// Establish the is_department relationship

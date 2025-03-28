@@ -46,9 +46,47 @@ def create_entity_for_query():
     """Create a base entity with metadata, attributes, and relationships."""
     print("\n🟢 Creating entity for query tests...")
 
-    payload = {
+    payload_child = {
+        "id": RELATED_ID,
+        "kind": {"major": "test", "minor": "child"},
+        "created": "2024-01-01T00:00:00Z",
+        "terminated": "",
+        "name": {
+            "startTime": "2024-01-01T00:00:00Z",
+            "endTime": "",
+            "value": {
+                "typeUrl": "type.googleapis.com/google.protobuf.StringValue",
+                "value": "Query Test Entity Child"
+            }
+        },
+        "metadata": [
+            {"key": "source", "value": "unit-test-1"},
+            {"key": "env", "value": "test-1"}
+        ],
+        "attributes": [
+            {
+                "key": "humidity",
+                "value": {
+                    "values": [
+                        {
+                            "startTime": "2024-01-01T00:00:00Z",
+                            "endTime": "2024-01-02T00:00:00Z",
+                            "value": {
+                                "typeUrl": "type.googleapis.com/google.protobuf.StringValue",
+                                "value": "10.5"
+                            }
+                        }
+                    ]
+                }
+            }
+        ],
+        "relationships": [
+        ]
+    }
+
+    payload_source = {
         "id": ENTITY_ID,
-        "kind": {"major": "test", "minor": "query"},
+        "kind": {"major": "test", "minor": "parent"},
         "created": "2024-01-01T00:00:00Z",
         "terminated": "",
         "name": {
@@ -82,7 +120,7 @@ def create_entity_for_query():
         ],
         "relationships": [
             {
-                "key": "linked",
+                "key": "rel-001",
                 "value": {
                     "relatedEntityId": RELATED_ID,
                     "startTime": "2024-01-01T00:00:00Z",
@@ -94,7 +132,11 @@ def create_entity_for_query():
         ]
     }
 
-    res = requests.post(UPDATE_API_URL, json=payload)
+    res = requests.post(UPDATE_API_URL, json=payload_child)
+    assert res.status_code == 201 or res.status_code == 200, f"Failed to create entity: {res.text}"
+    print("✅ Created entity for query tests.")
+
+    res = requests.post(UPDATE_API_URL, json=payload_source)
     assert res.status_code == 201 or res.status_code == 200, f"Failed to create entity: {res.text}"
     print("✅ Created entity for query tests.")
 
@@ -104,6 +146,11 @@ def test_attribute_lookup():
     url = f"{QUERY_API_URL}/{ENTITY_ID}/attributes/temperature"
     res = requests.get(url)
     assert res.status_code == 404, f"Failed to get attribute: {res.text}"
+    
+    # Add response body validation
+    body = res.json()
+    assert isinstance(body, dict), "Response should be a dictionary"
+    assert "error" in body, "Error message should be present in 404 response"
     print("✅ Attribute response:", json.dumps(res.json(), indent=2))
 
 def test_metadata_lookup():
@@ -116,15 +163,15 @@ def test_metadata_lookup():
     body = res.json()
     print("✅ Raw metadata response:", json.dumps(body, indent=2))
     
-    # Check if keys exist, regardless of their format
+    # Enhanced metadata validation
+    assert isinstance(body, dict), "Metadata response should be a dictionary"
+    assert len(body) == 2, f"Expected 2 metadata entries, got {len(body)}"
     assert "source" in body, "Source metadata key missing"
     assert "env" in body, "Env metadata key missing"
     
-    # Extract actual string values from possibly complex protobuf structures
     source_value = decode_protobuf_any_value(body["source"])
     env_value = decode_protobuf_any_value(body["env"])
     
-    # Verify the extracted values match what we expect
     assert source_value == "unit-test", f"Source value mismatch: {source_value}"
     assert env_value == "test", f"Env value mismatch: {env_value}"
 
@@ -141,23 +188,39 @@ def test_relationship_query():
     }
     res = requests.post(url, json=payload)
     assert res.status_code == 200, f"Failed to get relationships: {res.text}"
+    
+    body = res.json()
+    # Add relationship response validation
+    assert isinstance(body, list), "Relationship response should be a list"
+    assert len(body) > 0, "Expected at least one relationship"
+    
+    relationship = body[0]
+    assert "relatedEntityId" in relationship, "Relationship should have relatedEntityId"
+    assert relationship["relatedEntityId"] == RELATED_ID, "Related entity ID mismatch"
+    assert relationship["name"] == "linked", "Relationship name mismatch"
+    assert relationship["id"] == "rel-001", "Relationship ID mismatch"
     print("✅ Relationship response:", json.dumps(res.json(), indent=2))
 
 def test_entity_search():
-    """Test search by kind."""
+    """Test search by entity ID."""
     print("\n🔍 Testing entity search...")
     url = f"{QUERY_API_URL}/search"
     payload = {
-        "kind": "test",
-        "birthDate": "",
-        "deathDate": "",
-        "attributes": {
-            "temperature": "25.5"
-        }
+        "id": ENTITY_ID,
+        "created": "",
+        "terminated": ""
     }
     res = requests.post(url, json=payload)
     assert res.status_code == 200, f"Search failed: {res.text}"
-    print("✅ Search response:", json.dumps(res.json(), indent=2))
+    
+    body = res.json()
+    # Add search response validation
+    ## FIXME: Make sure to implement the entities/search and update this test case
+    assert isinstance(body, dict), "Search response should be a dictionary"
+    assert "body" in body, "Search response should have a 'body' field"
+    assert isinstance(body["body"], list), "Search response body should be a list"
+    assert len(body["body"]) == 0, "Expected an empty list in search response"
+
 
 if __name__ == "__main__":
     print("🚀 Running Query API E2E Tests...")
