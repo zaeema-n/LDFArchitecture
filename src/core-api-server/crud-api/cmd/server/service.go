@@ -68,7 +68,7 @@ func (s *Server) ReadEntity(ctx context.Context, req *pb.Entity) (*pb.Entity, er
 
 	// Try to get additional entity information from Neo4j
 	kind, name, created, terminated, _ := s.neo4jRepo.GetGraphEntity(ctx, req.Id)
-
+ 
 	// Try to get relationships from Neo4j
 	relationships, _ := s.neo4jRepo.GetGraphRelationships(ctx, req.Id)
 

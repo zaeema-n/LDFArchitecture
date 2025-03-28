@@ -97,11 +97,34 @@ func (repo *Neo4jRepository) GetGraphRelationships(ctx context.Context, entityId
 			relationship.EndTime = terminated
 		}
 
-		// Store in map with unique key
-		relationships[relType] = relationship
+		// Store in map with unique key-relTypenotunique, change to relID
+		relationships[relID] = relationship
 	}
 
 	return relationships, nil
+}
+
+func (repo *Neo4jRepository) GetEntityIdsByRelationship(ctx context.Context, entityId string, relationship string, ts string) ([]string, error) {
+	// Validate input parameters
+	if entityId == "" {
+		return nil, fmt.Errorf("entityId cannot be empty")
+	}
+	if relationship == "" {
+		return nil, fmt.Errorf("relationship type cannot be empty")
+	}
+	if ts == "" {
+		return nil, fmt.Errorf("timestamp cannot be empty")
+	}
+
+	// Call ReadRelatedGraphEntityIds from neo4j_client.go
+	relatedEntityIDs, err := repo.ReadRelatedGraphEntityIds(ctx, entityId, relationship, ts)
+	if err != nil {
+		log.Printf("Error fetching related entity IDs for entity %s with relationship %s: %v", entityId, relationship, err)
+		return nil, err
+	}
+
+	// Return the list of related entity IDs
+	return relatedEntityIDs, nil
 }
 
 // validateGraphEntityCreation checks if an entity has all required fields for Neo4j storage
