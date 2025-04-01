@@ -26,7 +26,7 @@ design/crud-api/crud-service
 
 # Neo4j
 docker/neo4j/config.env
-docker/neo4j/neo4j/data
-docker/neo4j/neo4j/logs
-docker/neo4j/neo4j/import
-docker/neo4j/neo4j/plugins
+docker/neo4j/neo4j/data/*
+docker/neo4j/neo4j/logs/*
+docker/neo4j/neo4j/import/*
+docker/neo4j/neo4j/plugins/*
