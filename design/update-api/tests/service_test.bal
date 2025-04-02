@@ -82,8 +82,8 @@ function testMetadataHandling() returns error? {
     test:assertEquals(actualValues["key2"], expectedValue2, "Metadata value for key2 doesn't match");
     
     // Clean up
-    EntityId deleteEntityRequest = {id: testId};
-    Empty _ = check ep->DeleteEntity(deleteEntityRequest);
+    Empty _ = check ep->DeleteEntity(readEntityRequest);
+    Empty _ = check ep->DeleteEntity({id: testId});
     io:println("Test entity deleted");
     
     return;
@@ -203,8 +203,8 @@ function testMetadataUpdating() returns error? {
     io:println("Updated metadata verified");
     
     // Clean up
-    EntityId deleteEntityRequest = {id: testId};
-    Empty _ = check ep->DeleteEntity(deleteEntityRequest);
+    Empty _ = check ep->DeleteEntity(readEntityRequest);
+    Empty _ = check ep->DeleteEntity({id: testId});
     io:println("Test entity deleted");
     
     return;
@@ -306,6 +306,7 @@ function testEntityReading() returns error? {
     
     // Clean up
     Empty _ = check ep->DeleteEntity(readEntityRequest);
+    Empty _ = check ep->DeleteEntity({id: testId});
     io:println("Test entity deleted");
     
     return;
@@ -357,8 +358,8 @@ function testCreateMinimalGraphEntity() returns error? {
     test:assertEquals(readEntityResponse.relationships.length(), 0, "Relationships should be empty");
     
     // Clean up
-    EntityId deleteEntityRequest = {id: testId};
-    Empty _ = check ep->DeleteEntity(deleteEntityRequest);
+    Empty _ = check ep->DeleteEntity(readEntityRequest);
+    Empty _ = check ep->DeleteEntity({id: testId});
     io:println("Test minimal entity deleted");
     
     return;
@@ -424,8 +425,8 @@ function testCreateMinimalGraphEntityViaRest() returns error? {
     test:assertEquals(readEntityResponse.relationships.length(), 0, "Relationships should be empty");
     
     // Clean up
-    EntityId deleteEntityRequest = {id: testId};
-    Empty _ = check ep->DeleteEntity(deleteEntityRequest);
+    Empty _ = check ep->DeleteEntity(readEntityRequest);
+    Empty _ = check ep->DeleteEntity({id: testId});
     io:println("Test minimal JSON entity deleted");
     
     return;
@@ -559,10 +560,9 @@ function testEntityWithRelationship() returns error? {
     test:assertEquals(relationship.id, relationshipId, "Relationship ID doesn't match");
     
     // Clean up
-    EntityId deleteSourceRequest = {id: sourceEntityId};
-    EntityId deleteTargetRequest = {id: targetEntityId};
-    Empty _ = check ep->DeleteEntity(deleteSourceRequest);
-    Empty _ = check ep->DeleteEntity(deleteTargetRequest);
+    Empty _ = check ep->DeleteEntity(readEntityRequest);
+    Empty _ = check ep->DeleteEntity({id: sourceEntityId});
+    Empty _ = check ep->DeleteEntity({id: targetEntityId});
     io:println("Test entities with relationship deleted");
     
     return;
