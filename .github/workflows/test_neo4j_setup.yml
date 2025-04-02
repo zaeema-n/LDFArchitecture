@@ -14,6 +14,11 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
+    - name: Install required dependencies
+      run: |
+        apt-get update
+        apt-get install -y wget gnupg
+
     - name: Install Neo4j
       run: |
         wget -O - https://debian.neo4j.com/neotechnology.gpg.key | apt-key add -
