@@ -41,6 +41,11 @@ jobs:
         auto-activate-base: false
         miniconda-version: "latest"
 
+    - name: Install mamba
+      shell: bash -l {0}
+      run: |
+        conda install -n base -c conda-forge mamba
+
     - name: Activate Mamba environment
       shell: bash -l {0}
       run: mamba activate ldf-tests
