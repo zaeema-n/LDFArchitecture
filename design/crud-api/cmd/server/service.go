@@ -178,8 +178,6 @@ func main() {
 		Password: os.Getenv("NEO4J_PASSWORD"),
 	}
 
-	log.Printf("[service.main] MongoDB config: %+v", mongoConfig)
-	log.Printf("[service.main] Neo4j config: %+v", neo4jConfig)
 	// Create MongoDB repository
 	ctx := context.Background()
 	mongoRepo := mongorepository.NewMongoRepository(ctx, mongoConfig)
