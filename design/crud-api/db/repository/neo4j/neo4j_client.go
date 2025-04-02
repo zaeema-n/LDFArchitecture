@@ -18,6 +18,7 @@ type Neo4jRepository struct {
 
 // NewNeo4jRepository initializes a Neo4j driver
 func NewNeo4jRepository(ctx context.Context, config *config.Neo4jConfig) (*Neo4jRepository, error) {
+	log.Printf("[neo4j_client.NewNeo4jRepository] config.URI: %+v", config.URI)
 	client, err := neo4j.NewDriverWithContext(config.URI, neo4j.BasicAuth(config.Username, config.Password, ""))
 	if err != nil {
 		log.Printf("[neo4j_client.NewNeo4jRepository] failed to create Neo4j driver: %v", err)
