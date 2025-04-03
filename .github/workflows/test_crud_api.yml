@@ -17,7 +17,7 @@ jobs:
     - name: Install required dependencies
       run: |
         apt-get update
-        apt-get install -y wget gnupg systemd python3 python3-pip
+        apt-get install -y wget gnupg systemd python3 python3-pip golang-go
 
     - name: Set up Mamba
       uses: conda-incubator/setup-miniconda@v2
@@ -44,22 +44,12 @@ jobs:
       run: |
         bal version
 
-    - name: Start CRUD Server
-      shell: bash -l {0}
-      run: |
-        cd design/crud-api
-        ./crud-server &
-        sleep 10  # Wait for CRUD server to start
-
-    - name: Start API Server
-      shell: bash -l {0}
-      run: |
-        cd design/update-api
-        bal run &
-        sleep 10  # Wait for API server to start
-
     - name: Run CRUD Tests
       shell: bash -l {0}
       run: |
-        cd design/tests/e2e
-        mamba run -n ldf-tests python3 basic_crud_tests.py
+        cd design/crud-api &
+        go build ./... &
+        go build -o crud-service cmd/server/service.go cmd/server/utils.go
+        sleep 10  # Wait for CRUD server to start
+        go test -v ./...
+
