@@ -13,6 +13,7 @@ import (
 	neo4jrepository "lk/datafoundation/crud-api/db/repository/neo4j"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
@@ -204,6 +205,9 @@ func main() {
 	}
 
 	pb.RegisterCrudServiceServer(grpcServer, server)
+
+	// Register reflection service
+	reflection.Register(grpcServer)
 
 	log.Printf("[service.main] CRUD Service is running on %s:%s...", host, port)
 	if err := grpcServer.Serve(listener); err != nil {
