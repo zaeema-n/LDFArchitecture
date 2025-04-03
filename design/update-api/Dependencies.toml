@@ -200,6 +200,9 @@ dependencies = [
 	{org = "ballerina", name = "lang.__internal"},
 	{org = "ballerina", name = "lang.object"}
 ]
+modules = [
+	{org = "ballerina", packageName = "lang.int", moduleName = "lang.int"}
+]
 
 [[package]]
 org = "ballerina"
@@ -290,6 +293,9 @@ dependencies = [
 	{org = "ballerina", name = "io"},
 	{org = "ballerina", name = "jballerina.java"}
 ]
+modules = [
+	{org = "ballerina", packageName = "os", moduleName = "os"}
+]
 
 [[package]]
 org = "ballerina"
@@ -368,6 +374,8 @@ dependencies = [
 	{org = "ballerina", name = "grpc"},
 	{org = "ballerina", name = "http"},
 	{org = "ballerina", name = "io"},
+	{org = "ballerina", name = "lang.int"},
+	{org = "ballerina", name = "os"},
 	{org = "ballerina", name = "protobuf"},
 	{org = "ballerina", name = "test"},
 	{org = "ballerinai", name = "observe"}
