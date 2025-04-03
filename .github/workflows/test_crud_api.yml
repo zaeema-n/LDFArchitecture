@@ -44,10 +44,10 @@ jobs:
 
     - name: Set up Database Environment Variables
       run: |
-        echo "NEO4J_URI=bolt://localhost:7687" >> $GITHUB_ENV
+        echo "NEO4J_URI=bolt://neo4j:7687" >> $GITHUB_ENV
         echo "NEO4J_USER=neo4j" >> $GITHUB_ENV
         echo "NEO4J_PASSWORD=test123456" >> $GITHUB_ENV
-        echo "MONGO_URI=mongodb://localhost:27017" >> $GITHUB_ENV
+        echo "MONGO_URI=mongodb://mongo:27017" >> $GITHUB_ENV
         echo "MONGO_DB_NAME=testdb" >> $GITHUB_ENV
         echo "MONGO_COLLECTION=entities" >> $GITHUB_ENV
 
