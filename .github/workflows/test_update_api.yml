@@ -75,7 +75,11 @@ jobs:
           if nc -z localhost 50051; then
             echo "CRUD service is up and running"
             # Additional wait to ensure service is fully initialized
-            sleep 2
+            sleep 5
+            # Verify service is responding
+            echo "Testing CRUD service connection..."
+            curl -v http://localhost:50051/health || true
+            echo "CRUD service health check completed"
             break
           fi
           echo "Waiting for CRUD service to start... ($i/30)"
@@ -83,16 +87,21 @@ jobs:
         done
         if ! nc -z localhost 50051; then
           echo "CRUD service failed to start"
+          echo "Checking service logs:"
+          cat crud-service.log || true
           exit 1
         fi
-        # Verify service is responding
-        curl -v http://localhost:50051/health || true
+        echo "CRUD service is ready for tests"
     
     - name: Test Update API
       shell: bash -l {0}
       run: |
         cd design/update-api
         # Run tests and capture the exit code
+        echo "CRUD_SERVICE_HOST=$CRUD_SERVICE_HOST"
+        echo "CRUD_SERVICE_PORT=$CRUD_SERVICE_PORT"
+        echo "UPDATE_SERVICE_HOST=$UPDATE_SERVICE_HOST"
+        echo "UPDATE_SERVICE_PORT=$UPDATE_SERVICE_PORT"
         bal test || TEST_EXIT_CODE=$?
         # Store the exit code for later use
         echo "TEST_EXIT_CODE=$TEST_EXIT_CODE" >> $GITHUB_ENV
