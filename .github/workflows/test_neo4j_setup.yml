@@ -19,11 +19,6 @@ jobs:
         apt-get update
         apt-get install -y wget gnupg systemd
 
-    - name: Ensure systemd users and groups
-      run: |
-        getent passwd systemd-network || useradd -r systemd-network
-        getent group systemd-journal || groupadd -r systemd-journal
-
     - name: Install Neo4j
       run: |
         wget -O - https://debian.neo4j.com/neotechnology.gpg.key | apt-key add -
@@ -51,11 +46,6 @@ jobs:
       run: |
         conda install -n base -c conda-forge mamba
 
-    - name: Initialize mamba shell
-      shell: bash -l {0}
-      run: |
-        eval "$(mamba shell hook --shell bash)"
-
     - name: Activate Mamba environment
       shell: bash -l {0}
       run: mamba activate ldf-tests
@@ -65,6 +55,20 @@ jobs:
         echo "NEO4J_TESTING_DB_URI=bolt://localhost:7687" >> $GITHUB_ENV
         echo "NEO4J_TESTING_USERNAME=neo4j" >> $GITHUB_ENV
         echo "NEO4J_TESTING_PASSWORD=neo4j" >> $GITHUB_ENV
+
+    - name: Ensure systemd users and groups
+      run: |
+        getent passwd systemd-network || useradd -r systemd-network
+        getent group systemd-journal || groupadd -r systemd-journal
+        getent group systemd-resolve || groupadd -r systemd-resolve
+        getent passwd systemd-resolve || useradd -r -g systemd-resolve systemd-resolve
+
+    - name: Handle /etc/resolv.conf symlink
+      run: |
+        if [ -f /etc/resolv.conf ]; then
+          rm -f /etc/resolv.conf
+        fi
+        ln -s /run/systemd/resolve/stub-resolv.conf /etc/resolv.conf
 
     - name: Run tests
       shell: bash -l {0}
