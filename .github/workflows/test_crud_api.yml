@@ -44,7 +44,7 @@ jobs:
     - name: Start API Server
       shell: bash -l {0}
       run: |
-        cd design/api
+        cd design/crud-api
         bal run &
         sleep 10  # Wait for API server to start
 
