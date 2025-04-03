@@ -59,13 +59,6 @@ jobs:
         getent group systemd-resolve || groupadd -r systemd-resolve
         getent passwd systemd-resolve || useradd -r -g systemd-resolve systemd-resolve
 
-    - name: Handle /etc/resolv.conf symlink
-      run: |
-        if [ -f /etc/resolv.conf ]; then
-          rm -f /etc/resolv.conf
-        fi
-        ln -s /run/systemd/resolve/stub-resolv.conf /etc/resolv.conf
-
     - name: Run tests
       shell: bash -l {0}
       run: |
