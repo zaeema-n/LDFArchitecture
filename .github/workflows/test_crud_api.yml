@@ -1,0 +1,55 @@
+name: CRUD API Test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    container:
+      image: ubuntu:latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Install required dependencies
+      run: |
+        apt-get update
+        apt-get install -y wget gnupg systemd python3 python3-pip
+
+    - name: Set up Mamba
+      uses: conda-incubator/setup-miniconda@v2
+      with:
+        channels: conda-forge,defaults
+        channel-priority: strict
+        activate-environment: ldf-tests
+        environment-file: environment.yml
+        auto-activate-base: false
+        miniconda-version: "latest"
+
+    - name: Install mamba
+      shell: bash -l {0}
+      run: |
+        conda install -n base -c conda-forge mamba
+
+    - name: Start CRUD Server
+      shell: bash -l {0}
+      run: |
+        cd design/crud-api
+        ./crud-server &
+        sleep 10  # Wait for CRUD server to start
+
+    - name: Start API Server
+      shell: bash -l {0}
+      run: |
+        cd design/api
+        bal run &
+        sleep 10  # Wait for API server to start
+
+    - name: Run CRUD Tests
+      shell: bash -l {0}
+      run: |
+        cd design/tests/e2e
+        mamba run -n ldf-tests python3 basic_crud_tests.py
