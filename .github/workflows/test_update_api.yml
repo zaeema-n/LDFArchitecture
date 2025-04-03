@@ -56,8 +56,8 @@ jobs:
         echo "MONGO_URI=mongodb://mongo:27017" >> $GITHUB_ENV
         echo "MONGO_DB_NAME=testdb" >> $GITHUB_ENV
         echo "MONGO_COLLECTION=entities" >> $GITHUB_ENV
-        echo "CRUD_SERVICE_HOST=0.0.0.0" >> $GITHUB_ENV
-        echo "UPDATE_SERVICE_HOST=0.0.0.0" >> $GITHUB_ENV
+        echo "CRUD_SERVICE_HOST=localhost" >> $GITHUB_ENV
+        echo "UPDATE_SERVICE_HOST=localhost" >> $GITHUB_ENV
         echo "CRUD_SERVICE_PORT=50051" >> $GITHUB_ENV
         echo "UPDATE_SERVICE_PORT=8080" >> $GITHUB_ENV
 
