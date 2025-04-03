@@ -56,8 +56,8 @@ jobs:
         echo "MONGO_URI=mongodb://mongo:27017" >> $GITHUB_ENV
         echo "MONGO_DB_NAME=testdb" >> $GITHUB_ENV
         echo "MONGO_COLLECTION=entities" >> $GITHUB_ENV
-        echo "CRUD_SERVICE_HOST=localhost" >> $GITHUB_ENV
-        echo "UPDATE_SERVICE_HOST=localhost" >> $GITHUB_ENV
+        echo "CRUD_SERVICE_HOST=0.0.0.0" >> $GITHUB_ENV
+        echo "UPDATE_SERVICE_HOST=0.0.0.0" >> $GITHUB_ENV
         echo "CRUD_SERVICE_PORT=50051" >> $GITHUB_ENV
         echo "UPDATE_SERVICE_PORT=8080" >> $GITHUB_ENV
 
@@ -68,24 +68,25 @@ jobs:
         go build ./...
         go build -o crud-service cmd/server/service.go cmd/server/utils.go
         go test -v ./...
-        ./crud-service &
+        # Start the service with environment variables
+        CRUD_SERVICE_HOST=0.0.0.0 CRUD_SERVICE_PORT=50051 ./crud-service &
         echo $! > crud-service.pid
         # Wait for the service to be ready
         for i in {1..30}; do
-          if nc -z localhost 50051; then
+          if nc -z 0.0.0.0 50051; then
             echo "CRUD service is up and running"
             # Additional wait to ensure service is fully initialized
             sleep 5
             # Verify service is responding
             echo "Testing CRUD service connection..."
-            curl -v http://localhost:50051/health || true
+            curl -v http://0.0.0.0:50051/health || true
             echo "CRUD service health check completed"
             break
           fi
           echo "Waiting for CRUD service to start... ($i/30)"
           sleep 1
         done
-        if ! nc -z localhost 50051; then
+        if ! nc -z 0.0.0.0 50051; then
           echo "CRUD service failed to start"
           echo "Checking service logs:"
           cat crud-service.log || true
