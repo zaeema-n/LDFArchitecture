@@ -17,7 +17,7 @@ jobs:
     - name: Install required dependencies
       run: |
         apt-get update
-        apt-get install -y wget gnupg
+        apt-get install -y wget gnupg systemd
 
     - name: Install Neo4j
       run: |
@@ -55,6 +55,11 @@ jobs:
         echo "NEO4J_TESTING_DB_URI=bolt://localhost:7687" >> $GITHUB_ENV
         echo "NEO4J_TESTING_USERNAME=neo4j" >> $GITHUB_ENV
         echo "NEO4J_TESTING_PASSWORD=neo4j" >> $GITHUB_ENV
+
+    - name: Ensure systemd users and groups
+      run: |
+        getent passwd systemd-network || useradd -r systemd-network
+        getent group systemd-journal || groupadd -r systemd-journal
 
     - name: Run tests
       shell: bash -l {0}
