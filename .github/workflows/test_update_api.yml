@@ -72,17 +72,21 @@ jobs:
         echo $! > crud-service.pid
         # Wait for the service to be ready
         for i in {1..30}; do
-          if nc -z 0.0.0.0 50051; then
+          if nc -z localhost 50051; then
             echo "CRUD service is up and running"
+            # Additional wait to ensure service is fully initialized
+            sleep 2
             break
           fi
           echo "Waiting for CRUD service to start... ($i/30)"
           sleep 1
         done
-        if ! nc -z 0.0.0.0 50051; then
+        if ! nc -z localhost 50051; then
           echo "CRUD service failed to start"
           exit 1
         fi
+        # Verify service is responding
+        curl -v http://localhost:50051/health || true
     
     - name: Test Update API
       shell: bash -l {0}
