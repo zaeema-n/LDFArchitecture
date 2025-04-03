@@ -1,4 +1,4 @@
-name: CRUD API Test
+name: Update API Test
 
 on:
   push:
@@ -64,10 +64,14 @@ jobs:
         go build ./...
         go build -o crud-service cmd/server/service.go cmd/server/utils.go
         go test -v ./...
-        ./crud-service
+        ./crud-service &
+        echo $! > crud-service.pid
+        sleep 5  # Give the service time to start up
     
     - name: Test Update API
       shell: bash -l {0}
       run: |
         cd design/update-api
         bal test
+        cd ../crud-api
+        kill $(cat crud-service.pid)
