@@ -66,8 +66,8 @@ jobs:
         echo "CRUD_SERVICE_PORT=50051" >> $GITHUB_ENV
         echo "UPDATE_SERVICE_PORT=8080" >> $GITHUB_ENV
         # Add test-specific environment variables
-        echo "TEST_CRUD_SERVICE_HOST=0.0.0.0" >> $GITHUB_ENV
-        echo "TEST_UPDATE_SERVICE_HOST=0.0.0.0" >> $GITHUB_ENV
+        echo "TEST_CRUD_SERVICE_HOST=localhost" >> $GITHUB_ENV
+        echo "TEST_UPDATE_SERVICE_HOST=localhost" >> $GITHUB_ENV
 
     - name: Run CRUD Server
       shell: bash -l {0}
@@ -125,6 +125,8 @@ jobs:
           ps aux | grep crud-service
         fi
         # Run tests with test-specific host
+        echo "Checking gRPC with grpcurl..."
+        grpcurl -v -plaintext localhost:50051 list || echo "grpcurl failed to connect"
         CRUD_SERVICE_HOST=$TEST_CRUD_SERVICE_HOST UPDATE_SERVICE_HOST=$TEST_UPDATE_SERVICE_HOST bal test || TEST_EXIT_CODE=$?
         # Store the exit code for later use
         echo "TEST_EXIT_CODE=$TEST_EXIT_CODE" >> $GITHUB_ENV
