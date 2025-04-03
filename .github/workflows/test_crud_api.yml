@@ -34,6 +34,12 @@ jobs:
       run: |
         conda install -n base -c conda-forge mamba
 
+    - name: Install Ballerina
+      run: |
+        wget https://dist.ballerina.io/downloads/2201.9.0/ballerina-2201.9.0-linux-x64.deb
+        dpkg -i ballerina-2201.9.0-linux-x64.deb || true
+        apt-get install -f -y
+
     - name: Start CRUD Server
       shell: bash -l {0}
       run: |
@@ -44,7 +50,7 @@ jobs:
     - name: Start API Server
       shell: bash -l {0}
       run: |
-        cd design/crud-api
+        cd design/update-api
         bal run &
         sleep 10  # Wait for API server to start
 
