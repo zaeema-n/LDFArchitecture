@@ -46,10 +46,6 @@ jobs:
       run: |
         conda install -n base -c conda-forge mamba
 
-    - name: Activate Mamba environment
-      shell: bash -l {0}
-      run: mamba activate ldf-tests
-
     - name: Set Neo4j environment variables
       run: |
         echo "NEO4J_TESTING_DB_URI=bolt://localhost:7687" >> $GITHUB_ENV
@@ -73,4 +69,4 @@ jobs:
     - name: Run tests
       shell: bash -l {0}
       run: |
-        python -m pytest design/tests/neo4j/test_local_instance.py -v 
+        mamba run -n ldf-tests python -m pytest design/tests/neo4j/test_local_instance.py -v 
