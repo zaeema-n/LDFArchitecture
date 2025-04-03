@@ -56,6 +56,10 @@ jobs:
         echo "MONGO_URI=mongodb://mongo:27017" >> $GITHUB_ENV
         echo "MONGO_DB_NAME=testdb" >> $GITHUB_ENV
         echo "MONGO_COLLECTION=entities" >> $GITHUB_ENV
+        echo "CRUD_SERVICE_HOST=0.0.0.0" >> $GITHUB_ENV
+        echo "UPDATE_SERVICE_HOST=0.0.0.0" >> $GITHUB_ENV
+        echo "CRUD_SERVICE_PORT=50051" >> $GITHUB_ENV
+        echo "UPDATE_SERVICE_PORT=8080" >> $GITHUB_ENV
 
     - name: Run CRUD Server
       shell: bash -l {0}
@@ -66,12 +70,35 @@ jobs:
         go test -v ./...
         ./crud-service &
         echo $! > crud-service.pid
-        sleep 5  # Give the service time to start up
+        # Wait for the service to be ready
+        for i in {1..30}; do
+          if nc -z 0.0.0.0 50051; then
+            echo "CRUD service is up and running"
+            break
+          fi
+          echo "Waiting for CRUD service to start... ($i/30)"
+          sleep 1
+        done
+        if ! nc -z 0.0.0.0 50051; then
+          echo "CRUD service failed to start"
+          exit 1
+        fi
     
     - name: Test Update API
       shell: bash -l {0}
       run: |
         cd design/update-api
-        bal test
+        # Run tests and capture the exit code
+        bal test || TEST_EXIT_CODE=$?
+        # Store the exit code for later use
+        echo "TEST_EXIT_CODE=$TEST_EXIT_CODE" >> $GITHUB_ENV
         cd ../crud-api
         kill $(cat crud-service.pid)
+        # Exit with the test exit code to ensure workflow fails if tests failed
+        exit ${TEST_EXIT_CODE:-0}
+
+    - name: Check Test Results
+      if: failure()
+      run: |
+        echo "Tests failed with exit code: $TEST_EXIT_CODE"
+        echo "Please check the test output above for details."
