@@ -9,8 +9,6 @@ import (
 	"lk/datafoundation/crud-api/db/config"
 	pb "lk/datafoundation/crud-api/lk/datafoundation/crud-api"
 
-	"github.com/joho/godotenv"
-
 	mongorepository "lk/datafoundation/crud-api/db/repository/mongo"
 	neo4jrepository "lk/datafoundation/crud-api/db/repository/neo4j"
 
@@ -159,10 +157,6 @@ func (s *Server) DeleteEntity(ctx context.Context, req *pb.EntityId) (*pb.Empty,
 
 // Start the gRPC server
 func main() {
-	// Load .env file
-	if err := godotenv.Load(); err != nil {
-		log.Fatal("Error loading .env file")
-	}
 
 	// Initialize MongoDB config
 	mongoConfig := &config.MongoConfig{
