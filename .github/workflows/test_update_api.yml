@@ -103,6 +103,17 @@ jobs:
         echo "CRUD_SERVICE_PORT=$CRUD_SERVICE_PORT"
         echo "UPDATE_SERVICE_HOST=$UPDATE_SERVICE_HOST"
         echo "UPDATE_SERVICE_PORT=$UPDATE_SERVICE_PORT"
+        # Check if CRUD service is still running and accessible
+        echo "Verifying CRUD service is still accessible..."
+        if nc -z $CRUD_SERVICE_HOST $CRUD_SERVICE_PORT; then
+          echo "CRUD service is running on $CRUD_SERVICE_HOST:$CRUD_SERVICE_PORT"
+          # Try to ping the health endpoint
+          curl -v http://$CRUD_SERVICE_HOST:$CRUD_SERVICE_PORT/health || echo "Health endpoint not responding, but port is open"
+        else
+          echo "ERROR: CRUD service is not accessible on $CRUD_SERVICE_HOST:$CRUD_SERVICE_PORT"
+          echo "This may cause the tests to fail. Checking process status..."
+          ps aux | grep crud-service
+        fi
         bal test || TEST_EXIT_CODE=$?
         # Store the exit code for later use
         echo "TEST_EXIT_CODE=$TEST_EXIT_CODE" >> $GITHUB_ENV
