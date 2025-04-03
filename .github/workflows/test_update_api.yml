@@ -60,6 +60,9 @@ jobs:
         echo "UPDATE_SERVICE_HOST=0.0.0.0" >> $GITHUB_ENV
         echo "CRUD_SERVICE_PORT=50051" >> $GITHUB_ENV
         echo "UPDATE_SERVICE_PORT=8080" >> $GITHUB_ENV
+        # Add test-specific environment variables
+        echo "TEST_CRUD_SERVICE_HOST=localhost" >> $GITHUB_ENV
+        echo "TEST_UPDATE_SERVICE_HOST=localhost" >> $GITHUB_ENV
 
     - name: Run CRUD Server
       shell: bash -l {0}
@@ -77,9 +80,9 @@ jobs:
             echo "CRUD service is up and running"
             # Additional wait to ensure service is fully initialized
             sleep 5
-            # Verify service is responding
+            # Verify service is responding using gRPC health check
             echo "Testing CRUD service connection..."
-            curl -v http://0.0.0.0:50051/health || true
+            grpcurl -plaintext 0.0.0.0:50051 grpc.health.v1.Health/Check || echo "gRPC health check failed, but port is open"
             echo "CRUD service health check completed"
             break
           fi
@@ -103,18 +106,21 @@ jobs:
         echo "CRUD_SERVICE_PORT=$CRUD_SERVICE_PORT"
         echo "UPDATE_SERVICE_HOST=$UPDATE_SERVICE_HOST"
         echo "UPDATE_SERVICE_PORT=$UPDATE_SERVICE_PORT"
+        echo "TEST_CRUD_SERVICE_HOST=$TEST_CRUD_SERVICE_HOST"
+        echo "TEST_UPDATE_SERVICE_HOST=$TEST_UPDATE_SERVICE_HOST"
         # Check if CRUD service is still running and accessible
         echo "Verifying CRUD service is still accessible..."
-        if nc -z $CRUD_SERVICE_HOST $CRUD_SERVICE_PORT; then
-          echo "CRUD service is running on $CRUD_SERVICE_HOST:$CRUD_SERVICE_PORT"
-          # Try to ping the health endpoint
-          curl -v http://$CRUD_SERVICE_HOST:$CRUD_SERVICE_PORT/health || echo "Health endpoint not responding, but port is open"
+        if nc -z $TEST_CRUD_SERVICE_HOST $CRUD_SERVICE_PORT; then
+          echo "CRUD service is running on $TEST_CRUD_SERVICE_HOST:$CRUD_SERVICE_PORT"
+          # Try to ping the health endpoint using gRPC
+          grpcurl -plaintext $TEST_CRUD_SERVICE_HOST:$CRUD_SERVICE_PORT grpc.health.v1.Health/Check || echo "gRPC health check failed, but port is open"
         else
-          echo "ERROR: CRUD service is not accessible on $CRUD_SERVICE_HOST:$CRUD_SERVICE_PORT"
+          echo "ERROR: CRUD service is not accessible on $TEST_CRUD_SERVICE_HOST:$CRUD_SERVICE_PORT"
           echo "This may cause the tests to fail. Checking process status..."
           ps aux | grep crud-service
         fi
-        bal test || TEST_EXIT_CODE=$?
+        # Run tests with test-specific host
+        CRUD_SERVICE_HOST=$TEST_CRUD_SERVICE_HOST UPDATE_SERVICE_HOST=$TEST_UPDATE_SERVICE_HOST bal test || TEST_EXIT_CODE=$?
         # Store the exit code for later use
         echo "TEST_EXIT_CODE=$TEST_EXIT_CODE" >> $GITHUB_ENV
         cd ../crud-api
