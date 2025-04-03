@@ -36,9 +36,13 @@ jobs:
 
     - name: Install Ballerina
       run: |
-        wget https://dist.ballerina.io/downloads/2201.9.0/ballerina-2201.9.0-linux-x64.deb
-        dpkg -i ballerina-2201.9.0-linux-x64.deb || true
+        wget https://dist.ballerina.io/downloads/2201.12.2/ballerina-2201.12.2-swan-lake-linux-x64.deb
+        dpkg -i ballerina-2201.12.2-linux-x64.deb || true
         apt-get install -f -y
+
+    - name: Verify Ballerina Installation
+      run: |
+        bal version
 
     - name: Start CRUD Server
       shell: bash -l {0}
