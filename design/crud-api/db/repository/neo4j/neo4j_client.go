@@ -326,9 +326,8 @@ func (r *Neo4jRepository) ReadGraphEntity(ctx context.Context, entityID string) 
 	return nil, fmt.Errorf("entity with Id %s not found", entityID)
 }
 
-// NOT USED IN graph_entity_handler.go
-// ReadRelatedGraphEntityIds retrieves related entity IDs based on a given relationship
-func (r *Neo4jRepository) ReadRelatedGraphEntityIds(ctx context.Context, entityID string, relationship string, ts string) ([]string, error) {
+// ReadRelatedGraphEntityIds retrieves related relationships based on a given relationship type and timestamp
+func (r *Neo4jRepository) ReadRelatedGraphEntityIds(ctx context.Context, entityID string, relationship string, ts string) ([]map[string]interface{}, error) {
 	if entityID == "" {
 		return nil, fmt.Errorf("entity Id cannot be empty")
 	}
@@ -339,7 +338,7 @@ func (r *Neo4jRepository) ReadRelatedGraphEntityIds(ctx context.Context, entityI
 	query := fmt.Sprintf(`
         MATCH (e {Id: $entityID})-[r:%s]->(related)
         WHERE r.Created <= datetime($ts) AND (r.Terminated IS NULL OR r.Terminated > datetime($ts))
-        RETURN related.Id AS relatedID
+        RETURN r.Id AS relationshipID, r.Created AS startTime, r.Terminated AS endTime, type(r) AS name, related.Id AS relatedEntityId
     `, relationship)
 
 	result, err := session.Run(ctx, query, map[string]interface{}{
@@ -351,12 +350,49 @@ func (r *Neo4jRepository) ReadRelatedGraphEntityIds(ctx context.Context, entityI
 		return nil, fmt.Errorf("error querying related entities: %v", err)
 	}
 
-	var relatedIDs []string
+	var relationships []map[string]interface{}
 	for result.Next(ctx) {
 		record := result.Record()
-		if relatedID, exists := record.Get("relatedID"); exists && relatedID != nil {
-			relatedIDs = append(relatedIDs, fmt.Sprintf("%v", relatedID))
+
+		// Extract fields from the query result
+		relationshipID, _ := record.Get("relationshipID")
+		startTime, _ := record.Get("startTime")
+		endTime, _ := record.Get("endTime")
+		name, _ := record.Get("name")
+		relatedEntityID, _ := record.Get("relatedEntityId")
+
+		// Ensure the relationship ID exists
+		if relationshipID == nil {
+			continue
 		}
+
+		// Format datetime fields
+		var formattedStartTime, formattedEndTime string
+		if startTime != nil {
+			if t, ok := startTime.(time.Time); ok {
+				formattedStartTime = t.Format(time.RFC3339) // Format as ISO 8601
+			} else {
+				formattedStartTime = fmt.Sprintf("%v", startTime)
+			}
+		}
+		if endTime != nil {
+			if t, ok := endTime.(time.Time); ok {
+				formattedEndTime = t.Format(time.RFC3339) // Format as ISO 8601
+			} else {
+				formattedEndTime = fmt.Sprintf("%v", endTime)
+			}
+		}
+
+		// Populate the relationship map
+		relationship := map[string]interface{}{
+			"Id":              fmt.Sprintf("%v", relationshipID),
+			"StartTime":       formattedStartTime,
+			"EndTime":         formattedEndTime,
+			"Name":            fmt.Sprintf("%v", name),
+			"RelatedEntityId": fmt.Sprintf("%v", relatedEntityID),
+		}
+
+		relationships = append(relationships, relationship)
 	}
 
 	if err := result.Err(); err != nil {
@@ -364,7 +400,7 @@ func (r *Neo4jRepository) ReadRelatedGraphEntityIds(ctx context.Context, entityI
 		return nil, fmt.Errorf("error iterating over query result: %v", err)
 	}
 
-	return relatedIDs, nil
+	return relationships, nil
 }
 
 func (r *Neo4jRepository) ReadRelationships(ctx context.Context, entityID string) ([]map[string]interface{}, error) {

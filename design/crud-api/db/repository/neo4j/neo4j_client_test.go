@@ -153,7 +153,6 @@ func TestReadEntity(t *testing.T) {
 
 // TestReadRelatedEntityIds tests the ReadRelatedGraphEntityIds method of the Neo4jRepository
 func TestReadRelatedEntityIds(t *testing.T) {
-
 	kind := &pb.Kind{
 		Major: "Person",
 		Minor: "Minister",
@@ -184,24 +183,32 @@ func TestReadRelatedEntityIds(t *testing.T) {
 		Name:            "KNOWS",
 		RelatedEntityId: "5",
 		StartTime:       "2025-03-18",
+		EndTime:         "2025-12-31",
 	}
 
 	_, err = repository.CreateRelationship(context.Background(), "4", relationship)
 	assert.Nil(t, err, "Expected no error when creating the relationship")
 
-	// Step 3: Prepare the test data for fetching related entities
-	entityID := "4"             // ID of the entity to get related IDs for
+	// Step 3: Prepare the test data for fetching related relationships
+	entityID := "4"             // ID of the entity to get related relationships for
 	relationshipType := "KNOWS" // Relationship type
 	ts := "2025-03-18"          // Timestamp (YYYY-MM-DD)
 
-	// Step 4: Call the function to fetch related entity IDs
-	relatedEntityIDs, err := repository.ReadRelatedGraphEntityIds(context.Background(), entityID, relationshipType, ts)
-	assert.Nil(t, err, "Expected no error when getting related entity IDs")
-	log.Printf("Related entity IDs: %v", relatedEntityIDs)
+	// Step 4: Call the function to fetch related relationships
+	relatedRelationships, err := repository.ReadRelatedGraphEntityIds(context.Background(), entityID, relationshipType, ts)
+	assert.Nil(t, err, "Expected no error when getting related relationships")
+	assert.NotNil(t, relatedRelationships, "Expected related relationships to be returned")
 
 	// Step 5: Verify the response
-	assert.NotNil(t, relatedEntityIDs, "Expected related entity IDs to be returned")
-	assert.Contains(t, relatedEntityIDs, "5", "Expected related entity ID 5 to be present")
+	assert.Equal(t, 1, len(relatedRelationships), "Expected exactly one related relationship")
+	relationshipData := relatedRelationships[0]
+
+	// Verify the structure and content of the relationship
+	assert.Equal(t, "102", relationshipData["Id"], "Expected relationship ID to match")
+	assert.Equal(t, "KNOWS", relationshipData["Name"], "Expected relationship Name to match")
+	assert.Equal(t, "5", relationshipData["RelatedEntityId"], "Expected RelatedEntityId to match")
+	assert.Equal(t, "2025-03-18", relationshipData["StartTime"], "Expected StartTime to match")
+	assert.Equal(t, "2025-12-31", relationshipData["EndTime"], "Expected EndTime to match")
 }
 
 func TestReadRelationships(t *testing.T) {

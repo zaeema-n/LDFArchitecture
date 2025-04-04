@@ -111,7 +111,7 @@ func (repo *Neo4jRepository) GetGraphRelationships(ctx context.Context, entityId
 	return relationships, nil
 }
 
-func (repo *Neo4jRepository) GetEntityIdsByRelationship(ctx context.Context, entityId string, relationship string, ts string) ([]string, error) {
+func (repo *Neo4jRepository) GetEntityIdsByRelationship(ctx context.Context, entityId string, relationship string, ts string) (map[string]*pb.Relationship, error) {
 	// Validate input parameters
 	if entityId == "" {
 		return nil, fmt.Errorf("entityId cannot be empty")
@@ -124,14 +124,38 @@ func (repo *Neo4jRepository) GetEntityIdsByRelationship(ctx context.Context, ent
 	}
 
 	// Call ReadRelatedGraphEntityIds from neo4j_client.go
-	relatedEntityIDs, err := repo.ReadRelatedGraphEntityIds(ctx, entityId, relationship, ts)
+	relationshipData, err := repo.ReadRelatedGraphEntityIds(ctx, entityId, relationship, ts)
 	if err != nil {
-		log.Printf("Error fetching related entity IDs for entity %s with relationship %s: %v", entityId, relationship, err)
+		log.Printf("[GetEntityIdsByRelationship] Error fetching related relationships for entity %s with relationship %s: %v", entityId, relationship, err)
 		return nil, err
 	}
 
-	// Return the list of related entity IDs
-	return relatedEntityIDs, nil
+	// Convert the list of relationships into a map[string]*pb.Relationship
+	relationships := make(map[string]*pb.Relationship)
+	for _, rel := range relationshipData {
+		relID, ok1 := rel["Id"].(string)
+		relatedEntityID, ok2 := rel["RelatedEntityId"].(string)
+		startTime, ok3 := rel["StartTime"].(string)
+		endTime, _ := rel["EndTime"].(string) // Optional field
+		name, ok4 := rel["Name"].(string)
+
+		// Ensure required fields are present
+		if !ok1 || !ok2 || !ok3 || !ok4 {
+			log.Printf("[GetEntityIdsByRelationship] Skipping relationship due to missing required fields: %v", rel)
+			continue
+		}
+
+		// Create a pb.Relationship object
+		relationships[relID] = &pb.Relationship{
+			Id:              relID,
+			RelatedEntityId: relatedEntityID,
+			StartTime:       startTime,
+			EndTime:         endTime,
+			Name:            name,
+		}
+	}
+
+	return relationships, nil
 }
 
 // validateGraphEntityCreation checks if an entity has all required fields for Neo4j storage
