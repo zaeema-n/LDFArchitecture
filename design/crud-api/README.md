@@ -1,5 +1,13 @@
 # crud-api
 
+## TODOs
+
+## Note
+
+⚠️ **Warning**  
+Please do not commit generated protobuf files, please generate them at build time..
+
+
 ## Pre-requisites
 
 ```bash
