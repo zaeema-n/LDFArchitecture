@@ -57,3 +57,10 @@ go build -o crud-service cmd/server/service.go cmd/server/utils.go
 ```
 
 The service will be running in port `50051` and it is hard coded. This needs to be configurable. 
+
+### Run with Docker
+
+```bash
+docker build -t crud-service -f Dockerfile.crud .
+docker run -p 50051:50051 -p 27017:27017 -p 7687:7687 -p 7474:7474 crud-service
+```

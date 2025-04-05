@@ -19,7 +19,29 @@ In the same terminal or ssh session, do the following;
 
 This will start an instance of the neo4j database server. 
 
-### Start the Neo4j Server
+### Start the Neo4j Server with Docker
+
+**Build**
+
+```bash
+docker build -t neo4j-custom -f Dockerfile.neo4j .
+```
+
+**Run**
+
+```bash
+docker run -d \
+  --name neo4j-local \
+  -p 7474:7474 \
+  -p 7687:7687 \
+  -v $(pwd)/data:/data \
+  -v $(pwd)/logs:/logs \
+  -v $(pwd)/plugins:/plugins \
+  -v $(pwd)/import:/var/lib/neo4j/import \
+  neo4j-custom
+```
+
+### Start the Neo4j Server with Docker Composer
 
 ```bash
 docker compose up --build

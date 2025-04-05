@@ -1,0 +1,46 @@
+# Build stage
+FROM golang:1.24 AS builder
+
+# Set working directory
+WORKDIR /app
+
+# Copy go mod and sum files
+COPY go.mod go.sum ./
+
+# Download all dependencies
+RUN go mod download
+
+# Copy the source code
+COPY . .
+
+# Build the application
+RUN go build -o crud-service cmd/server/service.go cmd/server/utils.go
+
+# Final stage
+FROM golang:1.24
+
+# Copy the built binary from builder stage
+COPY --from=builder /app/crud-service /usr/local/bin/
+
+# Set environment variables with defaults
+ENV NEO4J_URI=${NEO4J_URI:-bolt://neo4j:7687}
+ENV NEO4J_USER=${NEO4J_USER:-neo4j}
+ENV NEO4J_PASSWORD=${NEO4J_PASSWORD:-test123456}
+ENV NEO4J_TESTING_DB_URI=${NEO4J_TESTING_DB_URI:-bolt://neo4j:7687}
+ENV NEO4J_TESTING_USERNAME=${NEO4J_TESTING_USERNAME:-neo4j}
+ENV NEO4J_TESTING_PASSWORD=${NEO4J_TESTING_PASSWORD:-test123456}
+ENV MONGO_URI=${MONGO_URI:-mongodb://mongo:27017}
+ENV MONGO_DB_NAME=${MONGO_DB_NAME:-testdb}
+ENV MONGO_COLLECTION=${MONGO_COLLECTION:-metadata}
+ENV MONGO_ADMIN_USER=${MONGO_ADMIN_USER:-admin}
+ENV MONGO_ADMIN_PASSWORD=${MONGO_ADMIN_PASSWORD:-test123456}
+ENV MONGO_TEST_USER=${MONGO_TEST_USER:-testuser}
+ENV MONGO_TEST_PASSWORD=${MONGO_TEST_PASSWORD:-test123456}
+ENV CRUD_SERVICE_HOST=${CRUD_SERVICE_HOST:-0.0.0.0}
+ENV CRUD_SERVICE_PORT=${CRUD_SERVICE_PORT:-50051}
+
+# Expose port
+EXPOSE 50051
+
+# Command to run the service
+CMD ["crud-service"]
