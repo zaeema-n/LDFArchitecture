@@ -5,7 +5,7 @@ services:
       - "7687:7687"
       - "7474:7474"
     environment:
-      NEO4J_AUTH: neo4j/test123456
+      NEO4J_AUTH: ${NEO4J_USER:-neo4j}/${NEO4J_PASSWORD:-test123456}
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:7474"]
       interval: 10s
@@ -29,17 +29,17 @@ services:
     ports:
       - "50051:50051"
     environment:
-      NEO4J_URI: bolt://neo4j:7687
-      NEO4J_USER: neo4j
-      NEO4J_PASSWORD: test123456
-      NEO4J_TESTING_DB_URI: bolt://neo4j:7687
-      NEO4J_TESTING_USERNAME: neo4j
-      NEO4J_TESTING_PASSWORD: test123456
-      MONGO_URI: mongodb://mongo:27017
-      MONGO_DB_NAME: testdb
-      MONGO_COLLECTION: entities
-      CRUD_SERVICE_HOST: 0.0.0.0
-      CRUD_SERVICE_PORT: 50051
+      NEO4J_URI: ${NEO4J_URI:-bolt://neo4j:7687}
+      NEO4J_USER: ${NEO4J_USER:-neo4j}
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD:-test123456}
+      NEO4J_TESTING_DB_URI: ${NEO4J_TESTING_DB_URI:-bolt://neo4j:7687}
+      NEO4J_TESTING_USERNAME: ${NEO4J_TESTING_USERNAME:-neo4j}
+      NEO4J_TESTING_PASSWORD: ${NEO4J_TESTING_PASSWORD:-test123456}
+      MONGO_URI: ${MONGO_URI:-mongodb://mongo:27017}
+      MONGO_DB_NAME: ${MONGO_DB_NAME:-testdb}
+      MONGO_COLLECTION: ${MONGO_COLLECTION:-metadata}
+      CRUD_SERVICE_HOST: ${CRUD_SERVICE_HOST:-0.0.0.0}
+      CRUD_SERVICE_PORT: ${CRUD_SERVICE_PORT:-50051}
     depends_on:
       neo4j:
         condition: service_healthy
@@ -51,17 +51,17 @@ services:
       context: .
       dockerfile: Dockerfile
     environment:
-      NEO4J_URI: bolt://neo4j:7687
-      NEO4J_USER: neo4j
-      NEO4J_PASSWORD: test123456
-      NEO4J_TESTING_DB_URI: bolt://neo4j:7687
-      NEO4J_TESTING_USERNAME: neo4j
-      NEO4J_TESTING_PASSWORD: test123456
-      MONGO_URI: mongodb://mongo:27017
-      MONGO_DB_NAME: testdb
-      MONGO_COLLECTION: entities
-      CRUD_SERVICE_HOST: crud-service
-      CRUD_SERVICE_PORT: 50051
+      NEO4J_URI: ${NEO4J_URI:-bolt://neo4j:7687}
+      NEO4J_USER: ${NEO4J_USER:-neo4j}
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD:-test123456}
+      NEO4J_TESTING_DB_URI: ${NEO4J_TESTING_DB_URI:-bolt://neo4j:7687}
+      NEO4J_TESTING_USERNAME: ${NEO4J_TESTING_USERNAME:-neo4j}
+      NEO4J_TESTING_PASSWORD: ${NEO4J_TESTING_PASSWORD:-test123456}
+      MONGO_URI: ${MONGO_URI:-mongodb://mongo:27017}
+      MONGO_DB_NAME: ${MONGO_DB_NAME:-testdb}
+      MONGO_COLLECTION: ${MONGO_COLLECTION:-metadata}
+      CRUD_SERVICE_HOST: ${CRUD_SERVICE_HOST:-crud-service}
+      CRUD_SERVICE_PORT: ${CRUD_SERVICE_PORT:-50051}
     command: >
       sh -c "go test -v ./... || (echo 'Tests failed' && exit 1)"
     depends_on:
@@ -75,14 +75,14 @@ services:
     ports:
       - "50051:50051"
     environment:
-      NEO4J_URI: bolt://neo4j:7687
-      NEO4J_USER: neo4j
-      NEO4J_PASSWORD: test123456
-      MONGO_URI: mongodb://mongo:27017
-      MONGO_DB_NAME: testdb
-      MONGO_COLLECTION: entities
-      CRUD_SERVICE_HOST: 0.0.0.0
-      CRUD_SERVICE_PORT: 50051
+      NEO4J_URI: ${NEO4J_URI:-bolt://neo4j:7687}
+      NEO4J_USER: ${NEO4J_USER:-neo4j}
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD:-test123456}
+      MONGO_URI: ${MONGO_URI:-mongodb://mongo:27017}
+      MONGO_DB_NAME: ${MONGO_DB_NAME:-testdb}
+      MONGO_COLLECTION: ${MONGO_COLLECTION:-metadata}
+      CRUD_SERVICE_HOST: ${CRUD_SERVICE_HOST:-0.0.0.0}
+      CRUD_SERVICE_PORT: ${CRUD_SERVICE_PORT:-50051}
     command: >
       sh -c "./crud-service"
     depends_on:
