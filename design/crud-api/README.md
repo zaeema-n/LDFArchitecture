@@ -7,7 +7,6 @@
 ⚠️ **Warning**  
 Please do not commit generated protobuf files, please generate them at build time..
 
-
 ## Pre-requisites
 
 ```bash
@@ -58,9 +57,59 @@ go build -o crud-service cmd/server/service.go cmd/server/utils.go
 
 The service will be running in port `50051` and it is hard coded. This needs to be configurable. 
 
-### Run with Docker
+#### Run with Docker
+
+`Dockerfile.crud` refers to just running the
+
+Make sure to create a network for this work since we need every other service to be accessible hence
+we place them in the same network. 
+
+```bash
+docker network create crud-network
+```
 
 ```bash
 docker build -t crud-service -f Dockerfile.crud .
-docker run -p 50051:50051 -p 27017:27017 -p 7687:7687 -p 7474:7474 crud-service
+```
+
+```bash
+docker run -d \
+  --name crud-service \
+  --network crud-network \
+  -p 50051:50051 \
+  -e NEO4J_URI=bolt://neo4j-local:7687 \
+  -e NEO4J_USER=${NEO4J_USER} \
+  -e NEO4J_PASSWORD=${NEO4J_PASSWORD} \
+  -e MONGO_URI=${MONGO_URI} \
+  crud-service
+```
+
+#### Validate 
+
+```bash
+brew install grpcurl
+```
+
+```bash
+grpcurl -plaintext localhost:50051 list
+```
+
+Output
+
+```bash
+crud.CrudService
+grpc.reflection.v1.ServerReflection
+grpc.reflection.v1alpha.ServerReflection
+```
+
+### Run Tests (Please Validate this work)
+
+```bash
+# Build the test image
+docker build -t crud-service-test -f Dockerfile.test .
+
+# Run the tests
+docker run --rm \
+  --add-host=host.docker.internal:host-gateway \
+  crud-service-test
 ```

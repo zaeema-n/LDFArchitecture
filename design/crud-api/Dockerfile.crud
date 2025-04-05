@@ -1,4 +1,4 @@
-# Build stage
+# Build stage for CRUD service
 FROM golang:1.24 AS builder
 
 # Set working directory
@@ -22,25 +22,37 @@ FROM golang:1.24
 # Copy the built binary from builder stage
 COPY --from=builder /app/crud-service /usr/local/bin/
 
-# Set environment variables with defaults
+# Set environment variables with defaults for Neo4j connection
+# Note: When running in Docker, use the service name 'neo4j' if both services are in the same network
 ENV NEO4J_URI=${NEO4J_URI:-bolt://neo4j:7687}
 ENV NEO4J_USER=${NEO4J_USER:-neo4j}
-ENV NEO4J_PASSWORD=${NEO4J_PASSWORD:-test123456}
-ENV NEO4J_TESTING_DB_URI=${NEO4J_TESTING_DB_URI:-bolt://neo4j:7687}
-ENV NEO4J_TESTING_USERNAME=${NEO4J_TESTING_USERNAME:-neo4j}
-ENV NEO4J_TESTING_PASSWORD=${NEO4J_TESTING_PASSWORD:-test123456}
+ENV NEO4J_PASSWORD=${NEO4J_PASSWORD:-neo4j123}
+
+# Set MongoDB environment variables with defaults
 ENV MONGO_URI=${MONGO_URI:-mongodb://mongo:27017}
 ENV MONGO_DB_NAME=${MONGO_DB_NAME:-testdb}
 ENV MONGO_COLLECTION=${MONGO_COLLECTION:-metadata}
 ENV MONGO_ADMIN_USER=${MONGO_ADMIN_USER:-admin}
 ENV MONGO_ADMIN_PASSWORD=${MONGO_ADMIN_PASSWORD:-test123456}
-ENV MONGO_TEST_USER=${MONGO_TEST_USER:-testuser}
-ENV MONGO_TEST_PASSWORD=${MONGO_TEST_PASSWORD:-test123456}
+
+# Set CRUD service environment variables
 ENV CRUD_SERVICE_HOST=${CRUD_SERVICE_HOST:-0.0.0.0}
 ENV CRUD_SERVICE_PORT=${CRUD_SERVICE_PORT:-50051}
 
-# Expose port
+# Expose ports
 EXPOSE 50051
 
-# Command to run the service
-CMD ["crud-service"]
+# Display environment variables and start the service
+CMD echo "Environment Variables:" && \
+    echo "NEO4J_URI: $NEO4J_URI" && \
+    echo "NEO4J_USER: $NEO4J_USER" && \
+    echo "NEO4J_PASSWORD: ********" && \
+    echo "MONGO_URI: $MONGO_URI" && \
+    echo "MONGO_DB_NAME: $MONGO_DB_NAME" && \
+    echo "MONGO_COLLECTION: $MONGO_COLLECTION" && \
+    echo "MONGO_ADMIN_USER: $MONGO_ADMIN_USER" && \
+    echo "MONGO_ADMIN_PASSWORD: ********" && \
+    echo "CRUD_SERVICE_HOST: $CRUD_SERVICE_HOST" && \
+    echo "CRUD_SERVICE_PORT: $CRUD_SERVICE_PORT" && \
+    echo "Starting CRUD service..." && \
+    exec crud-service

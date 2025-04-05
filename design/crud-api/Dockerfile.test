@@ -1,0 +1,33 @@
+# Test stage
+FROM golang:1.24
+
+# Set working directory
+WORKDIR /app
+
+# Copy go mod and sum files
+COPY go.mod go.sum ./
+
+# Download all dependencies
+RUN go mod download
+
+# Copy the source code
+COPY . .
+
+# Set environment variables for testing
+ENV NEO4J_URI=${NEO4J_URI:-bolt://host.docker.internal:7687}
+ENV NEO4J_USER=${NEO4J_USER:-neo4j}
+ENV NEO4J_PASSWORD=${NEO4J_PASSWORD:-neo4j123}
+ENV NEO4J_TESTING_DB_URI=${NEO4J_TESTING_DB_URI:-bolt://host.docker.internal:7687}
+ENV NEO4J_TESTING_USERNAME=${NEO4J_TESTING_USERNAME:-neo4j}
+ENV NEO4J_TESTING_PASSWORD=${NEO4J_TESTING_PASSWORD:-neo4j123}
+
+ENV MONGO_URI=${MONGO_URI:-mongodb://host.docker.internal:27017}
+ENV MONGO_DB_NAME=${MONGO_DB_NAME:-testdb}
+ENV MONGO_COLLECTION=${MONGO_COLLECTION:-metadata}
+ENV MONGO_ADMIN_USER=${MONGO_ADMIN_USER:-admin}
+ENV MONGO_ADMIN_PASSWORD=${MONGO_ADMIN_PASSWORD:-test123456}
+ENV MONGO_TEST_USER=${MONGO_TEST_USER:-testuser}
+ENV MONGO_TEST_PASSWORD=${MONGO_TEST_PASSWORD:-test123456}
+
+# Run tests with verbose output
+CMD ["go", "test", "-v", "./..."]
