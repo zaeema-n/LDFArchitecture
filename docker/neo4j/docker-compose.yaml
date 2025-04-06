@@ -1,4 +1,4 @@
-version: '3'
+version: '3.8'
 
 services:
   neo4j:
@@ -18,10 +18,18 @@ services:
       - NEO4J_dbms_memory_heap_initial__size=2G
       - NEO4J_dbms_memory_heap_max__size=2G
       - NEO4J_dbms_memory_offheap_max__size=1G
+      - NEO4J_AUTH=neo4j/neo4j123
     env_file:
       - ./config.env
     restart: unless-stopped
+    networks:
+      - crud-network
 
 volumes:
   neo4j_data:
   neo4j_logs:
+
+networks:
+  crud-network:
+    external: true
+    name: crud-network
