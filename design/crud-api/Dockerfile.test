@@ -143,8 +143,8 @@ USER 10014
 # Expose ports
 EXPOSE 7474 7687 27017
 
-# Start the test environment
-CMD mongod --dbpath /data/db --logpath /var/log/mongodb/mongodb.log && \
+# Start everything
+CMD mongod --dbpath /data/db --logpath /var/log/mongodb/mongodb.log --logappend && \
     neo4j start && \
     until curl -s http://localhost:7474 > /dev/null; do echo "Waiting for Neo4j..."; sleep 2; done && \
     echo "Changing initial Neo4j password..." && \
