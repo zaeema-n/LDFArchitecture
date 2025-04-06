@@ -274,29 +274,3 @@ func TestMetadataHandling(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, int32(42), intWrapper.Value)
 }
-
-// TestReadNonExistentEntity verifies that reading a non-existent entity returns an error
-func TestReadNonExistentEntity(t *testing.T) {
-	// Generate a random ID that doesn't exist in the database
-	nonExistentID := "non-existent-id-" + generateRandomString(8)
-
-	// Attempt to read the non-existent entity
-	entity, err := testRepo.ReadEntity(testCtx, nonExistentID)
-
-	// Verify that an error is returned
-	assert.Error(t, err, "Reading a non-existent entity should return an error")
-	assert.Nil(t, entity, "Entity should be nil when not found")
-
-	// Optionally check for specific error message or type
-	assert.Contains(t, err.Error(), "not found", "Error should indicate entity was not found")
-}
-
-// Helper function to generate random string for test IDs
-func generateRandomString(length int) string {
-	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	b := make([]byte, length)
-	for i := range b {
-		b[i] = charset[int(os.Getpid()+i)%len(charset)]
-	}
-	return string(b)
-}

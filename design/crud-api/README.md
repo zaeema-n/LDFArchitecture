@@ -102,14 +102,33 @@ grpc.reflection.v1.ServerReflection
 grpc.reflection.v1alpha.ServerReflection
 ```
 
-### Run Tests (Please Validate this work)
+### Run Tests: Mode 1
+
+We assume the Mongodb and Neo4j are provided as services or they exist in the same network. 
 
 ```bash
 # Build the test image
-docker build -t crud-service-test -f Dockerfile.test .
+docker build -t crud-service-test-v1 -f Dockerfile.test.v1 .
 
 # Run the tests
 docker run --rm \
-  --add-host=host.docker.internal:host-gateway \
-  crud-service-test
+  --network crud-network \
+  -e NEO4J_URI=bolt://neo4j-local:7687 \
+  -e NEO4J_USER=${NEO4J_USER} \
+  -e NEO4J_PASSWORD=${NEO4J_PASSWORD} \
+  -e MONGO_URI=${MONGO_URI} \
+  crud-service-test-v1
+```
+
+### Run Tests: Mode 2
+
+MongoDB and Neo4j are running in the same container. 
+
+```bash
+docker build -t crud-service-test-standalone -f Dockerfile.test .
+
+
+# Run the tests
+
+docker run --rm crud-service-test-standalone
 ```
