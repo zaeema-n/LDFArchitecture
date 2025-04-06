@@ -102,7 +102,7 @@ grpc.reflection.v1.ServerReflection
 grpc.reflection.v1alpha.ServerReflection
 ```
 
-### Run Tests: Mode 1
+### Run Tests: Mode 1 (Independent Environments and Services)
 
 We assume the Mongodb and Neo4j are provided as services or they exist in the same network. 
 
@@ -120,7 +120,7 @@ docker run --rm \
   crud-service-test-v1
 ```
 
-### Run Tests: Mode 2
+### Run Tests: Mode 2 (Choreo and CI/CD)
 
 MongoDB and Neo4j are running in the same container. 
 

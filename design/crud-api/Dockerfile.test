@@ -1,9 +1,37 @@
-# This is the Dockerfile for testing the crud-api
 # Dockerfile.test
+# ===============
 #
-# Purpose:
-# This Dockerfile creates a self-contained test environment with Neo4j, MongoDB,
-# and the CRUD service all in one container for isolated testing.
+# This Dockerfile creates a self-contained environment for testing the CRUD API service.
+# It builds a single container that includes:
+#   1. The Go CRUD service
+#   2. MongoDB database
+#   3. Neo4j graph database
+#   4. All test binaries
+#
+# The testing process:
+# --------------------
+# 1. First stage (builder):
+#    - Uses golang:1.24 as the base image
+#    - Downloads all Go dependencies
+#    - Builds the CRUD service binary
+#    - Compiles test binaries for each package
+#
+# 2. Second stage (final):
+#    - Uses Ubuntu 22.04 as the base image
+#    - Installs system dependencies
+#    - Sets up MongoDB and Neo4j databases
+#    - Copies the compiled binaries from the builder stage
+#    - Configures the environment for testing
+#    - Runs tests in an isolated environment
+#
+# Usage:
+# ------
+# Build:  docker build -t crud-service-test-standalone -f Dockerfile.test .
+# Run:    docker run --rm crud-service-test-standalone
+#
+# This approach ensures consistent test results regardless of the host environment
+# and eliminates the need for external database services during testing.
+
 
 # -------------------
 # Stage 1: Build Go binaries
