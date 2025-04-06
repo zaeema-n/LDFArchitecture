@@ -1,0 +1,128 @@
+# Dockerfile.test
+# ===============
+#
+# This Dockerfile creates a self-contained environment for testing the CRUD API service.
+# It builds a single container that includes:
+#   1. The Go CRUD service
+#   2. MongoDB database
+#   3. Neo4j graph database
+#   4. All test binaries
+#
+# The testing process:
+# --------------------
+# 1. First stage (builder):
+#    - Uses golang:1.24 as the base image
+#    - Downloads all Go dependencies
+#    - Builds the CRUD service binary
+#    - Compiles test binaries for each package
+#
+# 2. Second stage (final):
+#    - Uses Ubuntu 22.04 as the base image
+#    - Installs system dependencies
+#    - Sets up MongoDB and Neo4j databases
+#    - Copies the compiled binaries from the builder stage
+#    - Configures the environment for testing
+#    - Runs tests in an isolated environment
+#
+# Usage:
+# ------
+# Build:  docker build -t crud-service-test-standalone -f Dockerfile.test .
+# Run:    docker run --rm crud-service-test-standalone
+#
+# This approach ensures consistent test results regardless of the host environment
+# and eliminates the need for external database services during testing.
+
+
+# -------------------
+# Stage 1: Build Go binaries
+# -------------------
+FROM golang:1.24 AS builder
+
+# Set working directory
+WORKDIR /app
+
+# Copy go mod and sum files
+COPY go.mod go.sum ./
+
+# Download all dependencies
+RUN go mod download
+
+# Copy the source code
+COPY . .
+
+# Build the test binary
+RUN go build ./...
+RUN go build -o crud-service cmd/server/service.go cmd/server/utils.go
+
+# Create a directory for test binaries
+RUN mkdir -p /app/testbin
+
+# Compile tests for each package
+RUN cd cmd/server && go test -c -o /app/testbin/crud-test .
+RUN cd db/repository/mongo && go test -c -o /app/testbin/mongo-test .
+RUN cd db/repository/neo4j && go test -c -o /app/testbin/neo4j-test .
+
+# Final stage
+FROM ubuntu:22.04
+
+# Install required packages
+RUN apt-get update && apt-get install -y \
+    curl \
+    gnupg \
+    lsb-release \
+    wget \
+    openjdk-11-jre-headless \
+    net-tools \
+    nano \
+    apt-transport-https \
+    software-properties-common \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install MongoDB
+RUN wget -qO - https://www.mongodb.org/static/pgp/server-6.0.asc | apt-key add - \
+    && echo "deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/6.0 multiverse" | tee /etc/apt/sources.list.d/mongodb-org-6.0.list \
+    && apt-get update \
+    && apt-get install -y mongodb-org \
+    && mkdir -p /data/db
+
+# Install Neo4j
+RUN wget -O - https://debian.neo4j.com/neotechnology.gpg.key | apt-key add - \
+    && echo 'deb https://debian.neo4j.com stable 4.4' | tee /etc/apt/sources.list.d/neo4j.list \
+    && apt-get update \
+    && apt-get install -y neo4j=1:4.4.28 cypher-shell
+
+# Configure Neo4j
+RUN sed -i 's/#server.default_listen_address=0.0.0.0/server.default_listen_address=0.0.0.0/' /etc/neo4j/neo4j.conf \
+    && sed -i 's/#server.bolt.enabled=true/server.bolt.enabled=true/' /etc/neo4j/neo4j.conf \
+    && sed -i 's/#server.bolt.address=0.0.0.0:7687/server.bolt.address=0.0.0.0:7687/' /etc/neo4j/neo4j.conf \
+    && sed -i 's/#server.http.enabled=true/server.http.enabled=true/' /etc/neo4j/neo4j.conf \
+    && sed -i 's/#server.http.address=0.0.0.0:7474/server.http.address=0.0.0.0:7474/' /etc/neo4j/neo4j.conf \
+    && sed -i 's/#dbms.security.auth_enabled=true/dbms.security.auth_enabled=true/' /etc/neo4j/neo4j.conf \
+    && echo "dbms.security.procedures.unrestricted=apoc.*" >> /etc/neo4j/neo4j.conf
+
+# Copy test binaries
+COPY --from=builder /app/crud-service /usr/local/bin/
+COPY --from=builder /app/testbin/* /usr/local/bin/
+
+# Set environment variables
+ENV NEO4J_URI=bolt://localhost:7687
+ENV NEO4J_USER=neo4j
+ENV NEO4J_PASSWORD=neo4j123
+ENV MONGO_URI=mongodb://localhost:27017
+ENV MONGO_DB_NAME=testdb
+ENV MONGO_COLLECTION=metadata
+
+# Expose ports
+EXPOSE 7474 7687 27017
+
+# Start the test environment
+CMD mongod --fork --logpath /var/log/mongodb.log && \
+    neo4j start && \
+    until curl -s http://localhost:7474 > /dev/null; do echo "Waiting for Neo4j..."; sleep 2; done && \
+    echo "Changing initial Neo4j password..." && \
+    echo "ALTER CURRENT USER SET PASSWORD FROM 'neo4j' TO '$NEO4J_PASSWORD';" \
+      | cypher-shell -u neo4j -p 'neo4j' -d system && \
+    until mongosh --eval "db.version()" > /dev/null 2>&1; do echo "Waiting for MongoDB..."; sleep 2; done && \
+    crud-test -test.v && \
+    mongo-test -test.v && \
+    neo4j-test -test.v

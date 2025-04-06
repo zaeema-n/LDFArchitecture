@@ -1,0 +1,23 @@
+# Use the Neo4j 4.4 image
+FROM neo4j:4.4
+
+# Set platform (this is not defined in Dockerfile but needs to be specified when building/running if required)
+# For ARM64, you’ll need to use --platform=linux/arm64 when running/building if you're not on ARM natively
+
+# Set environment variables for memory configuration
+ENV NEO4J_dbms_memory_pagecache_size=2G \
+    NEO4J_dbms_memory_heap_initial__size=2G \
+    NEO4J_dbms_memory_heap_max__size=2G \
+    NEO4J_dbms_memory_offheap_max__size=1G
+
+# Optionally, copy the config.env file to container (if you need it inside)
+COPY config.env /config.env
+
+# Expose the required ports
+EXPOSE 7474 7687
+
+# Create and mount necessary directories (bind-mount when running)
+VOLUME ["/data", "/logs", "/plugins", "/var/lib/neo4j/import"]
+
+# Default command
+CMD ["neo4j"]
