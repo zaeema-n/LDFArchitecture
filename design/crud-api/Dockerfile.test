@@ -59,9 +59,7 @@ RUN go build ./...
 RUN go build -o crud-service cmd/server/service.go cmd/server/utils.go
 
 # Create a directory for test binaries
-RUN mkdir -p /app/testbin
-
-USER 10014
+RUN mkdir -p /app/testbin && chown -R 10014:10014 /app/testbin
 
 # Compile tests for each package
 RUN cd cmd/server && go test -c -o /app/testbin/crud-test .
@@ -90,13 +88,20 @@ RUN wget -qO - https://www.mongodb.org/static/pgp/server-6.0.asc | apt-key add -
     && apt-get update \
     && apt-get install -y mongodb-org \
     && mkdir -p /data/db \
-    && chown -R 10014:10014 /data/db
+    && mkdir -p /var/log/mongodb \
+    && chown -R 10014:10014 /data/db \
+    && chown -R 10014:10014 /var/log/mongodb
 
 # Install Neo4j
 RUN wget -O - https://debian.neo4j.com/neotechnology.gpg.key | apt-key add - \
     && echo 'deb https://debian.neo4j.com stable 4.4' | tee /etc/apt/sources.list.d/neo4j.list \
     && apt-get update \
-    && apt-get install -y neo4j=1:4.4.28 cypher-shell
+    && apt-get install -y neo4j=1:4.4.28 cypher-shell \
+    && mkdir -p /var/lib/neo4j/data \
+    && mkdir -p /var/log/neo4j \
+    && chown -R 10014:10014 /var/lib/neo4j \
+    && chown -R 10014:10014 /var/log/neo4j \
+    && chown -R 10014:10014 /etc/neo4j
 
 # Configure Neo4j
 RUN sed -i 's/#server.default_listen_address=0.0.0.0/server.default_listen_address=0.0.0.0/' /etc/neo4j/neo4j.conf \
@@ -119,11 +124,13 @@ ENV MONGO_URI=mongodb://localhost:27017
 ENV MONGO_DB_NAME=testdb
 ENV MONGO_COLLECTION=metadata
 
+USER 10014
+
 # Expose ports
 EXPOSE 7474 7687 27017
 
 # Start the test environment
-CMD mongod --dbpath /data/db --logpath /var/log/mongodb.log && \
+CMD mongod --dbpath /data/db --logpath /var/log/mongodb/mongodb.log && \
     neo4j start && \
     until curl -s http://localhost:7474 > /dev/null; do echo "Waiting for Neo4j..."; sleep 2; done && \
     echo "Changing initial Neo4j password..." && \
