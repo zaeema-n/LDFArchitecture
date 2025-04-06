@@ -47,6 +47,10 @@ COPY go.mod go.sum ./
 # Download all dependencies
 RUN go mod download
 
+# Create a new user with UID 10014
+RUN addgroup -g 10014 choreo && \
+    adduser  --disabled-password  --no-create-home --uid 10014 --ingroup choreo choreouser
+
 # Copy the source code
 COPY . .
 
@@ -114,6 +118,8 @@ ENV MONGO_COLLECTION=metadata
 
 # Expose ports
 EXPOSE 7474 7687 27017
+
+USER 10014
 
 # Start the test environment
 CMD mongod --fork --logpath /var/log/mongodb.log && \

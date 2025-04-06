@@ -49,6 +49,10 @@ COPY go.mod go.sum ./
 # Download all dependencies
 RUN go mod download
 
+# Create a new user with UID 10014
+RUN addgroup -g 10014 choreo && \
+    adduser  --disabled-password  --no-create-home --uid 10014 --ingroup choreo choreouser
+
 # Copy the source code
 COPY . .
 
@@ -80,6 +84,8 @@ ENV CRUD_SERVICE_PORT=${CRUD_SERVICE_PORT:-50051}
 
 # Expose ports
 EXPOSE 50051
+
+USER 10014
 
 # Display environment variables and start the service
 CMD echo "Environment Variables:" && \
