@@ -137,16 +137,14 @@ ENV MONGO_URI=mongodb://localhost:27017
 ENV MONGO_DB_NAME=testdb
 ENV MONGO_COLLECTION=metadata
 
+# Switch to non-root user
 USER 10014
 
 # Expose ports
 EXPOSE 7474 7687 27017
 
 # Start the test environment
-CMD touch /var/log/mongodb/mongodb.log && \
-    chown 10014:10014 /var/log/mongodb/mongodb.log && \
-    chmod 666 /var/log/mongodb/mongodb.log && \
-    mongod --dbpath /data/db --logpath /var/log/mongodb/mongodb.log && \
+CMD mongod --dbpath /data/db --logpath /var/log/mongodb/mongodb.log && \
     neo4j start && \
     until curl -s http://localhost:7474 > /dev/null; do echo "Waiting for Neo4j..."; sleep 2; done && \
     echo "Changing initial Neo4j password..." && \
