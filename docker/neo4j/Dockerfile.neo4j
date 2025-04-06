@@ -10,6 +10,10 @@ ENV NEO4J_dbms_memory_pagecache_size=2G \
     NEO4J_dbms_memory_heap_max__size=2G \
     NEO4J_dbms_memory_offheap_max__size=1G
 
+# Create a new user with UID 10014
+RUN addgroup -g 10014 choreo && \
+    adduser  --disabled-password  --no-create-home --uid 10014 --ingroup choreo choreouser
+
 # Optionally, copy the config.env file to container (if you need it inside)
 COPY config.env /config.env
 
@@ -18,6 +22,8 @@ EXPOSE 7474 7687
 
 # Create and mount necessary directories (bind-mount when running)
 VOLUME ["/data", "/logs", "/plugins", "/var/lib/neo4j/import"]
+
+USER 10014
 
 # Default command
 CMD ["neo4j"]
