@@ -61,6 +61,8 @@ RUN go build -o crud-service cmd/server/service.go cmd/server/utils.go
 # Create a directory for test binaries
 RUN mkdir -p /app/testbin
 
+USER 10014
+
 # Compile tests for each package
 RUN cd cmd/server && go test -c -o /app/testbin/crud-test .
 RUN cd db/repository/mongo && go test -c -o /app/testbin/mongo-test .
@@ -87,7 +89,8 @@ RUN wget -qO - https://www.mongodb.org/static/pgp/server-6.0.asc | apt-key add -
     && echo "deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/6.0 multiverse" | tee /etc/apt/sources.list.d/mongodb-org-6.0.list \
     && apt-get update \
     && apt-get install -y mongodb-org \
-    && mkdir -p /data/db
+    && mkdir -p /data/db \
+    && chown -R 10014:10014 /data/db
 
 # Install Neo4j
 RUN wget -O - https://debian.neo4j.com/neotechnology.gpg.key | apt-key add - \
@@ -116,13 +119,11 @@ ENV MONGO_URI=mongodb://localhost:27017
 ENV MONGO_DB_NAME=testdb
 ENV MONGO_COLLECTION=metadata
 
-USER 10014
-
 # Expose ports
 EXPOSE 7474 7687 27017
 
 # Start the test environment
-CMD mongod --fork --logpath /var/log/mongodb.log && \
+CMD mongod --dbpath /data/db --logpath /var/log/mongodb.log && \
     neo4j start && \
     until curl -s http://localhost:7474 > /dev/null; do echo "Waiting for Neo4j..."; sleep 2; done && \
     echo "Changing initial Neo4j password..." && \
