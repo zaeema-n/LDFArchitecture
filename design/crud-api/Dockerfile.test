@@ -116,6 +116,17 @@ RUN sed -i 's/#server.default_listen_address=0.0.0.0/server.default_listen_addre
 COPY --from=builder /app/crud-service /usr/local/bin/
 COPY --from=builder /app/testbin/* /usr/local/bin/
 
+# Set up MongoDB and Neo4j directories
+RUN mkdir -p /data/db \
+    && mkdir -p /var/log/mongodb \
+    && mkdir -p /var/lib/neo4j/data \
+    && mkdir -p /var/log/neo4j \
+    && chown -R 10014:10014 /data/db \
+    && chown -R 10014:10014 /var/log/mongodb \
+    && chown -R 10014:10014 /var/lib/neo4j \
+    && chown -R 10014:10014 /var/log/neo4j \
+    && chown -R 10014:10014 /etc/neo4j
+
 # Set environment variables
 ENV NEO4J_URI=bolt://localhost:7687
 ENV NEO4J_USER=neo4j
