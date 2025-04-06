@@ -47,6 +47,10 @@ COPY go.mod go.sum ./
 # Download all dependencies
 RUN go mod download
 
+# Create a new user with UID 10014
+RUN addgroup -g 10014 choreo && \
+    adduser  --disabled-password  --no-create-home --uid 10014 --ingroup choreo choreouser
+
 # Copy the source code
 COPY . .
 
@@ -65,6 +69,8 @@ ENV MONGO_ADMIN_USER=${MONGO_ADMIN_USER:-admin}
 ENV MONGO_ADMIN_PASSWORD=${MONGO_ADMIN_PASSWORD:-test123456}
 ENV MONGO_TEST_USER=${MONGO_TEST_USER:-testuser}
 ENV MONGO_TEST_PASSWORD=${MONGO_TEST_PASSWORD:-test123456}
+
+USER 10014
 
 # Run tests with verbose output
 CMD ["go", "test", "-v", "./..."]
