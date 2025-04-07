@@ -66,7 +66,9 @@ RUN cd cmd/server && go test -c -o /app/testbin/crud-test .
 RUN cd db/repository/mongo && go test -c -o /app/testbin/mongo-test .
 RUN cd db/repository/neo4j && go test -c -o /app/testbin/neo4j-test .
 
-# Final stage
+# -------------------
+# Stage 2: Final image
+# -------------------
 FROM ubuntu:22.04
 
 # Install required packages
@@ -88,9 +90,7 @@ RUN wget -qO - https://www.mongodb.org/static/pgp/server-6.0.asc | apt-key add -
     && apt-get update \
     && apt-get install -y mongodb-org \
     && mkdir -p /data/db \
-    && mkdir -p /var/log/mongodb \
-    && chown -R 10014:10014 /data/db \
-    && chown -R 10014:10014 /var/log/mongodb
+    && chown -R 10014:10014 /data/db
 
 # Install Neo4j
 RUN wget -O - https://debian.neo4j.com/neotechnology.gpg.key | apt-key add - \
@@ -116,20 +116,10 @@ RUN sed -i 's/#server.default_listen_address=0.0.0.0/server.default_listen_addre
 COPY --from=builder /app/crud-service /usr/local/bin/
 COPY --from=builder /app/testbin/* /usr/local/bin/
 
-# Set up MongoDB and Neo4j directories
-RUN mkdir -p /data/db \
-    && mkdir -p /var/log/mongodb \
-    && mkdir -p /var/lib/neo4j/data \
-    && mkdir -p /var/log/neo4j \
-    && touch /var/log/mongodb/mongodb.log \
-    && chown -R 10014:10014 /data/db \
-    && chown -R 10014:10014 /var/log/mongodb \
-    && chown -R 10014:10014 /var/lib/neo4j \
-    && chown -R 10014:10014 /var/log/neo4j \
-    && chown -R 10014:10014 /etc/neo4j \
-    && chmod 666 /var/log/mongodb/mongodb.log
+# Create log directory for MongoDB under non-root user home
+RUN mkdir -p /home/choreouser/logs && chown -R 10014:10014 /home/choreouser
 
-# Set environment variables
+# Environment variables
 ENV NEO4J_URI=bolt://localhost:7687
 ENV NEO4J_USER=neo4j
 ENV NEO4J_PASSWORD=neo4j123
@@ -144,7 +134,7 @@ USER 10014
 EXPOSE 7474 7687 27017
 
 # Start everything
-CMD mongod --dbpath /data/db --logpath /var/log/mongodb/mongodb.log --logappend && \
+CMD mongod --dbpath /data/db --logpath /home/choreouser/logs/mongodb.log --logappend && \
     neo4j start && \
     until curl -s http://localhost:7474 > /dev/null; do echo "Waiting for Neo4j..."; sleep 2; done && \
     echo "Changing initial Neo4j password..." && \
