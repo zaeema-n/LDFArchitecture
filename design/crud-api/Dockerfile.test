@@ -47,9 +47,9 @@ COPY go.mod go.sum ./
 # Download all dependencies
 RUN go mod download
 
-# Create a new user with UID 10014
-RUN groupadd -g 10014 choreo && \
-    useradd -u 10014 -g choreo -s /bin/false -M choreouser
+# Create a new user and group with proper home directory
+RUN addgroup --gid 10014 choreo && \
+    adduser --disabled-password --uid 10014 --ingroup choreo --home /home/choreouser choreouser
 
 # Copy the source code
 COPY . .
@@ -83,6 +83,10 @@ RUN apt-get update && apt-get install -y \
     apt-transport-https \
     software-properties-common \
     && rm -rf /var/lib/apt/lists/*
+
+# Create user and group in final stage
+RUN addgroup --gid 10014 choreo && \
+    adduser --disabled-password --uid 10014 --ingroup choreo --home /home/choreouser choreouser
 
 # Install MongoDB
 RUN wget -qO - https://www.mongodb.org/static/pgp/server-6.0.asc | apt-key add - \
@@ -121,17 +125,7 @@ RUN mkdir -p /home/choreouser/logs && \
     touch /home/choreouser/logs/mongodb.log && \
     chown -R 10014:10014 /home/choreouser && \
     chmod -R 777 /home/choreouser/logs && \
-    chmod 777 /home/choreouser/logs/mongodb.log && \
-    echo "=== MongoDB Paths Debug ===" && \
-    echo "Checking /home/choreouser/logs:" && \
-    ls -la /home/choreouser/logs && \
-    echo "Checking /home/choreouser:" && \
-    ls -la /home/choreouser && \
-    echo "Checking /data/db:" && \
-    ls -la /data/db && \
-    echo "Checking /var/log/mongodb:" && \
-    ls -la /var/log/mongodb 2>/dev/null || echo "Directory does not exist" && \
-    echo "=== End Debug ==="
+    chmod 777 /home/choreouser/logs/mongodb.log
 
 # Environment variables
 ENV NEO4J_URI=bolt://localhost:7687
