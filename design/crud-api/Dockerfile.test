@@ -121,7 +121,17 @@ RUN mkdir -p /home/choreouser/logs && \
     touch /home/choreouser/logs/mongodb.log && \
     chown -R 10014:10014 /home/choreouser && \
     chmod -R 777 /home/choreouser/logs && \
-    chmod 777 /home/choreouser/logs/mongodb.log
+    chmod 777 /home/choreouser/logs/mongodb.log && \
+    echo "=== MongoDB Paths Debug ===" && \
+    echo "Checking /home/choreouser/logs:" && \
+    ls -la /home/choreouser/logs && \
+    echo "Checking /home/choreouser:" && \
+    ls -la /home/choreouser && \
+    echo "Checking /data/db:" && \
+    ls -la /data/db && \
+    echo "Checking /var/log/mongodb:" && \
+    ls -la /var/log/mongodb 2>/dev/null || echo "Directory does not exist" && \
+    echo "=== End Debug ==="
 
 # Environment variables
 ENV NEO4J_URI=bolt://localhost:7687
@@ -138,7 +148,15 @@ USER 10014
 EXPOSE 7474 7687 27017
 
 # Start everything
-CMD mongod --dbpath /data/db --logpath /home/choreouser/logs/mongodb.log --logappend && \
+CMD echo "=== Pre-start Debug ===" && \
+    echo "Checking /home/choreouser/logs:" && \
+    ls -la /home/choreouser/logs && \
+    echo "Checking /home/choreouser:" && \
+    ls -la /home/choreouser && \
+    echo "Checking /data/db:" && \
+    ls -la /data/db && \
+    echo "=== End Pre-start Debug ===" && \
+    mongod --dbpath /data/db --logpath /home/choreouser/logs/mongodb.log --logappend && \
     neo4j start && \
     until curl -s http://localhost:7474 > /dev/null; do echo "Waiting for Neo4j..."; sleep 2; done && \
     echo "Changing initial Neo4j password..." && \
