@@ -117,7 +117,11 @@ COPY --from=builder /app/crud-service /usr/local/bin/
 COPY --from=builder /app/testbin/* /usr/local/bin/
 
 # Create log directory for MongoDB under non-root user home
-RUN mkdir -p /home/choreouser/logs && chown -R 10014:10014 /home/choreouser
+RUN mkdir -p /home/choreouser/logs && \
+    touch /home/choreouser/logs/mongodb.log && \
+    chown -R 10014:10014 /home/choreouser && \
+    chmod -R 777 /home/choreouser/logs && \
+    chmod 777 /home/choreouser/logs/mongodb.log
 
 # Environment variables
 ENV NEO4J_URI=bolt://localhost:7687
