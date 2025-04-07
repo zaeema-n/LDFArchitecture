@@ -111,7 +111,7 @@ func (repo *Neo4jRepository) GetGraphRelationships(ctx context.Context, entityId
 	return relationships, nil
 }
 
-func (repo *Neo4jRepository) GetEntityIdsByRelationship(ctx context.Context, entityId string, relationship string, ts string) (map[string]*pb.Relationship, error) {
+func (repo *Neo4jRepository) GetRelationshipsByName(ctx context.Context, entityId string, relationship string, ts string) (map[string]*pb.Relationship, error) {
 	// Validate input parameters
 	if entityId == "" {
 		return nil, fmt.Errorf("entityId cannot be empty")

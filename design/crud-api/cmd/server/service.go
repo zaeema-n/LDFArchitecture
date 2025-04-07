@@ -97,18 +97,20 @@ func (s *Server) ReadEntity(ctx context.Context, req *pb.Entity) (*pb.Entity, er
 		// Call GetEntityIdsByRelationship for each relationship
 		for _, rel := range req.Relationships {
 			log.Printf("Fetching related entity IDs for entity %s with relationship %s and start time %s", req.Id, rel.Name, rel.StartTime)
-			relatedEntityIDs, err := s.neo4jRepo.GetEntityIdsByRelationship(ctx, req.Id, rel.Name, rel.StartTime)
+			rels, err := s.neo4jRepo.GetRelationshipsByName(ctx, req.Id, rel.Name, rel.StartTime)
 			if err != nil {
 				log.Printf("Error fetching related entity IDs for entity %s: %v", req.Id, err)
 				return nil, err
 			}
 
 			// Populate the relationships map with only ID and Name
-			for _, relatedID := range relatedEntityIDs {
-				relationships[relatedID] = &pb.Relationship{
-					Id:              "", // No relationship ID available in this case
+			for _, rel := range rels {
+				relationships[rel.Id] = &pb.Relationship{
+					Id:              rel.Id, // No relationship ID available in this case
 					Name:            rel.Name,
-					RelatedEntityId: relatedID,
+					RelatedEntityId: rel.RelatedEntityId,
+					StartTime:       rel.StartTime,
+					EndTime:         rel.EndTime,
 				}
 			}
 		}

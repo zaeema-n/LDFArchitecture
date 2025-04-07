@@ -213,8 +213,7 @@ func (r *Neo4jRepository) CreateRelationship(ctx context.Context, entityID strin
 
 	createQuery := `MATCH (p {Id: $parentID}), (c {Id: $childID})
                     MERGE (p)-[r:` + rel.Name + ` {Id: $relationshipID}]->(c)
-                    SET r.Created = datetime($startDate)
-                    RETURN r`
+                    SET r.Created = datetime($startDate)`
 
 	params := map[string]interface{}{
 		"parentID":       entityID,
@@ -227,6 +226,8 @@ func (r *Neo4jRepository) CreateRelationship(ctx context.Context, entityID strin
 		createQuery += `, r.Terminated = datetime($endDate)`
 		params["endDate"] = rel.EndTime
 	}
+
+	createQuery += ` RETURN r`
 
 	result, err = session.Run(ctx, createQuery, params)
 	if err != nil {

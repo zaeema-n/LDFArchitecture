@@ -162,12 +162,12 @@ func TestReadRelatedEntityIds(t *testing.T) {
 	entity1 := map[string]interface{}{
 		"Id":      "4",
 		"Name":    "Alice",
-		"Created": "2025-03-18",
+		"Created": "2025-03-18T00:00:00Z",
 	}
 	entity2 := map[string]interface{}{
 		"Id":      "5",
 		"Name":    "Bob",
-		"Created": "2025-03-18",
+		"Created": "2025-03-18T00:00:00Z",
 	}
 
 	// Create entities
@@ -182,17 +182,17 @@ func TestReadRelatedEntityIds(t *testing.T) {
 		Id:              "102",
 		Name:            "KNOWS",
 		RelatedEntityId: "5",
-		StartTime:       "2025-03-18",
-		EndTime:         "2025-12-31",
+		StartTime:       "2025-03-18T00:00:00Z",
+		EndTime:         "2025-12-31T00:00:00Z",
 	}
 
 	_, err = repository.CreateRelationship(context.Background(), "4", relationship)
 	assert.Nil(t, err, "Expected no error when creating the relationship")
 
 	// Step 3: Prepare the test data for fetching related relationships
-	entityID := "4"             // ID of the entity to get related relationships for
-	relationshipType := "KNOWS" // Relationship type
-	ts := "2025-03-18"          // Timestamp (YYYY-MM-DD)
+	entityID := "4"              // ID of the entity to get related relationships for
+	relationshipType := "KNOWS"  // Relationship type
+	ts := "2025-03-18T00:00:00Z" // Timestamp (YYYY-MM-DD)
 
 	// Step 4: Call the function to fetch related relationships
 	relatedRelationships, err := repository.ReadRelatedGraphEntityIds(context.Background(), entityID, relationshipType, ts)
@@ -207,8 +207,8 @@ func TestReadRelatedEntityIds(t *testing.T) {
 	assert.Equal(t, "102", relationshipData["Id"], "Expected relationship ID to match")
 	assert.Equal(t, "KNOWS", relationshipData["Name"], "Expected relationship Name to match")
 	assert.Equal(t, "5", relationshipData["RelatedEntityId"], "Expected RelatedEntityId to match")
-	assert.Equal(t, "2025-03-18", relationshipData["StartTime"], "Expected StartTime to match")
-	assert.Equal(t, "2025-12-31", relationshipData["EndTime"], "Expected EndTime to match")
+	assert.Equal(t, "2025-03-18T00:00:00Z", relationshipData["StartTime"], "Expected StartTime to match")
+	assert.Equal(t, "2025-12-31T00:00:00Z", relationshipData["EndTime"], "Expected EndTime to match")
 }
 
 func TestReadRelationships(t *testing.T) {
