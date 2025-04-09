@@ -166,6 +166,54 @@ service /v1 on ep0 {
         return {};
     }
 
+    # Get all related entity IDs
+    #
+    # + return - List of all related entities 
+    resource function post entities/[string entityId]/allrelations() returns InlineResponse2002ArrayOk|error {
+        // Create entity filter without any relationship filtering criteria
+        Entity entityFilter = {
+            id: entityId,
+            kind: {
+                major: "",
+                minor: ""
+            },
+            created: "",
+            terminated: "",
+            name: {
+                startTime: "",
+                endTime: "",
+                value: {
+                    typeUrl: "type.googleapis.com/google.protobuf.StringValue",
+                    value: ""
+                }
+            },
+            metadata: [],
+            attributes: [],
+            relationships: []  // No filtering criteria for relationships
+        };
+
+        // Read the entity using the crud service
+        Entity entity = check ep->ReadEntity(entityFilter);
+
+        // Process the relationships returned by the backend
+        inline_response_200_2[] relationships = [];
+
+        foreach var relEntry in entity.relationships {
+            Relationship rel = relEntry.value;
+
+            // Add to our result list
+            relationships.push({
+                relatedEntityId: rel.relatedEntityId,
+                startTime: rel.startTime,
+                endTime: rel.endTime,
+                id: rel.id,
+                name: rel.name
+            });
+        }
+
+        return {body: relationships};
+    }
+
     # Get related entity IDs
     #
     # + return - List of related entities 
@@ -232,6 +280,4 @@ service /v1 on ep0 {
         // Create entity filter with search criteria from payload
         return {body: {body: []}};
     }
-    
-    
 }

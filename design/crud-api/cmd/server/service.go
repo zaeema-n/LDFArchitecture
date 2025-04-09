@@ -87,7 +87,6 @@ func (s *Server) ReadEntity(ctx context.Context, req *pb.Entity) (*pb.Entity, er
 		}
 		relationships = graphRelationships
 	} else {
-		log.Printf("----------GetEntityIdsByRelationship------------")
 
 		// Case 2: Validate that all relationships have a Name field
 		for _, rel := range req.Relationships {
