@@ -52,7 +52,7 @@ docker run -d \
 
 ```bash
 docker run -d \
-  --name neo4j-local \
+  --name neo4j-local-v1 \
   --network crud-network \
   -p 7474:7474 \
   -p 7687:7687 \
@@ -60,7 +60,7 @@ docker run -d \
   -v $(pwd)/logs:/logs \
   -v $(pwd)/plugins:/plugins \
   -v $(pwd)/import:/var/lib/neo4j/import \
-  neo4j-custom
+  neo4j-service
 ```
 
 ### Start the Neo4j Server with Docker Composer
