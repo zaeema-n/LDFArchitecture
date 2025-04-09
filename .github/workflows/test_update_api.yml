@@ -27,6 +27,15 @@ jobs:
         apt-get update
         apt-get install -y neo4j
 
+    - name: Configure Neo4j
+      run: |
+        # Set Neo4j password
+        echo "dbms.security.auth_enabled=true" >> /etc/neo4j/neo4j.conf
+        echo "dbms.security.procedures.unrestricted=apoc.*" >> /etc/neo4j/neo4j.conf
+        echo "dbms.security.procedures.allowlist=apoc.*" >> /etc/neo4j/neo4j.conf
+        # Set initial password
+        neo4j-admin set-initial-password test123456
+
     - name: Install MongoDB
       run: |
         # Install libssl1.1
@@ -74,7 +83,7 @@ jobs:
         echo "UPDATE_SERVICE_HOST=localhost" >> $GITHUB_ENV
         echo "UPDATE_SERVICE_PORT=8080" >> $GITHUB_ENV
 
-    - name: Run CRUD Server
+    - name: Build and Start CRUD Service
       run: |
         cd design/crud-api
         go build ./...
@@ -90,6 +99,17 @@ jobs:
             break
           fi
           echo "Still waiting for crud-service..."
+          sleep 1
+        done
+
+        # Verify service is responding
+        echo "Verifying CRUD service is responding..."
+        for i in {1..10}; do
+          if curl -s http://localhost:50051 > /dev/null; then
+            echo "CRUD service is responding!"
+            break
+          fi
+          echo "Still verifying CRUD service..."
           sleep 1
         done
 
