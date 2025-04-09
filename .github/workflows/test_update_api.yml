@@ -34,7 +34,7 @@ jobs:
         echo "dbms.security.procedures.unrestricted=apoc.*" >> /etc/neo4j/neo4j.conf
         echo "dbms.security.procedures.allowlist=apoc.*" >> /etc/neo4j/neo4j.conf
         # Set initial password
-        neo4j-admin set-initial-password test123456
+        neo4j-admin dbms set-initial-password test123456
 
     - name: Install MongoDB
       run: |
