@@ -5,7 +5,9 @@ import sys
 QUERY_API_URL = "http://localhost:8081/v1/entities"
 UPDATE_API_URL = "http://localhost:8080/entities"
 ENTITY_ID = "query-test-entity"
-RELATED_ID = "query-related-entity"
+RELATED_ID_1 = "query-related-entity-1"
+RELATED_ID_2 = "query-related-entity-2"
+RELATED_ID_3 = "query-related-entity-3"
 
 
 """
@@ -46,8 +48,9 @@ def create_entity_for_query():
     """Create a base entity with metadata, attributes, and relationships."""
     print("\n🟢 Creating entity for query tests...")
 
-    payload_child = {
-        "id": RELATED_ID,
+# First related entity
+    payload_child_1 = {
+        "id": RELATED_ID_1,
         "kind": {"major": "test", "minor": "child"},
         "created": "2024-01-01T00:00:00Z",
         "terminated": "",
@@ -56,7 +59,7 @@ def create_entity_for_query():
             "endTime": "",
             "value": {
                 "typeUrl": "type.googleapis.com/google.protobuf.StringValue",
-                "value": "Query Test Entity Child"
+                "value": "Query Test Entity Child 1"
             }
         },
         "metadata": [
@@ -82,6 +85,51 @@ def create_entity_for_query():
         ],
         "relationships": [
         ]
+    }
+
+    # Second related entity
+    payload_child_2 = {
+        "id": RELATED_ID_2,
+        "kind": {"major": "test", "minor": "child"},
+        "created": "2024-01-01T00:00:00Z",
+        "terminated": "",
+        "name": {
+            "startTime": "2024-01-01T00:00:00Z",
+            "endTime": "",
+            "value": {
+                "typeUrl": "type.googleapis.com/google.protobuf.StringValue",
+                "value": "Query Test Entity Child 2"
+            }
+        },
+        "metadata": [
+            {"key": "source", "value": "unit-test-2"},
+            {"key": "env", "value": "test-2"}
+        ],
+        "attributes": [],
+        "relationships": []
+    }
+
+    # Third related entity
+    
+    payload_child_3 = {
+        "id": RELATED_ID_3,
+        "kind": {"major": "test", "minor": "child"},
+        "created": "2024-01-01T00:00:00Z",
+        "terminated": "",
+        "name": {
+            "startTime": "2024-01-01T00:00:00Z",
+            "endTime": "",
+            "value": {
+                "typeUrl": "type.googleapis.com/google.protobuf.StringValue",
+                "value": "Query Test Entity Child 3"
+            }
+        },
+        "metadata": [
+            {"key": "source", "value": "unit-test-3"},
+            {"key": "env", "value": "test-3"}
+        ],
+        "attributes": [],
+        "relationships": []
     }
 
     payload_source = {
@@ -122,23 +170,51 @@ def create_entity_for_query():
             {
                 "key": "rel-001",
                 "value": {
-                    "relatedEntityId": RELATED_ID,
+                    "relatedEntityId": RELATED_ID_1,
                     "startTime": "2024-01-01T00:00:00Z",
                     "endTime": "2024-12-31T23:59:59Z",
                     "id": "rel-001",
                     "name": "linked"
                 }
+            },
+            {
+                "key": "rel-002",
+                "value": {
+                    "relatedEntityId": RELATED_ID_2,
+                    "startTime": "2024-06-01T00:00:00Z",  # Different timestamp
+                    "endTime": "2024-12-31T23:59:59Z",
+                    "id": "rel-002",
+                    "name": "linked"  # Same type as the first relationship
+                }
+            },
+            {
+                "key": "rel-003",
+                "value": {
+                    "relatedEntityId": RELATED_ID_3,
+                    "startTime": "2024-01-01T00:00:00Z",  # Same timestamp as the first relationship
+                    "endTime": "2024-12-31T23:59:59Z",
+                    "id": "rel-003",
+                    "name": "associated"  # Different type
+                }
             }
         ]
     }
 
-    res = requests.post(UPDATE_API_URL, json=payload_child)
+    res = requests.post(UPDATE_API_URL, json=payload_child_1)
     assert res.status_code == 201 or res.status_code == 200, f"Failed to create entity: {res.text}"
-    print("✅ Created entity for query tests.")
+    print("✅ Created first related entity.")
+
+    res = requests.post(UPDATE_API_URL, json=payload_child_2)
+    assert res.status_code == 201 or res.status_code == 200, f"Failed to create entity: {res.text}"
+    print("✅ Created second related entity.")
+
+    res = requests.post(UPDATE_API_URL, json=payload_child_3)
+    assert res.status_code == 201 or res.status_code == 200, f"Failed to create entity: {res.text}"
+    print("✅ Created third related entity.")
 
     res = requests.post(UPDATE_API_URL, json=payload_source)
     assert res.status_code == 201 or res.status_code == 200, f"Failed to create entity: {res.text}"
-    print("✅ Created entity for query tests.")
+    print("✅ Created base entity for query tests.")
 
 def test_attribute_lookup():
     """Test retrieving attributes via the query API."""
@@ -180,7 +256,7 @@ def test_relationship_query():
     print("\n🔍 Testing relationship filtering...")
     url = f"{QUERY_API_URL}/{ENTITY_ID}/relations"
     payload = {
-        "relatedEntityId": RELATED_ID,
+        "relatedEntityId": RELATED_ID_1,
         "startTime": "2024-01-01T00:00:00Z",
         "endTime": "2024-12-31T23:59:59Z",
         "id": "rel-001",
@@ -196,10 +272,132 @@ def test_relationship_query():
     
     relationship = body[0]
     assert "relatedEntityId" in relationship, "Relationship should have relatedEntityId"
-    assert relationship["relatedEntityId"] == RELATED_ID, "Related entity ID mismatch"
+    assert relationship["relatedEntityId"] == RELATED_ID_1, "Related entity ID mismatch"
     assert relationship["name"] == "linked", "Relationship name mismatch"
     assert relationship["id"] == "rel-001", "Relationship ID mismatch"
     print("✅ Relationship response:", json.dumps(res.json(), indent=2))
+
+def test_relationship_query_associated():
+    """Test relationship query for 'associated' relationships with a specific start time."""
+    print("\n🔍 Testing relationship filtering for 'associated' relationships...")
+    
+    # Define the API endpoint and payload
+    url = f"{QUERY_API_URL}/{ENTITY_ID}/relations"
+    payload = {
+        "relatedEntityId": "",
+        "startTime": "2024-02-01T00:00:00Z",  # Start time filter
+        "endTime": "",
+        "id": "",
+        "name": "associated"  # Relationship name filter
+    }
+    
+    # Send the POST request
+    res = requests.post(url, json=payload)
+    assert res.status_code == 200, f"Failed to get relationships: {res.text}"
+    
+    # Parse the response
+    body = res.json()
+    assert isinstance(body, list), "Relationship response should be a list"
+    assert len(body) == 1, f"Expected exactly one relationship, got {len(body)}"
+    
+    # Validate the returned relationship
+    relationship = body[0]
+    assert "relatedEntityId" in relationship, "Relationship should have relatedEntityId"
+    assert relationship["relatedEntityId"] == RELATED_ID_3, "Related entity ID mismatch"
+    assert relationship["name"] == "associated", "Relationship name mismatch"
+    assert relationship["startTime"] == "2024-01-01T00:00:00Z", "Start time mismatch"
+    assert relationship["id"] == "rel-003", "Relationship ID mismatch"
+    
+    print("✅ Relationship response for 'associated':", json.dumps(body, indent=2))
+
+def test_relationship_query_linked():
+    """Test relationship query for 'linked' relationships with a specific start time."""
+    print("\n🔍 Testing relationship filtering for 'linked' relationships...")
+    
+    # Define the API endpoint and payload
+    url = f"{QUERY_API_URL}/{ENTITY_ID}/relations"
+    payload = {
+        "relatedEntityId": "",
+        "startTime": "2024-02-01T00:00:00Z",  # Start time filter
+        "endTime": "",
+        "id": "",
+        "name": "linked"  # Relationship name filter
+    }
+    
+    # Send the POST request
+    res = requests.post(url, json=payload)
+    assert res.status_code == 200, f"Failed to get relationships: {res.text}"
+    
+    # Parse the response
+    body = res.json()
+    assert isinstance(body, list), "Relationship response should be a list"
+    assert len(body) == 1, f"Expected exactly one relationship, got {len(body)}"
+    
+    # Validate the returned relationship
+    relationship = body[0]
+    assert "relatedEntityId" in relationship, "Relationship should have relatedEntityId"
+    assert relationship["relatedEntityId"] == RELATED_ID_1, "Related entity ID mismatch"
+    assert relationship["name"] == "linked", "Relationship name mismatch"
+    assert relationship["startTime"] == "2024-01-01T00:00:00Z", "Start time mismatch"
+    assert relationship["id"] == "rel-001", "Relationship ID mismatch"
+    
+    print("✅ Relationship response for 'linked':", json.dumps(body, indent=2))
+
+def test_allrelationships_query():
+    """Test relationship query without a payload to retrieve all relationships."""
+    print("\n🔍 Testing relationship retrieval without a payload...")
+    
+    # Define the API endpoint
+    url = f"{QUERY_API_URL}/{ENTITY_ID}/allrelations"
+    
+    # Send the POST request without a payload
+    res = requests.post(url)
+    assert res.status_code == 200, f"Failed to get relationships: {res.text}"
+    
+    # Parse the response
+    body = res.json()
+    assert isinstance(body, list), "Relationship response should be a list"
+    assert len(body) == 3, f"Expected exactly 3 relationships, got {len(body)}"
+    
+    # Expected relationships for validation
+    expected_relationships = [
+        {
+            "relatedEntityId": RELATED_ID_1,
+            "name": "linked",
+            "id": "rel-001",
+            "startTime": "2024-01-01T00:00:00Z",
+            "endTime": "2024-12-31T23:59:59Z"
+        },
+        {
+            "relatedEntityId": RELATED_ID_2,
+            "name": "linked",
+            "id": "rel-002",
+            "startTime": "2024-06-01T00:00:00Z",
+            "endTime": "2024-12-31T23:59:59Z"
+        },
+        {
+            "relatedEntityId": RELATED_ID_3,
+            "name": "associated",
+            "id": "rel-003",
+            "startTime": "2024-01-01T00:00:00Z",
+            "endTime": "2024-12-31T23:59:59Z"
+        }
+    ]
+    
+    # Validate all relationships
+    for expected in expected_relationships:
+        matching_relationships = [
+            rel for rel in body if rel["id"] == expected["id"]
+        ]
+        assert len(matching_relationships) == 1, f"Expected exactly one match for relationship ID {expected['id']}"
+        relationship = matching_relationships[0]
+        assert relationship["relatedEntityId"] == expected["relatedEntityId"], f"Related entity ID mismatch for {expected['id']}"
+        assert relationship["name"] == expected["name"], f"Relationship name mismatch for {expected['id']}"
+        assert relationship["id"] == expected["id"], f"Relationship ID mismatch for {expected['id']}"
+        assert relationship["startTime"] == expected["startTime"], f"Start time mismatch for {expected['id']}"
+        assert relationship["endTime"] == expected["endTime"], f"End time mismatch for {expected['id']}"
+    
+    print("✅ All relationships retrieved successfully without a payload.")
 
 def test_entity_search():
     """Test search by entity ID."""
@@ -230,6 +428,9 @@ if __name__ == "__main__":
         test_attribute_lookup()
         test_metadata_lookup()
         test_relationship_query()
+        test_relationship_query_associated()
+        test_relationship_query_linked()
+        test_allrelationships_query()
         test_entity_search()
         print("\n🎉 All Query API tests passed!")
     except AssertionError as e:
