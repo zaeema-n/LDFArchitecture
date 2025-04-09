@@ -48,10 +48,16 @@ jobs:
 
     - name: Start Services
       run: |
+        # Create MongoDB directories and set permissions
+        mkdir -p /data/db
+        chown -R mongodb:mongodb /data/db
+        mkdir -p /var/log/mongodb
+        chown -R mongodb:mongodb /var/log/mongodb
+
         # Start Neo4j
         /usr/bin/neo4j start
         # Start MongoDB
-        /usr/bin/mongod --fork --logpath /var/log/mongodb/mongod.log
+        /usr/bin/mongod --dbpath /data/db --logpath /var/log/mongodb/mongod.log --fork
         # Wait for services to be ready
         sleep 10
 
@@ -99,4 +105,4 @@ jobs:
           rm crud-service.pid
         fi
         /usr/bin/neo4j stop
-        /usr/bin/mongod --shutdown
+        /usr/bin/mongod --dbpath /data/db --shutdown
