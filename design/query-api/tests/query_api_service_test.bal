@@ -282,7 +282,7 @@ function testEntityRelationships() returns error? {
                 key: relationshipId,
                 value: {
                     relatedEntityId: relatedEntityId,
-                    startTime: "",
+                    startTime: "2023-01-05",
                     endTime: "",
                     id: relationshipId,
                     name: relationshipType

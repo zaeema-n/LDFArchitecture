@@ -87,6 +87,8 @@ func (s *Server) ReadEntity(ctx context.Context, req *pb.Entity) (*pb.Entity, er
 		}
 		relationships = graphRelationships
 	} else {
+		log.Printf("----------GetEntityIdsByRelationship------------")
+
 		// Case 2: Validate that all relationships have a Name field
 		for _, rel := range req.Relationships {
 			if rel.Name == "" {
@@ -96,21 +98,22 @@ func (s *Server) ReadEntity(ctx context.Context, req *pb.Entity) (*pb.Entity, er
 
 		// Call GetEntityIdsByRelationship for each relationship
 		for _, rel := range req.Relationships {
+
 			log.Printf("Fetching related entity IDs for entity %s with relationship %s and start time %s", req.Id, rel.Name, rel.StartTime)
-			rels, err := s.neo4jRepo.GetRelationshipsByName(ctx, req.Id, rel.Name, rel.StartTime)
+			relsByName, err := s.neo4jRepo.GetRelationshipsByName(ctx, req.Id, rel.Name, rel.StartTime)
 			if err != nil {
 				log.Printf("Error fetching related entity IDs for entity %s: %v", req.Id, err)
 				return nil, err
 			}
 
 			// Populate the relationships map with only ID and Name
-			for _, rel := range rels {
-				relationships[rel.Id] = &pb.Relationship{
-					Id:              rel.Id, // No relationship ID available in this case
-					Name:            rel.Name,
-					RelatedEntityId: rel.RelatedEntityId,
-					StartTime:       rel.StartTime,
-					EndTime:         rel.EndTime,
+			for _, relByName := range relsByName {
+				relationships[relByName.Id] = &pb.Relationship{
+					Id:              relByName.Id, // No relationship ID available in this case
+					Name:            relByName.Name,
+					RelatedEntityId: relByName.RelatedEntityId,
+					StartTime:       relByName.StartTime,
+					EndTime:         relByName.EndTime,
 				}
 			}
 		}

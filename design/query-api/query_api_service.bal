@@ -191,7 +191,7 @@ service /v1 on ep0 {
             attributes: [],
             relationships: [
                 {
-                    key: entityId,  // Using name as the relationship type
+                    key: payload.id,  // Using id as the key
                     value: {
                         relatedEntityId: payload.relatedEntityId,
                         startTime: payload.startTime,
