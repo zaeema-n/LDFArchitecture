@@ -7,11 +7,11 @@
 
 ### Run CRUD API Service
 
-Read about running the [CRUD Service](src/core-api-server/crud-api/README.md)
+Read about running the [CRUD Service](design/crud-api/README.md)
 
 ### Run Update API Service
 
-Read about running the [Update API](src/update-api/README.md)
+Read about running the [Update API](design/update-api/README.md)
 
 ## Run a sample query with CURL
 
@@ -106,7 +106,7 @@ python basic_crud_tests.py
 ### Run Query API Tests
 
 ```bash
-cd src/tests/e2e
+cd design/tests/e2e
 python basic_query_tests.py
 ```
 
