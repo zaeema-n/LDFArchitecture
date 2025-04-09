@@ -14,9 +14,6 @@ ENV NEO4J_dbms_memory_pagecache_size=2G \
 RUN addgroup --gid 10014 choreo && \
     adduser --disabled-password --no-create-home --uid 10014 --ingroup choreo choreouser
 
-# Optionally, copy the config.env file to container (if you need it inside)
-COPY config.env /config.env
-
 # Expose the required ports
 EXPOSE 7474 7687
 
