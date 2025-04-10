@@ -37,3 +37,14 @@ docker compose down -v
 
 
 ### Restore Server Data (TODO)
+
+
+### Docker
+
+```bash
+docker build -t all-services-test-standalone -f Dockerfile .
+```
+
+```bash
+docker run --rm all-services-test-standalone
+```
