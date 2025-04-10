@@ -109,6 +109,13 @@ RUN sed -i 's/#server.default_listen_address=0.0.0.0/server.default_listen_addre
 COPY --from=builder /app/design/crud-api/crud-service /usr/local/bin/
 COPY --from=builder /app/testbin/* /usr/local/bin/
 
+# Copy source code
+COPY --from=builder /app/design/crud-api /app/design/crud-api
+COPY --from=builder /app/design/update-api /app/design/update-api
+
+# Set working directory
+WORKDIR /app
+
 # Create log directories and configure logging
 RUN mkdir -p /var/log/mongodb && \
     touch /var/log/mongodb/mongod.log && \
@@ -159,11 +166,46 @@ until mongosh --eval "db.version()" > /dev/null 2>&1; do\n\
   sleep 2\n\
 done\n\
 \n\
-# Run tests\n\
-echo "Running tests..."\n\
+# Run CRUD service tests first\n\
+echo "Running CRUD service tests..."\n\
+cd /app/design/crud-api\n\
+echo "Running crud-test..."\n\
 crud-test -test.v\n\
+echo "Running mongo-test..."\n\
 mongo-test -test.v\n\
+echo "Running neo4j-test..."\n\
 neo4j-test -test.v\n\
+\n\
+# Check if any test failed\n\
+if [ $? -ne 0 ]; then\n\
+  echo "CRUD tests failed. Exiting."\n\
+  exit 1\n\
+fi\n\
+\n\
+# Start CRUD server in background\n\
+echo "Starting CRUD server..."\n\
+cd /app/design/crud-api\n\
+./crud-service &\n\
+CRUD_PID=$!\n\
+\n\
+# Wait for CRUD server to be ready\n\
+echo "Waiting for CRUD server..."\n\
+# TODO: Uncomment when health endpoint is implemented
+# until curl -s http://localhost:50051/health > /dev/null; do\n\
+#   echo "Waiting for CRUD server..."\n\
+#   sleep 2\n\
+# done\n\
+# For now, just wait a few seconds for the server to start
+echo "Waiting for CRUD server to start..."\n\
+sleep 5\n\
+\n\
+# Run update-api tests\n\
+echo "Running update-api tests..."\n\
+cd /app/design/update-api\n\
+bal test\n\
+\n\
+# Cleanup\n\
+kill $CRUD_PID\n\
 \n\
 # Keep container running to view logs\n\
 tail -f /dev/null' > /start.sh && chmod +x /start.sh
