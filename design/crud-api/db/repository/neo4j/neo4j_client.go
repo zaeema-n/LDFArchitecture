@@ -780,3 +780,82 @@ func (r *Neo4jRepository) DeleteGraphEntity(ctx context.Context, entityID string
 
 	return nil
 }
+
+func (r *Neo4jRepository) FilterEntities(ctx context.Context, kind *pb.Kind, filters map[string]interface{}) ([]map[string]interface{}, error) {
+	if kind == nil || kind.Major == "" {
+		return nil, fmt.Errorf("kind.Major is required")
+	}
+
+	// Open a session
+	session := r.getSession(ctx)
+	defer session.Close(ctx)
+
+	// Start building the Cypher query
+	query := `MATCH (e:` + kind.Major + `) WHERE 1=1 ` // Use kind.Major as the label
+	params := map[string]interface{}{}
+
+	// Add MinorKind filter if provided
+	if kind.Minor != "" {
+		query += `AND e.MinorKind = $minorKind `
+		params["minorKind"] = kind.Minor
+	}
+
+	// Add optional filters
+	if id, ok := filters["id"].(string); ok && id != "" {
+		query += `AND e.Id = $id `
+		params["id"] = id
+	}
+	if created, ok := filters["created"].(string); ok && created != "" {
+		query += `AND e.Created = datetime($created) `
+		params["created"] = created
+	}
+	if terminated, ok := filters["terminated"].(string); ok && terminated != "" {
+		query += `AND e.Terminated = datetime($terminated) `
+		params["terminated"] = terminated
+	}
+	if name, ok := filters["name"].(string); ok && name != "" {
+		query += `AND e.Name = $name `
+		params["name"] = name
+	}
+
+	// Return the matched entities
+	query += `
+        RETURN e.Id AS id, labels(e)[0] AS kind, 
+               toString(e.Created) AS created, 
+               CASE WHEN e.Terminated IS NOT NULL THEN toString(e.Terminated) ELSE NULL END AS terminated, 
+               e.Name AS name, 
+               e.MinorKind AS minorKind
+    `
+
+	// Run the query
+	result, err := session.Run(ctx, query, params)
+	if err != nil {
+		log.Printf("[neo4j_client.FilterEntities] error querying entities: %v", err)
+		return nil, fmt.Errorf("error querying entities: %v", err)
+	}
+
+	// Process the results
+	var entities []map[string]interface{}
+	for result.Next(ctx) {
+		record := result.Record()
+
+		entity := map[string]interface{}{
+			"id":         record.Values[0], // e.Id
+			"kind":       record.Values[1], // labels(e)[0]
+			"created":    record.Values[2], // e.Created
+			"terminated": record.Values[3], // e.Terminated
+			"name":       record.Values[4], // e.Name
+			"minorKind":  record.Values[5], // e.MinorKind
+		}
+
+		entities = append(entities, entity)
+	}
+
+	// Check for errors during iteration
+	if err := result.Err(); err != nil {
+		log.Printf("[neo4j_client.FilterEntities] error iterating over query results: %v", err)
+		return nil, fmt.Errorf("error iterating over query results: %v", err)
+	}
+
+	return entities, nil
+}
