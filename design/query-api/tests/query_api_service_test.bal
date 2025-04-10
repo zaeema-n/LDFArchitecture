@@ -1,6 +1,7 @@
 import ballerina/io;
 import ballerina/test;
 import ballerina/protobuf.types.'any as pbAny;
+import ballerina/log;
 
 // Before Suite Function
 @test:BeforeSuite
@@ -281,7 +282,7 @@ function testEntityRelationships() returns error? {
                 key: relationshipId,
                 value: {
                     relatedEntityId: relatedEntityId,
-                    startTime: "",
+                    startTime: "2023-01-05",
                     endTime: "",
                     id: relationshipId,
                     name: relationshipType
@@ -291,11 +292,14 @@ function testEntityRelationships() returns error? {
     };
     
     Entity readResponse = check ep->ReadEntity(relationshipFilter);
+    log:printInfo("Read entity with relationships: " + readResponse.toString());
     
     // Verify the relationship was retrieved
     boolean foundRelationship = false;
     
     foreach var relEntry in readResponse.relationships {
+        log:printInfo("Returned Relationship Key: " + relEntry.key.toString());
+        log:printInfo("Expected Relationship Key: " + relationshipId.toString());
         if relEntry.key == relationshipId {
             Relationship rel = relEntry.value;
             

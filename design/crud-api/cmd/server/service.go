@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net"
 	"os"
@@ -70,8 +71,50 @@ func (s *Server) ReadEntity(ctx context.Context, req *pb.Entity) (*pb.Entity, er
 	// Try to get additional entity information from Neo4j
 	kind, name, created, terminated, _ := s.neo4jRepo.GetGraphEntity(ctx, req.Id)
 
-	// Try to get relationships from Neo4j
-	relationships, _ := s.neo4jRepo.GetGraphRelationships(ctx, req.Id)
+	// Initialize the relationships map
+	relationships := make(map[string]*pb.Relationship)
+
+	// Handle relationships based on the input
+	if len(req.Relationships) == 0 {
+		// Case 1: If Relationships is empty, call GetGraphRelationships
+		log.Printf("Fetching all relationships for entity %s", req.Id)
+		graphRelationships, err := s.neo4jRepo.GetGraphRelationships(ctx, req.Id)
+		if err != nil {
+			log.Printf("Error fetching relationships for entity %s: %v", req.Id, err)
+			return nil, err
+		}
+		relationships = graphRelationships
+	} else {
+
+		// Case 2: Validate that all relationships have a Name field
+		for _, rel := range req.Relationships {
+			if rel.Name == "" {
+				return nil, fmt.Errorf("invalid relationship: all relationships must have a Name field")
+			}
+		}
+
+		// Call GetEntityIdsByRelationship for each relationship
+		for _, rel := range req.Relationships {
+
+			log.Printf("Fetching related entity IDs for entity %s with relationship %s and start time %s", req.Id, rel.Name, rel.StartTime)
+			relsByName, err := s.neo4jRepo.GetRelationshipsByName(ctx, req.Id, rel.Name, rel.StartTime)
+			if err != nil {
+				log.Printf("Error fetching related entity IDs for entity %s: %v", req.Id, err)
+				return nil, err
+			}
+
+			// Populate the relationships map with only ID and Name
+			for _, relByName := range relsByName {
+				relationships[relByName.Id] = &pb.Relationship{
+					Id:              relByName.Id, // No relationship ID available in this case
+					Name:            relByName.Name,
+					RelatedEntityId: relByName.RelatedEntityId,
+					StartTime:       relByName.StartTime,
+					EndTime:         relByName.EndTime,
+				}
+			}
+		}
+	}
 
 	// Return entity with all available fields
 	return &pb.Entity{
@@ -82,7 +125,7 @@ func (s *Server) ReadEntity(ctx context.Context, req *pb.Entity) (*pb.Entity, er
 		Terminated:    terminated,
 		Metadata:      metadata,
 		Attributes:    make(map[string]*pb.TimeBasedValueList), // Empty attributes
-		Relationships: relationships,                           // Include relationships from Neo4j
+		Relationships: relationships,                           // Dynamically populated relationships
 	}, nil
 }
 

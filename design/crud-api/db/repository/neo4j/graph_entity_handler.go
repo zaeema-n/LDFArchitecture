@@ -85,8 +85,9 @@ func (repo *Neo4jRepository) GetGraphRelationships(ctx context.Context, entityId
 		relatedID, ok2 := rel["relatedID"].(string)
 		created, ok3 := rel["Created"].(string)
 		relID, ok4 := rel["relationshipID"].(string)
+		direction, ok5 := rel["direction"].(string)
 
-		if !ok1 || !ok2 || !ok3 || !ok4 {
+		if !ok1 || !ok2 || !ok3 || !ok4 || !ok5 || direction != "OUTGOING" {
 			continue // Skip if any required field is missing
 		}
 
@@ -105,6 +106,53 @@ func (repo *Neo4jRepository) GetGraphRelationships(ctx context.Context, entityId
 
 		// Store in map with unique key
 		relationships[relID] = relationship
+	}
+
+	return relationships, nil
+}
+
+func (repo *Neo4jRepository) GetRelationshipsByName(ctx context.Context, entityId string, relationship string, ts string) (map[string]*pb.Relationship, error) {
+	// Validate input parameters
+	if entityId == "" {
+		return nil, fmt.Errorf("entityId cannot be empty")
+	}
+	if relationship == "" {
+		return nil, fmt.Errorf("relationship type cannot be empty")
+	}
+	if ts == "" {
+		return nil, fmt.Errorf("timestamp cannot be empty")
+	}
+
+	// Call ReadRelatedGraphEntityIds from neo4j_client.go
+	relationshipData, err := repo.ReadRelatedGraphEntityIds(ctx, entityId, relationship, ts)
+	if err != nil {
+		log.Printf("[GetEntityIdsByRelationship] Error fetching related relationships for entity %s with relationship %s: %v", entityId, relationship, err)
+		return nil, err
+	}
+
+	// Convert the list of relationships into a map[string]*pb.Relationship
+	relationships := make(map[string]*pb.Relationship)
+	for _, rel := range relationshipData {
+		relID, ok1 := rel["Id"].(string)
+		relatedEntityID, ok2 := rel["RelatedEntityId"].(string)
+		startTime, ok3 := rel["StartTime"].(string)
+		endTime, _ := rel["EndTime"].(string) // Optional field
+		name, ok4 := rel["Name"].(string)
+
+		// Ensure required fields are present
+		if !ok1 || !ok2 || !ok3 || !ok4 {
+			log.Printf("[GetEntityIdsByRelationship] Skipping relationship due to missing required fields: %v", rel)
+			continue
+		}
+
+		// Create a pb.Relationship object
+		relationships[relID] = &pb.Relationship{
+			Id:              relID,
+			RelatedEntityId: relatedEntityID,
+			StartTime:       startTime,
+			EndTime:         endTime,
+			Name:            name,
+		}
 	}
 
 	return relationships, nil
