@@ -529,3 +529,133 @@ func TestAddMinistriesAndDepartments(t *testing.T) {
 		}
 	}
 }
+
+func TestFilterEntities(t *testing.T) {
+	// Prepare the context
+	ctx := context.Background()
+
+	// Define kinds
+	kindAnimal := &pb.Kind{
+		Major: "Animal",
+		Minor: "Mammal",
+	}
+	kindPlant := &pb.Kind{
+		Major: "Plant",
+		Minor: "Tree",
+	}
+
+	// Create test entities
+	entities := []struct {
+		kind       *pb.Kind
+		entityData map[string]interface{}
+	}{
+		{
+			kind: kindAnimal,
+			entityData: map[string]interface{}{
+				"Id":      "lion",
+				"Name":    "Lion",
+				"Created": "2025-01-01T00:00:00Z",
+			},
+		},
+		{
+			kind: kindAnimal,
+			entityData: map[string]interface{}{
+				"Id":         "elephant",
+				"Name":       "Elephant",
+				"Created":    "2025-02-01T00:00:00Z",
+				"Terminated": "2025-12-31T00:00:00Z",
+			},
+		},
+		{
+			kind: kindPlant,
+			entityData: map[string]interface{}{
+				"Id":      "oak",
+				"Name":    "Oak Tree",
+				"Created": "2025-03-01T00:00:00Z",
+			},
+		},
+	}
+
+	// Create entities in the repository
+	for _, e := range entities {
+		_, err := repository.CreateGraphEntity(ctx, e.kind, e.entityData)
+		assert.Nil(t, err, "Expected no error when creating entity")
+	}
+
+	// Test case 1: Filter by Major kind only (Animal)
+	t.Run("Filter by Major kind only", func(t *testing.T) {
+		filters := map[string]interface{}{}
+		entities, err := repository.FilterEntities(ctx, &pb.Kind{Major: "Animal"}, filters)
+		log.Printf("Filtered entities by Major kind only (Animal): %v", entities)
+		assert.Nil(t, err, "Expected no error when filtering by Major kind")
+		assert.Equal(t, 2, len(entities), "Expected 2 entities to be returned")
+
+		// Verify that the returned entities have the correct kind
+		for _, entity := range entities {
+			assert.Equal(t, "Animal", entity["kind"], "Expected entity kind to be Animal")
+		}
+	})
+
+	// Test case 2: Filter by Major kind only (Plant)
+	t.Run("Filter by Major kind and Minor only", func(t *testing.T) {
+		filters := map[string]interface{}{}
+		entities, err := repository.FilterEntities(ctx, &pb.Kind{Major: "Plant", Minor: "Tree"}, filters)
+		log.Printf("Filtered entities by kind (Plant,Tree): %v", entities)
+		assert.Nil(t, err, "Expected no error when filtering by kind")
+		assert.Equal(t, 1, len(entities), "Expected 1 entity to be returned")
+
+		// Verify that the returned entity has the correct kind
+		entity := entities[0]
+		assert.Equal(t, "Plant", entity["kind"], "Expected entity kind to be Plant")
+		assert.Equal(t, "Tree", entity["minorKind"], "Expected entity minor kind to be Tree")
+		assert.Equal(t, "Oak Tree", entity["name"], "Expected entity name to be Oak Tree")
+	})
+
+	// Test case 3: Filter by id
+	t.Run("Filter by id", func(t *testing.T) {
+		filters := map[string]interface{}{
+			"id": "lion",
+		}
+		entities, err := repository.FilterEntities(ctx, &pb.Kind{Major: "Animal"}, filters)
+		log.Printf("Filtered entities by id (lion): %v", entities)
+		assert.Nil(t, err, "Expected no error when filtering by id")
+		assert.Equal(t, 1, len(entities), "Expected 1 entity to be returned")
+		assert.Equal(t, "Lion", entities[0]["name"], "Expected entity name to be Lion")
+	})
+
+	// Test case 4: Filter by created date
+	t.Run("Filter by created date", func(t *testing.T) {
+		filters := map[string]interface{}{
+			"created": "2025-02-01T00:00:00Z",
+		}
+		entities, err := repository.FilterEntities(ctx, &pb.Kind{Major: "Animal"}, filters)
+		log.Printf("Filtered entities by created date (2025-02-01): %v", entities)
+		assert.Nil(t, err, "Expected no error when filtering by created date")
+		assert.Equal(t, 1, len(entities), "Expected 1 entity to be returned")
+		assert.Equal(t, "Elephant", entities[0]["name"], "Expected entity name to be Elephant")
+	})
+
+	// Test case 5: Filter by terminated date
+	t.Run("Filter by terminated date", func(t *testing.T) {
+		filters := map[string]interface{}{
+			"terminated": "2025-12-31T00:00:00Z",
+		}
+		entities, err := repository.FilterEntities(ctx, &pb.Kind{Major: "Animal"}, filters)
+		log.Printf("Filtered entities by terminated date (2025-12-31): %v", entities)
+		assert.Nil(t, err, "Expected no error when filtering by terminated date")
+		assert.Equal(t, 1, len(entities), "Expected 1 entity to be returned")
+		assert.Equal(t, "Elephant", entities[0]["name"], "Expected entity name to be Elephant")
+	})
+
+	// Test case 6: Filter by name
+	t.Run("Filter by name", func(t *testing.T) {
+		filters := map[string]interface{}{
+			"name": "Oak Tree",
+		}
+		entities, err := repository.FilterEntities(ctx, &pb.Kind{Major: "Plant"}, filters)
+		log.Printf("Filtered entities by name (Oak Tree): %v", entities)
+		assert.Nil(t, err, "Expected no error when filtering by name")
+		assert.Equal(t, 1, len(entities), "Expected 1 entity to be returned")
+		assert.Equal(t, "Oak Tree", entities[0]["name"], "Expected entity name to be Oak Tree")
+	})
+}
