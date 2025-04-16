@@ -1,0 +1,37 @@
+## TODO: Please complete the Dockerfile.update file
+## WORK IN PROGRESS
+
+
+FROM ballerina/ballerina:2201.11.0
+
+# Install system packages
+USER root
+RUN apk update && apk add --no-cache \
+    curl gnupg wget net-tools nano \
+    unzip \
+    && rm -rf /var/cache/apk/*
+
+WORKDIR /app
+COPY . .
+
+# Print Ballerina version with clear formatting
+RUN echo "=========================================" \
+    && echo "Checking Ballerina version:" \
+    && bal version \
+    && echo "========================================="
+
+# Set proper permissions for the entire project
+
+RUN mkdir -p /app/design/update-api/target \
+    && chmod -R 755 /app
+
+# Set environment variables
+ENV CRUD_SERVICE_HOST=crud-service
+ENV CRUD_SERVICE_PORT=50051
+
+# Build and test
+RUN cd design/update-api && bal build && bal test
+
+EXPOSE 8080
+
+CMD ["bal", "run", "design/update-api"]

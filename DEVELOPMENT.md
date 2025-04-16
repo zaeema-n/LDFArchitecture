@@ -39,7 +39,7 @@ docker compose down -v
 ### Restore Server Data (TODO)
 
 
-### Docker
+### Docker (Standalone): WIP
 
 ```bash
 docker build -t all-services-test-standalone -f Dockerfile .
@@ -48,3 +48,31 @@ docker build -t all-services-test-standalone -f Dockerfile .
 ```bash
 docker run --rm all-services-test-standalone
 ```
+
+### Docker Compose
+
+Use the `docker compose` to up the services to run tests and to check the current version of the software is working. 
+
+#### Up the Services
+
+`docker compose up` 
+
+#### Down the Services
+
+`docker compose down` 
+
+#### Get services up independently 
+
+MongoDB Service
+
+`docker compose up -d mongodb`
+
+Neo4j Service 
+
+`docker compose up -d neo4j` 
+
+Build CRUD Service
+
+`docker compose build crud` 
+
+And to up it `docker compose up crud`
