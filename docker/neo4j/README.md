@@ -28,7 +28,7 @@ Build the image (optional since you're using an official base image with no extr
 ```bash
 docker build -t neo4j-service -f Dockerfile.neo4j .
 ```
-# Run the container with mounted volumes and env file
+Run the container with mounted volumes and env file
 
 ```bash
 docker run -d \

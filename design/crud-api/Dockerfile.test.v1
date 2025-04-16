@@ -1,3 +1,6 @@
+## WORK IN PROGRESS
+## TODO: Please complete the Dockerfile.test.v1 file
+
 # This is the Dockerfile for testing the crud-api
 # Dockerfile.test
 #
@@ -47,9 +50,10 @@ COPY go.mod go.sum ./
 # Download all dependencies
 RUN go mod download
 
-# Create a new user with UID 10014
-RUN addgroup -g 10014 choreo && \
-    adduser  --disabled-password  --no-create-home --uid 10014 --ingroup choreo choreouser
+## ONLY FOR CHOREO ENVIRONMENT
+## Create a new user with UID 10014
+# RUN addgroup -g 10014 choreo && \
+#     adduser  --disabled-password  --no-create-home --uid 10014 --ingroup choreo choreouser
 
 # Copy the source code
 COPY . .
@@ -70,7 +74,8 @@ ENV MONGO_ADMIN_PASSWORD=${MONGO_ADMIN_PASSWORD:-test123456}
 ENV MONGO_TEST_USER=${MONGO_TEST_USER:-testuser}
 ENV MONGO_TEST_PASSWORD=${MONGO_TEST_PASSWORD:-test123456}
 
-USER 10014
+## ONLY FOR CHOREO ENVIRONMENT
+# USER 10014
 
 # Run tests with verbose output
 CMD ["go", "test", "-v", "./..."]
