@@ -72,6 +72,11 @@ services:
         condition: service_healthy
     networks:
       - ldf-network
+    healthcheck:
+      test: ["CMD", "grpc_health_probe", "-addr=:50051"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
   update-api:
     platform: linux/amd64
@@ -84,11 +89,14 @@ services:
     networks:
       - ldf-network
     environment:
-      - CRUD_SERVICE_HOST=crud
+      - CRUD_SERVICE_HOST=crud-service
       - CRUD_SERVICE_PORT=50051
+      - UPDATE_SERVICE_HOST=update-api
+      - UPDATE_SERVICE_PORT=8080
     depends_on:
       crud:
-        condition: service_started
+        condition: service_healthy
+    command: sh -c "/app/run-tests.sh && bal run update_api.jar"
 
 networks:
   ldf-network:
