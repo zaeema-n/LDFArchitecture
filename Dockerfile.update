@@ -26,11 +26,23 @@ RUN mkdir -p /app/design/update-api/target \
     && chmod -R 755 /app
 
 # Set environment variables
-ENV CRUD_SERVICE_HOST=crud-service
-ENV CRUD_SERVICE_PORT=50051
+ENV CRUD_SERVICE_HOST=${CRUD_SERVICE_HOST:-crud-service}
+ENV CRUD_SERVICE_PORT=${CRUD_SERVICE_PORT:-50051}
+ENV UPDATE_SERVICE_HOST=${UPDATE_SERVICE_HOST:-0.0.0.0}
+ENV UPDATE_SERVICE_PORT=${UPDATE_SERVICE_PORT:-8080}
 
-# Build and test
-RUN cd design/update-api && bal build && bal test
+# Build and test with connection check
+RUN cd design/update-api && \
+    echo "Testing CRUD service connection before build..." && \
+    echo "Trying to connect to ${CRUD_SERVICE_HOST}:${CRUD_SERVICE_PORT}" && \
+    (nc -z -w 5 ${CRUD_SERVICE_HOST} ${CRUD_SERVICE_PORT} || (echo "Failed to connect to CRUD service!" && exit 1)) && \
+    echo "Successfully connected to CRUD service!" && \
+    bal build && \
+    echo "Testing CRUD service connection before tests..." && \
+    echo "Trying to connect to ${CRUD_SERVICE_HOST}:${CRUD_SERVICE_PORT}" && \
+    (nc -z -w 5 ${CRUD_SERVICE_HOST} ${CRUD_SERVICE_PORT} || (echo "Failed to connect to CRUD service!" && exit 1)) && \
+    echo "Successfully connected to CRUD service!" && \
+    bal test
 
 EXPOSE 8080
 
