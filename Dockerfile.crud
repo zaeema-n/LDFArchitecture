@@ -37,7 +37,7 @@
 # docker network create crud-network
 
 # Build stage for CRUD service
-FROM --platform=linux/amd64 golang:1.24 AS builder
+FROM --platform=linux/amd64 golang:1.23 AS builder
 
 # Set working directory
 WORKDIR /app
