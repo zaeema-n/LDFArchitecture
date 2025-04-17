@@ -51,7 +51,7 @@ services:
       dockerfile: Dockerfile.crud
       args:
         - DOCKER_DEFAULT_PLATFORM=linux/amd64
-    container_name: crud-service
+    container_name: crud
     ports:
       - "50051:50051"
     environment:
@@ -73,30 +73,29 @@ services:
     networks:
       - ldf-network
     healthcheck:
-      test: ["CMD", "grpc_health_probe", "-addr=:50051"]
+      test: ["CMD-SHELL", "nc -z localhost 50051 || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 3
 
-  update-api:
+  update:
     platform: linux/amd64
     build:
       context: .
       dockerfile: Dockerfile.update
-    container_name: update-api
+    container_name: update
     ports:
       - "8080:8080"
     networks:
       - ldf-network
     environment:
-      - CRUD_SERVICE_HOST=crud-service
+      - CRUD_SERVICE_HOST=crud
       - CRUD_SERVICE_PORT=50051
-      - UPDATE_SERVICE_HOST=update-api
+      - UPDATE_SERVICE_HOST=0.0.0.0
       - UPDATE_SERVICE_PORT=8080
     depends_on:
       crud:
         condition: service_healthy
-    command: sh -c "/app/run-tests.sh && bal run update_api.jar"
 
 networks:
   ldf-network:
