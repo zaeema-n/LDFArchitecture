@@ -391,3 +391,17 @@ func (repo *Neo4jRepository) HandleGraphRelationshipsUpdate(ctx context.Context,
 
 	return nil
 }
+
+// FilterGraphEntities filters entities in the Neo4j database based on the provided kind and filters.
+// It wraps the FilterEntities function from neo4j_client.go and directly returns the result.
+func (repo *Neo4jRepository) FilterGraphEntities(ctx context.Context, kind *pb.Kind, filters map[string]interface{}) ([]map[string]interface{}, error) {
+	// Call the FilterEntities function from neo4j_client.go
+	entityMaps, err := repo.FilterEntities(ctx, kind, filters)
+	if err != nil {
+		log.Printf("[neo4j_handler.FilterGraphEntities] Error filtering entities: %v", err)
+		return nil, fmt.Errorf("error filtering entities: %v", err)
+	}
+
+	// Directly return the result from the Neo4j client
+	return entityMaps, nil
+}

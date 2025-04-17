@@ -841,7 +841,7 @@ func (r *Neo4jRepository) FilterEntities(ctx context.Context, kind *pb.Kind, fil
 
 		entity := map[string]interface{}{
 			"id":         record.Values[0], // e.Id
-			"kind":       record.Values[1], // labels(e)[0]
+			"majorKind":       record.Values[1], // labels(e)[0]
 			"created":    record.Values[2], // e.Created
 			"terminated": record.Values[3], // e.Terminated
 			"name":       record.Values[4], // e.Name
