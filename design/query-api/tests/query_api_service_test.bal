@@ -1,12 +1,35 @@
 import ballerina/io;
 import ballerina/test;
 import ballerina/protobuf.types.'any as pbAny;
-import ballerina/log;
+import ballerina/os;
 
 // Before Suite Function
 @test:BeforeSuite
 function beforeSuiteFunc() {
     io:println("Starting query API service tests!");
+}
+
+// Helper function to get CRUD service URL
+function getCrudServiceUrl() returns string {
+    io:println("Getting CRUD service URL");
+    string crudHostname = os:getEnv("CRUD_SERVICE_HOST");
+    string crudPort = os:getEnv("CRUD_SERVICE_PORT");
+    
+    if crudHostname == "" || crudPort == "" {
+        io:println("Error: CRUD_SERVICE_HOST and CRUD_SERVICE_PORT environment variables must be set");
+        return "";
+    }
+    
+    // Validate port is a number
+    int|error portNumber = int:fromString(crudPort);
+    if portNumber is error {
+        io:println("Error: CRUD_SERVICE_PORT must be a valid number");
+        return "";
+    }
+    
+    string url = "http://" + crudHostname + ":" + crudPort;
+    io:println("Connecting to CRUD service at: " + url);
+    return url;
 }
 
 // Helper function to unpack Any values to strings
@@ -22,7 +45,7 @@ function unwrapAny(pbAny:Any anyValue) returns string|error {
 function testEntityAttributeRetrieval() returns error? {
     // TODO: Implement this test once the Data handling layer is written
     // Initialize the client
-    CrudServiceClient ep = check new ("http://localhost:50051");
+    CrudServiceClient ep = check new (getCrudServiceUrl());
     
     // Test data setup
     string testId = "test-entity-attribute";
@@ -115,7 +138,7 @@ function testEntityMetadataRetrieval() returns error? {
     // To enable, ensure the CRUD service is running and all entity fields are properly populated
     
     // Initialize the client
-    CrudServiceClient ep = check new ("http://localhost:50051");
+    CrudServiceClient ep = check new (getCrudServiceUrl());
     
     // Test data setup
     string testId = "test-entity-metadata";
@@ -199,7 +222,7 @@ function testEntityMetadataRetrieval() returns error? {
 function testEntityRelationships() returns error? {
     // TODO: Implement this test once the Relationship handling layer is written
     // Initialize the client
-    CrudServiceClient ep = check new ("http://localhost:50051");
+    CrudServiceClient ep = check new (getCrudServiceUrl());
     
     // Test data setup
     string entityId = "test-entity-relationship";
@@ -328,7 +351,7 @@ function testEntitySearch() returns error? {
     // To enable, ensure the CRUD service is running and all entity fields are properly populated
     
     // Initialize clients
-    CrudServiceClient crudClient = check new ("http://localhost:50051");
+    CrudServiceClient crudClient = check new (getCrudServiceUrl());
     
     // Create several test entities with different attributes
     string[] testIds = [];

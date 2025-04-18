@@ -97,6 +97,25 @@ services:
       crud:
         condition: service_healthy
 
+  query:
+    platform: linux/amd64
+    build:
+      context: .
+      dockerfile: Dockerfile.query
+    container_name: query
+    ports:
+      - "8081:8081"
+    networks:
+      - ldf-network
+    environment:
+      - CRUD_SERVICE_HOST=crud
+      - CRUD_SERVICE_PORT=50051
+      - QUERY_SERVICE_HOST=0.0.0.0
+      - QUERY_SERVICE_PORT=8081
+    depends_on:
+      crud:
+        condition: service_healthy
+
 networks:
   ldf-network:
     driver: bridge
