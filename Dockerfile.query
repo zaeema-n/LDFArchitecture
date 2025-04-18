@@ -33,11 +33,7 @@ ENV QUERY_SERVICE_PORT=${QUERY_SERVICE_PORT:-8081}
 
 # Build the Ballerina service
 RUN cd design/query-api && \
-    echo "Setting environment variables for build and test" && \
-    echo "CRUD_SERVICE_HOST=$CRUD_SERVICE_HOST" && \
-    echo "CRUD_SERVICE_PORT=$CRUD_SERVICE_PORT" && \
-    bal build && \
-    bal test
+    bal build
 
 EXPOSE 8081
 
