@@ -14,6 +14,7 @@ import (
 	neo4jrepository "lk/datafoundation/crud-api/db/repository/neo4j"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
@@ -200,7 +201,6 @@ func (s *Server) DeleteEntity(ctx context.Context, req *pb.EntityId) (*pb.Empty,
 
 // Start the gRPC server
 func main() {
-
 	// Initialize MongoDB config
 	mongoConfig := &config.MongoConfig{
 		URI:        os.Getenv("MONGO_URI"),
@@ -215,6 +215,16 @@ func main() {
 		Password: os.Getenv("NEO4J_PASSWORD"),
 	}
 
+	// Get host and port from environment variables with defaults
+	host := os.Getenv("CRUD_SERVICE_HOST")
+	if host == "" {
+		host = "0.0.0.0"
+	}
+	port := os.Getenv("CRUD_SERVICE_PORT")
+	if port == "" {
+		port = "50051"
+	}
+
 	// Create MongoDB repository
 	ctx := context.Background()
 	mongoRepo := mongorepository.NewMongoRepository(ctx, mongoConfig)
@@ -226,7 +236,7 @@ func main() {
 	}
 	defer neo4jRepo.Close(ctx)
 
-	listener, err := net.Listen("tcp", ":50051")
+	listener, err := net.Listen("tcp", host+":"+port)
 	if err != nil {
 		log.Fatalf("[service.main] Failed to listen: %v", err)
 	}
@@ -239,7 +249,10 @@ func main() {
 
 	pb.RegisterCrudServiceServer(grpcServer, server)
 
-	log.Println("[service.main] CRUD Service is running on port 50051...")
+	// Register reflection service
+	reflection.Register(grpcServer)
+
+	log.Printf("[service.main] CRUD Service is running on %s:%s...", host, port)
 	if err := grpcServer.Serve(listener); err != nil {
 		log.Fatalf("[service.main] Failed to serve: %v", err)
 	}
