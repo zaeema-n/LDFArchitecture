@@ -22,6 +22,11 @@ go get go.mongodb.org/mongo-driver/mongo
 
 ```bash
 cd crud-api
+cp env.template .env
+# after updating the required fields to be added to the environment
+source .env
+go test -v ./...
+./crud-service
 ```
 
 ## Go Module Setup

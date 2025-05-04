@@ -38,6 +38,16 @@ export UPDATE_SERVICE_HOST=localhost
 export UPDATE_SERVICE_PORT=8080
 ```
 
+## Development
+
+```bash
+cd design/update-api
+cp env.template .env
+# update the required fields to set the environment variables
+source .env
+bal test
+```
+
 ## Run Test
 
 Make sure the CRUD server is running. (`cd design/crud-api; ./crud-server`)

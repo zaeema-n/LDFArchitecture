@@ -115,6 +115,30 @@ services:
     depends_on:
       crud:
         condition: service_healthy
+    # TODO: Add healthcheck for query service
+
+  e2e:
+    platform: linux/amd64
+    image: python:3.9-slim
+    container_name: e2e
+    volumes:
+      - ./design/tests/e2e:/app/tests
+    working_dir: /app/tests
+    networks:
+      - ldf-network
+    environment:
+      - PYTHONUNBUFFERED=1
+      - UPDATE_SERVICE_HOST=update
+      - QUERY_SERVICE_HOST=query
+    depends_on:
+      # TODO: Add depends on once healthcheck is added for query/update service
+      - crud
+      - query
+      - update
+    command: >
+      sh -c "pip install requests &&
+             python3 basic_crud_tests.py &&
+             python3 basic_query_tests.py"
 
 networks:
   ldf-network:

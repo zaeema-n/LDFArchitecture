@@ -5,7 +5,7 @@
 
 [ballerina]
 dependencies-toml-version = "2"
-distribution-version = "2201.12.2"
+distribution-version = "2201.11.0"
 
 [[package]]
 org = "ballerina"
@@ -94,7 +94,7 @@ modules = [
 [[package]]
 org = "ballerina"
 name = "http"
-version = "2.13.5"
+version = "2.13.6"
 dependencies = [
 	{org = "ballerina", name = "auth"},
 	{org = "ballerina", name = "cache"},
@@ -127,7 +127,7 @@ modules = [
 [[package]]
 org = "ballerina"
 name = "io"
-version = "1.8.0"
+version = "1.7.0"
 dependencies = [
 	{org = "ballerina", name = "jballerina.java"},
 	{org = "ballerina", name = "lang.value"}
@@ -245,7 +245,7 @@ dependencies = [
 [[package]]
 org = "ballerina"
 name = "log"
-version = "2.12.0"
+version = "2.11.0"
 dependencies = [
 	{org = "ballerina", name = "io"},
 	{org = "ballerina", name = "jballerina.java"},
@@ -283,7 +283,7 @@ dependencies = [
 [[package]]
 org = "ballerina"
 name = "observe"
-version = "1.5.0"
+version = "1.4.0"
 dependencies = [
 	{org = "ballerina", name = "jballerina.java"}
 ]
@@ -370,7 +370,7 @@ modules = [
 ]
 
 [[package]]
-org = "zaeema"
+org = "ldf"
 name = "query_api"
 version = "0.1.0"
 dependencies = [
@@ -378,12 +378,13 @@ dependencies = [
 	{org = "ballerina", name = "http"},
 	{org = "ballerina", name = "io"},
 	{org = "ballerina", name = "lang.int"},
+	{org = "ballerina", name = "log"},
 	{org = "ballerina", name = "os"},
 	{org = "ballerina", name = "protobuf"},
 	{org = "ballerina", name = "test"},
 	{org = "ballerinai", name = "observe"}
 ]
 modules = [
-	{org = "zaeema", packageName = "query_api", moduleName = "query_api"}
+	{org = "ldf", packageName = "query_api", moduleName = "query_api"}
 ]
 
