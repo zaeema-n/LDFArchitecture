@@ -1,4 +1,4 @@
-name: Neo4J Setup Test
+name: Neo4J Setup Test (Old)
 
 on:
   push:

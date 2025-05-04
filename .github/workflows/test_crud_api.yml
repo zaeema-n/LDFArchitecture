@@ -1,4 +1,4 @@
-name: CRUD API Test
+name: CRUD API Test (Old)
 
 on:
   push:

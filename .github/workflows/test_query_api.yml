@@ -1,4 +1,4 @@
-name: Query API Test
+name: Query API Test (Old)
 
 on:
   push:
