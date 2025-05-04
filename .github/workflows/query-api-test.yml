@@ -1,0 +1,59 @@
+name: Query API Test
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'design/query-api/**'
+      - 'Dockerfile.query'
+      - 'docker-compose.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'design/query-api/**'
+      - 'Dockerfile.query'
+      - 'docker-compose.yml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+    
+    - name: Build and test Query service
+      run: |
+        # Build Query service
+        docker compose build query
+        
+        # Start required dependencies
+        docker compose up -d mongodb neo4j crud
+        
+        # Wait for dependencies to be healthy
+        echo "Waiting for dependencies to be healthy..."
+        docker compose ps
+        
+        # Start Query service
+        docker compose up -d query
+        
+        # Wait for Query service to be healthy
+        echo "Waiting for Query service to be healthy..."
+        docker compose ps
+        
+        # Run Ballerina tests
+        echo "Running Ballerina tests..."
+        docker compose run --rm query bal test design/query-api
+        
+        # Check test results
+        if [ $? -eq 0 ]; then
+          echo "Query API tests passed!"
+        else
+          echo "Query API tests failed!"
+          exit 1
+        fi
+        
+        # Cleanup
+        docker compose down 

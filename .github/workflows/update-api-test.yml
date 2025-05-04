@@ -1,0 +1,59 @@
+name: Update API Test
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'design/update-api/**'
+      - 'Dockerfile.update'
+      - 'docker-compose.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'design/update-api/**'
+      - 'Dockerfile.update'
+      - 'docker-compose.yml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+    
+    - name: Build and test Update service
+      run: |
+        # Build Update service
+        docker compose build update
+        
+        # Start required dependencies
+        docker compose up -d mongodb neo4j crud
+        
+        # Wait for dependencies to be healthy
+        echo "Waiting for dependencies to be healthy..."
+        docker compose ps
+        
+        # Start Update service
+        docker compose up -d update
+        
+        # Wait for Update service to be healthy
+        echo "Waiting for Update service to be healthy..."
+        docker compose ps
+        
+        # Run Ballerina tests
+        echo "Running Ballerina tests..."
+        docker compose run --rm update bal test design/update-api
+        
+        # Check test results
+        if [ $? -eq 0 ]; then
+          echo "Update API tests passed!"
+        else
+          echo "Update API tests failed!"
+          exit 1
+        fi
+        
+        # Cleanup
+        docker compose down 

@@ -1,0 +1,44 @@
+name: Docker Compose Test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+    
+    - name: Build and test services
+      run: |
+        # Build all services
+        docker compose build
+        
+        # Start services and run tests
+        docker compose up -d
+        
+        # Wait for services to be healthy
+        echo "Waiting for services to be healthy..."
+        docker compose ps
+        
+        # Run E2E tests
+        echo "Running E2E tests..."
+        docker compose run e2e
+        
+        # Check test results
+        if [ $? -eq 0 ]; then
+          echo "All tests passed!"
+        else
+          echo "Tests failed!"
+          exit 1
+        fi
+        
+        # Cleanup
+        docker compose down 

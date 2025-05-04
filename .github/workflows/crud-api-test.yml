@@ -1,0 +1,59 @@
+name: CRUD API Test
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'design/crud-api/**'
+      - 'Dockerfile.crud'
+      - 'docker-compose.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'design/crud-api/**'
+      - 'Dockerfile.crud'
+      - 'docker-compose.yml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+    
+    - name: Build and test CRUD service
+      run: |
+        # Build CRUD service
+        docker compose build crud
+        
+        # Start required dependencies
+        docker compose up -d mongodb neo4j
+        
+        # Wait for dependencies to be healthy
+        echo "Waiting for MongoDB and Neo4j to be healthy..."
+        docker compose ps
+        
+        # Start CRUD service
+        docker compose up -d crud
+        
+        # Wait for CRUD service to be healthy
+        echo "Waiting for CRUD service to be healthy..."
+        docker compose ps
+        
+        # Run Go tests
+        echo "Running Go tests..."
+        docker compose run --rm crud go test -v ./design/crud-api/...
+        
+        # Check test results
+        if [ $? -eq 0 ]; then
+          echo "CRUD API tests passed!"
+        else
+          echo "CRUD API tests failed!"
+          exit 1
+        fi
+        
+        # Cleanup
+        docker compose down 
