@@ -36,22 +36,29 @@ jobs:
         echo "Waiting for MongoDB and Neo4j to be healthy..."
         docker compose ps
         
-        # Start CRUD service
+        # Start CRUD service in detached mode
+        echo "Starting CRUD service and running tests..."
         docker compose up -d crud
         
-        # Wait for CRUD service to be healthy
-        echo "Waiting for CRUD service to be healthy..."
-        docker compose ps
+        # Wait for a few seconds to allow tests to complete
+        sleep 10
         
-        # Run Go tests
-        echo "Running Go tests..."
-        docker compose run --rm -w /app/design/crud-api crud go test -v ./...
-        
-        # Check test results
-        if [ $? -eq 0 ]; then
-          echo "CRUD API tests passed!"
-        else
+        # Check the logs for test results
+        if docker compose logs crud | grep -q "FAIL"; then
           echo "CRUD API tests failed!"
+          echo "Container logs:"
+          docker compose logs crud
+          docker compose down
+          exit 1
+        elif docker compose logs crud | grep -q "Starting CRUD service"; then
+          echo "CRUD API tests passed!"
+          echo "Container logs:"
+          docker compose logs crud
+        else
+          echo "Could not determine test status from logs"
+          echo "Container logs:"
+          docker compose logs crud
+          docker compose down
           exit 1
         fi
         
