@@ -45,7 +45,7 @@ jobs:
         
         # Run Go tests
         echo "Running Go tests..."
-        docker compose run --rm crud go test -v ./design/crud-api/...
+        docker compose run --rm -w /app/design/crud-api crud go test -v ./...
         
         # Check test results
         if [ $? -eq 0 ]; then
