@@ -45,13 +45,13 @@ jobs:
         sleep 30
         
         # Check the logs for test results
-        if docker compose logs crud | grep -q "FAIL"; then
+        if docker compose logs crud | grep -q "^crud  | FAIL$"; then
           echo "CRUD API tests failed!"
           echo "Container logs:"
           docker compose logs crud
           docker compose down
           exit 1
-        elif docker compose logs crud | grep -q "^PASS$"; then
+        elif docker compose logs crud | grep -q "^crud  | PASS$"; then
           echo "CRUD API tests passed!"
           echo "Container logs:"
           docker compose logs crud
