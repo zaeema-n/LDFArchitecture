@@ -4,11 +4,18 @@
 import ballerina/http;
 import ballerina/protobuf.types.'any as pbAny;
 import ballerina/io;
+import ballerina/os;
+import ballerina/lang.'int as langint;
 
+string crudHostname = os:getEnv("CRUD_SERVICE_HOST");
+string updateHostname = os:getEnv("UPDATE_SERVICE_HOST");
+string crudPort = os:getEnv("CRUD_SERVICE_PORT");
+string updatePort = os:getEnv("UPDATE_SERVICE_PORT");
 
-listener http:Listener ep0 = new (8080, config = {host: "localhost"});
+listener http:Listener ep0 = new (check langint:fromString(updatePort), config = {host: updateHostname});
 
-CrudServiceClient ep = check new ("http://localhost:50051");
+string crudServiceUrl = "http://" + crudHostname + ":" + crudPort;
+CrudServiceClient ep = check new (crudServiceUrl);
 
 service / on ep0 {
     # Delete an entity

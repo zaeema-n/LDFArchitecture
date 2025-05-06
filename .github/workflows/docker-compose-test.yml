@@ -1,0 +1,96 @@
+name: Docker Compose Test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+    
+    - name: Build and test services
+      run: |
+        # Build all services
+        docker compose build
+        
+        # Start all services
+        echo "Starting all services..."
+        docker compose up -d
+        
+        # Wait for services to be healthy
+        echo "Waiting for services to be healthy..."
+        docker compose ps
+        
+        # Wait for tests to complete
+        echo "Waiting for tests to complete..."
+        sleep 30
+        
+        # Check CRUD service test results
+        if docker compose logs crud | grep -q "^crud  | FAIL$"; then
+          echo "CRUD API tests failed!"
+          echo "Container logs:"
+          docker compose logs crud
+          docker compose down
+          exit 1
+        elif docker compose logs crud | grep -q "^crud  | PASS$"; then
+          echo "CRUD API tests passed!"
+        else
+          echo "CRUD API test results not found in logs"
+          docker compose down
+          exit 1
+        fi
+        
+        # Check Update service test results
+        if docker compose logs update | grep -q "failing" && ! docker compose logs update | grep -q "0 failing"; then
+          echo "Update API tests failed!"
+          echo "Container logs:"
+          docker compose logs update
+          docker compose down
+          exit 1
+        elif docker compose logs update | grep -q "0 failing"; then
+          echo "Update API tests passed!"
+        else
+          echo "Update API test results not found in logs"
+          docker compose down
+          exit 1
+        fi
+        
+        # Check Query service test results
+        if docker compose logs query | grep -q "failing" && ! docker compose logs query | grep -q "0 failing"; then
+          echo "Query API tests failed!"
+          echo "Container logs:"
+          docker compose logs query
+          docker compose down
+          exit 1
+        elif docker compose logs query | grep -q "0 failing"; then
+          echo "Query API tests passed!"
+        else
+          echo "Query API test results not found in logs"
+          docker compose down
+          exit 1
+        fi
+        
+        ## Run E2E tests
+        ## FIXME: https://github.com/zaeema-n/LDFArchitecture/issues/117 
+        ## Then uncomment the following lines
+        # echo "Running E2E tests..."
+        # docker compose run e2e
+        
+        # Check E2E test results
+        # if [ $? -eq 0 ]; then
+        #   echo "All tests passed!"
+        # else
+        #   echo "E2E tests failed!"
+        #   exit 1
+        # fi
+        
+        # Cleanup
+        docker compose down 

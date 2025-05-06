@@ -30,3 +30,7 @@ docker/neo4j/neo4j/data/*
 docker/neo4j/neo4j/logs/*
 docker/neo4j/neo4j/import/*
 docker/neo4j/neo4j/plugins/*
+
+
+# executables
+design/crud-api/crud-service

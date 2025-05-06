@@ -21,3 +21,14 @@ This will send requests to the corresponding CRUD server endpoint.
 ```bash
 bal grpc --mode client --input ../crud-api/protos/types_v1.proto --output .
 ```
+
+## Development
+
+```bash
+cd design/query-api
+cp env.template .env
+# update the required fields to set the environment variables
+source .env
+# make sure crud service is running
+bal test
+```
