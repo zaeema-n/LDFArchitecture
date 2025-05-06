@@ -1,4 +1,4 @@
-name: Neo4J Docker Test (Old)
+name: Neo4J Docker Test
 
 on:
   push:
