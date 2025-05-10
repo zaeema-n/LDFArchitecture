@@ -182,3 +182,43 @@ func TestInvalidJSON(t *testing.T) {
 	_, err := JSONToAny(invalidJSON)
 	assert.Error(t, err)
 }
+
+// TestDirectScalarEntity tests scalar data with direct key-value pairs in attributes
+func TestDirectScalarEntity(t *testing.T) {
+	testCases := map[string]string{
+		"integer": `{
+			"attributes": {
+				"x": 37
+			}
+		}`,
+		"float": `{
+			"attributes": {
+				"pi": 3.14159
+			}
+		}`,
+		"string": `{
+			"attributes": {
+				"name": "test"
+			}
+		}`,
+		"boolean": `{
+			"attributes": {
+				"active": true
+			}
+		}`,
+	}
+
+	inferrer := &StorageInferrer{}
+	for testName, jsonStr := range testCases {
+		t.Run(testName, func(t *testing.T) {
+			// Convert JSON to Any
+			anyValue, err := JSONToAny(jsonStr)
+			assert.NoError(t, err)
+
+			// Infer the storage type
+			detectedType, err := inferrer.InferType(anyValue)
+			assert.NoError(t, err)
+			assert.Equal(t, ScalarData, detectedType, "Expected scalar data for test case: %s", testName)
+		})
+	}
+}

@@ -56,12 +56,9 @@ func (ti *StorageInferrer) InferType(anyValue *anypb.Any) (StorageType, error) {
 						return ListData, nil
 					}
 				}
-				// Check if it's a scalar structure (has "value" field)
-				if value, ok := attrStruct.Fields["value"]; ok {
-					switch value.GetKind().(type) {
-					case *structpb.Value_NumberValue, *structpb.Value_StringValue, *structpb.Value_BoolValue:
-						return ScalarData, nil
-					}
+				// Check if it's a scalar structure
+				if isScalar(attrStruct) {
+					return ScalarData, nil
 				}
 				return MapData, nil
 			case *structpb.Value_ListValue:
@@ -99,4 +96,27 @@ func isGraph(structValue *structpb.Struct) bool {
 	_, hasNodes := structValue.Fields["nodes"]
 	_, hasEdges := structValue.Fields["edges"]
 	return hasNodes && hasEdges
+}
+
+// isScalar checks if a struct represents scalar data
+func isScalar(structValue *structpb.Struct) bool {
+	// A struct is considered scalar if it has exactly one field with a scalar value
+	if len(structValue.Fields) != 1 {
+		return false
+	}
+
+	// Get the single value
+	var value *structpb.Value
+	for _, v := range structValue.Fields {
+		value = v
+		break
+	}
+
+	// Check if the value is scalar
+	switch value.GetKind().(type) {
+	case *structpb.Value_NumberValue, *structpb.Value_StringValue, *structpb.Value_BoolValue:
+		return true
+	default:
+		return false
+	}
 }
