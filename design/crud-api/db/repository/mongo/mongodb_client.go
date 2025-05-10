@@ -71,6 +71,7 @@ func (repo *MongoRepository) collection() *mongo.Collection {
 }
 
 // CreateEntity inserts a new entity in MongoDB
+// FIXME: https://github.com/zaeema-n/LDFArchitecture/issues/118
 func (repo *MongoRepository) CreateEntity(ctx context.Context, entity *pb.Entity) (*mongo.InsertOneResult, error) {
 	// Use the entity.Id as MongoDB's _id field
 	doc := toDocument(entity)
