@@ -222,3 +222,71 @@ func TestDirectScalarEntity(t *testing.T) {
 		})
 	}
 }
+
+// TestComplexListEntity tests various complex list structures in attributes
+func TestComplexListEntity(t *testing.T) {
+	testCases := map[string]string{
+		"nested_lists": `{
+			"attributes": {
+				"items": [
+					[1, 2, 3],
+					[4, 5, 6],
+					[7, 8, 9]
+				]
+			}
+		}`,
+		"mixed_types": `{
+			"attributes": {
+				"items": [
+					42,
+					"string value",
+					true,
+					3.14,
+					{"nested": "object"}
+				]
+			}
+		}`,
+		"list_of_objects": `{
+			"attributes": {
+				"items": [
+					{"id": 1, "name": "item1"},
+					{"id": 2, "name": "item2"},
+					{"id": 3, "name": "item3"}
+				]
+			}
+		}`,
+		"list_with_metadata": `{
+			"attributes": {
+				"items": [1, 2, 3, 4, 5],
+				"metadata": {
+					"count": 5,
+					"type": "numbers"
+				}
+			}
+		}`,
+		"heterogeneous_nested": `{
+			"attributes": {
+				"items": [
+					[1, "two", 3],
+					{"x": 1, "y": 2},
+					[true, false],
+					"string item"
+				]
+			}
+		}`,
+	}
+
+	inferrer := &StorageInferrer{}
+	for testName, jsonStr := range testCases {
+		t.Run(testName, func(t *testing.T) {
+			// Convert JSON to Any
+			anyValue, err := JSONToAny(jsonStr)
+			assert.NoError(t, err)
+
+			// Infer the storage type
+			detectedType, err := inferrer.InferType(anyValue)
+			assert.NoError(t, err)
+			assert.Equal(t, ListData, detectedType, "Expected list data for test case: %s", testName)
+		})
+	}
+}
