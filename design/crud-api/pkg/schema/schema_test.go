@@ -119,7 +119,9 @@ func TestSchemaGeneration(t *testing.T) {
 	}{
 		"scalar_data": {
 			input: `{
-				"attributes": 42
+				"attributes": {
+					"value": 42
+				}
 			}`,
 			expected: `{
 				"storage_type": "scalar",
@@ -130,7 +132,32 @@ func TestSchemaGeneration(t *testing.T) {
 		},
 		"list_data": {
 			input: `{
-				"attributes": [1, 2, 3]
+				"attributes": {
+					"numbers": [1, 2, 3]
+				}
+			}`,
+			expected: `{
+				"storage_type": "list",
+				"type_info": {
+					"type": "string",
+					"is_array": true,
+					"array_type": {
+						"type": "int"
+					}
+				},
+				"items": {
+					"storage_type": "scalar",
+					"type_info": {
+						"type": "int"
+					}
+				}
+			}`,
+		},
+		"list_data_with_different_name": {
+			input: `{
+				"attributes": {
+					"values": [1, 2, 3]
+				}
 			}`,
 			expected: `{
 				"storage_type": "list",
@@ -152,9 +179,11 @@ func TestSchemaGeneration(t *testing.T) {
 		"map_data": {
 			input: `{
 				"attributes": {
-					"name": "John",
-					"age": 30,
-					"active": true
+					"properties": {
+						"name": "John",
+						"age": 30,
+						"active": true
+					}
 				}
 			}`,
 			expected: `{
@@ -187,9 +216,11 @@ func TestSchemaGeneration(t *testing.T) {
 		"empty_values": {
 			input: `{
 				"attributes": {
-					"empty_str": "",
-					"zero": 0,
-					"null_val": null
+					"properties": {
+						"empty_str": "",
+						"zero": 0,
+						"null_val": null
+					}
 				}
 			}`,
 			expected: `{
