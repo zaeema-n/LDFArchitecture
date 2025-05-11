@@ -63,28 +63,49 @@ func NewSchemaGenerator() *SchemaGenerator {
 }
 
 // GenerateSchema analyzes a protobuf Any value and generates complete schema information.
-// The process involves two main steps:
-//  1. Determine the storage type (how the data is organized)
-//  2. Determine the data type (what kind of data it contains)
-//
-// The function handles different storage types differently:
-//   - Scalar: Simple value types (int, float, string, bool)
-//   - List: Arrays of values with consistent types
-//   - Map: Key-value pairs with potentially different value types
-//   - Tabular: Structured data with defined columns
-//   - Graph: Data with relationships between entities
-//
-// Parameters:
-//   - anyValue: A protobuf Any value containing the data to analyze
-//
-// Returns:
-//   - *SchemaInfo: A complete schema representation of the data
-//   - error: Any error that occurred during schema generation
 func (sg *SchemaGenerator) GenerateSchema(anyValue *anypb.Any) (*SchemaInfo, error) {
-	// First, determine the storage type
-	storageType, err := sg.storageInferrer.InferType(anyValue)
+	// Unpack the Any value
+	message, err := anyValue.UnmarshalNew()
 	if err != nil {
-		return nil, fmt.Errorf("failed to infer storage type: %v", err)
+		return nil, err
+	}
+
+	// Get the struct value
+	structValue, ok := message.(*structpb.Struct)
+	if !ok {
+		return nil, fmt.Errorf("expected struct value")
+	}
+
+	// Get the attributes field
+	attributes, ok := structValue.Fields["attributes"]
+	if !ok {
+		return nil, fmt.Errorf("attributes field not found")
+	}
+
+	// Determine storage type based on the structure of attributes
+	var storageType storageinference.StorageType
+	switch attr := attributes.GetKind().(type) {
+	case *structpb.Value_ListValue:
+		storageType = storageinference.ListData
+	case *structpb.Value_StructValue:
+		// Check if it's a map (has properties)
+		if _, ok := attr.StructValue.Fields["properties"]; ok {
+			storageType = storageinference.MapData
+		} else {
+			// Check if it's a list (has items)
+			for _, field := range attr.StructValue.Fields {
+				if _, ok := field.GetKind().(*structpb.Value_ListValue); ok {
+					storageType = storageinference.ListData
+					break
+				}
+			}
+			// If no list found, treat as scalar
+			if storageType == "" {
+				storageType = storageinference.ScalarData
+			}
+		}
+	default:
+		storageType = storageinference.ScalarData
 	}
 
 	// Then, determine the data type
@@ -110,7 +131,7 @@ func (sg *SchemaGenerator) GenerateSchema(anyValue *anypb.Any) (*SchemaInfo, err
 	case storageinference.MapData:
 		return sg.handleMapData(anyValue, schema)
 	case storageinference.ScalarData:
-		return schema, nil
+		return sg.handleScalarData(anyValue, schema)
 	default:
 		return nil, fmt.Errorf("unknown storage type: %v", storageType)
 	}
@@ -202,21 +223,6 @@ func (sg *SchemaGenerator) handleGraphData(anyValue *anypb.Any, schema *SchemaIn
 }
 
 // handleListData processes list data and generates item schema.
-// List data is expected to be a struct with an "attributes" field containing
-// an array of values.
-//
-// The function:
-//  1. Extracts the list from attributes
-//  2. If the list is empty, returns the base schema
-//  3. Otherwise, generates a schema for the first item and sets it as the Items schema
-//
-// Parameters:
-//   - anyValue: The protobuf Any value containing list data
-//   - schema: The base schema to populate with item information
-//
-// Returns:
-//   - *SchemaInfo: The complete schema with item information
-//   - error: Any error that occurred during processing
 func (sg *SchemaGenerator) handleListData(anyValue *anypb.Any, schema *SchemaInfo) (*SchemaInfo, error) {
 	// Unpack the Any value
 	message, err := anyValue.UnmarshalNew()
@@ -236,35 +242,90 @@ func (sg *SchemaGenerator) handleListData(anyValue *anypb.Any, schema *SchemaInf
 		return nil, fmt.Errorf("attributes field not found")
 	}
 
-	// Get the list value from attributes
-	attrList, ok := attributes.GetKind().(*structpb.Value_ListValue)
-	if !ok {
-		return nil, fmt.Errorf("attributes is not a list")
-	}
+	// Handle both direct list values and lists wrapped in a struct
+	switch attr := attributes.GetKind().(type) {
+	case *structpb.Value_ListValue:
+		// If attributes is a direct list, use it
+		if len(attr.ListValue.Values) == 0 {
+			schema.TypeInfo.IsArray = true
+			schema.TypeInfo.ArrayType = &typeinference.TypeInfo{Type: typeinference.StringType}
+			return schema, nil
+		}
 
-	// If the list is empty, return the schema as is
-	if len(attrList.ListValue.Values) == 0 {
+		// Create a new Any value for the first item
+		itemAny, err := anypb.New(&structpb.Struct{
+			Fields: map[string]*structpb.Value{
+				"attributes": attr.ListValue.Values[0],
+			},
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to create item Any value: %v", err)
+		}
+
+		// Generate schema for the item
+		itemSchema, err := sg.GenerateSchema(itemAny)
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate item schema: %v", err)
+		}
+
+		schema.Items = itemSchema
+		schema.TypeInfo.IsArray = true
+		schema.TypeInfo.ArrayType = itemSchema.TypeInfo
 		return schema, nil
-	}
 
-	// Create a new Any value for the first item
-	itemAny, err := anypb.New(&structpb.Struct{
-		Fields: map[string]*structpb.Value{
-			"attributes": attrList.ListValue.Values[0],
-		},
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to create item Any value: %v", err)
-	}
+	case *structpb.Value_StructValue:
+		// If attributes is a struct, find the first list field
+		var listField *structpb.Value
+		var listFieldName string
+		for name, field := range attr.StructValue.Fields {
+			if _, ok := field.GetKind().(*structpb.Value_ListValue); ok {
+				listField = field
+				listFieldName = name
+				break
+			}
+		}
 
-	// Generate schema for the item
-	itemSchema, err := sg.GenerateSchema(itemAny)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate item schema: %v", err)
-	}
+		if listField == nil {
+			return nil, fmt.Errorf("no list field found in attributes")
+		}
 
-	schema.Items = itemSchema
-	return schema, nil
+		// Get the list value
+		listVal, ok := listField.GetKind().(*structpb.Value_ListValue)
+		if !ok {
+			return nil, fmt.Errorf("field %s is not a list", listFieldName)
+		}
+
+		// If the list is empty, return the schema as is
+		if len(listVal.ListValue.Values) == 0 {
+			schema.TypeInfo.IsArray = true
+			schema.TypeInfo.ArrayType = &typeinference.TypeInfo{Type: typeinference.StringType}
+			return schema, nil
+		}
+
+		// Create a new Any value for the first item
+		itemAny, err := anypb.New(&structpb.Struct{
+			Fields: map[string]*structpb.Value{
+				"attributes": listVal.ListValue.Values[0],
+			},
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to create item Any value: %v", err)
+		}
+
+		// Generate schema for the item
+		itemSchema, err := sg.GenerateSchema(itemAny)
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate item schema: %v", err)
+		}
+
+		schema.Items = itemSchema
+		schema.TypeInfo.IsArray = true
+		schema.TypeInfo.ArrayType = itemSchema.TypeInfo
+		return schema, nil
+
+	default:
+		return nil, fmt.Errorf("attributes is not a list or struct containing a list")
+	}
 }
 
 // handleMapData processes map data and generates property schemas.
@@ -310,9 +371,21 @@ func (sg *SchemaGenerator) handleMapData(anyValue *anypb.Any, schema *SchemaInfo
 		return nil, fmt.Errorf("attributes is not a struct")
 	}
 
+	// Get the properties field
+	properties, ok := attrStruct.StructValue.Fields["properties"]
+	if !ok {
+		return nil, fmt.Errorf("properties field not found in attributes")
+	}
+
+	// Get the struct value from properties
+	propsStruct, ok := properties.GetKind().(*structpb.Value_StructValue)
+	if !ok {
+		return nil, fmt.Errorf("properties is not a struct")
+	}
+
 	// Generate schemas for each property
 	schema.Properties = make(map[string]*SchemaInfo)
-	for propName, propValue := range attrStruct.StructValue.Fields {
+	for propName, propValue := range propsStruct.StructValue.Fields {
 		// Create a new Any value for the property
 		propAny, err := anypb.New(&structpb.Struct{
 			Fields: map[string]*structpb.Value{
@@ -333,4 +406,69 @@ func (sg *SchemaGenerator) handleMapData(anyValue *anypb.Any, schema *SchemaInfo
 	}
 
 	return schema, nil
+}
+
+// handleScalarData processes scalar data and generates the appropriate schema.
+func (sg *SchemaGenerator) handleScalarData(anyValue *anypb.Any, schema *SchemaInfo) (*SchemaInfo, error) {
+	// Unpack the Any value
+	message, err := anyValue.UnmarshalNew()
+	if err != nil {
+		return nil, err
+	}
+
+	// Get the struct value
+	structValue, ok := message.(*structpb.Struct)
+	if !ok {
+		return nil, fmt.Errorf("expected struct value for scalar data")
+	}
+
+	// Get the attributes field
+	attributes, ok := structValue.Fields["attributes"]
+	if !ok {
+		return nil, fmt.Errorf("attributes field not found")
+	}
+
+	// Handle both direct values and values wrapped in a struct
+	switch attr := attributes.GetKind().(type) {
+	case *structpb.Value_StructValue:
+		// If attributes is a struct, look for a "value" field
+		value, ok := attr.StructValue.Fields["value"]
+		if !ok {
+			return nil, fmt.Errorf("value field not found in attributes")
+		}
+		// Create a new Any value for the scalar value
+		valueAny, err := anypb.New(&structpb.Struct{
+			Fields: map[string]*structpb.Value{
+				"attributes": value,
+			},
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to create value Any: %v", err)
+		}
+		// Use type inference directly
+		typeInfo, err := sg.typeInferrer.InferType(valueAny)
+		if err != nil {
+			return nil, fmt.Errorf("failed to infer type: %v", err)
+		}
+		schema.TypeInfo = typeInfo
+		return schema, nil
+
+	default:
+		// If attributes is a direct value, use it directly
+		valueAny, err := anypb.New(&structpb.Struct{
+			Fields: map[string]*structpb.Value{
+				"attributes": attributes,
+			},
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to create value Any: %v", err)
+		}
+		// Use type inference directly
+		typeInfo, err := sg.typeInferrer.InferType(valueAny)
+		if err != nil {
+			return nil, fmt.Errorf("failed to infer type: %v", err)
+		}
+		schema.TypeInfo = typeInfo
+		return schema, nil
+	}
 }
