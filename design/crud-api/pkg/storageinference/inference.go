@@ -21,7 +21,103 @@ const (
 // TypeInferrer provides functionality to infer data types from protobuf Any values
 type StorageInferrer struct{}
 
-// InferType attempts to determine the data type from a protobuf Any value
+// InferType attempts to determine the storage type from a protobuf Any value.
+// The function follows a hierarchical approach to identify the storage type:
+//
+// 1. First, it unpacks the Any value to get the underlying message:
+//
+//   - Uses UnmarshalNew() to convert the Any value to its concrete type
+//
+//   - Handles any unmarshaling errors that might occur
+//
+//     2. For structpb.Struct messages (most common case):
+//     a. Checks for the presence of an "attributes" field
+//     b. Based on the kind of the attributes field:
+//
+//   - If it's a StructValue:
+//
+//   - Checks for tabular structure (has both "columns" and "rows" fields)
+//
+//   - Checks for graph structure (has both "nodes" and "edges" fields)
+//
+//   - Checks for list structure (has "items" field with ListValue)
+//
+//   - Checks for scalar structure (single field with scalar value)
+//
+//   - If none of the above, defaults to MapData
+//
+//   - If it's a ListValue: returns ListData
+//
+//   - If it's a NumberValue, StringValue, or BoolValue: returns ScalarData
+//
+//   - For other cases: defaults to ScalarData
+//
+// 3. For non-structpb.Struct messages:
+//   - Uses reflection to determine the type:
+//   - Slice/Array types return ListData
+//   - Map types return MapData
+//   - All other types return ScalarData
+//
+// The function returns one of the following StorageType values:
+// - TabularData: For data with columns and rows structure
+// - GraphData: For data with nodes and edges structure
+// - ListData: For array-like data structures
+// - MapData: For key-value pair structures
+// - ScalarData: For single value data
+//
+// Example JSON structures for each type:
+//
+// TabularData:
+//
+//	{
+//	  "attributes": {
+//	    "columns": ["id", "name"],
+//	    "rows": [[1, "John"], [2, "Jane"]]
+//	  }
+//	}
+//
+// GraphData:
+//
+//	{
+//	  "attributes": {
+//	    "nodes": [{"id": "1", "type": "user"}],
+//	    "edges": [{"source": "1", "target": "2"}]
+//	  }
+//	}
+//
+// ListData:
+//
+//	{
+//	  "attributes": {
+//	    "items": [1, 2, 3]
+//	  }
+//	}
+//
+// MapData:
+//
+//	{
+//	  "attributes": {
+//	    "key1": "value1",
+//	    "key2": "value2"
+//	  }
+//	}
+//
+// ScalarData:
+//
+//	{
+//	  "attributes": {
+//	    "value": 42
+//	  }
+//	}
+//
+// Error handling:
+// - Returns error if Any value cannot be unmarshaled
+// - Returns error if the message type is not supported
+// - Returns error if the structure is invalid
+//
+// Note: The function prioritizes specific structures over generic ones.
+// For example, if a structure has both "items" and "nodes"/"edges",
+// it will be classified based on the more specific structure first.
 func (ti *StorageInferrer) InferType(anyValue *anypb.Any) (StorageType, error) {
 	// Unpack the Any value to get the underlying message
 	message, err := anyValue.UnmarshalNew()
