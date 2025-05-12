@@ -46,8 +46,8 @@ type SchemaInfo struct {
 // It analyzes protobuf Any values to determine both how the data is stored and what
 // types of data it contains.
 type SchemaGenerator struct {
-	storageInferrer *storageinference.StorageInferrer
-	typeInferrer    *typeinference.TypeInferrer
+	storageInferrer *storageinference.StorageInferrer // Infers how data is organized
+	typeInferrer    *typeinference.TypeInferrer       // Infers data types
 }
 
 // NewSchemaGenerator creates a new SchemaGenerator instance.
@@ -81,19 +81,19 @@ func NewSchemaGenerator() *SchemaGenerator {
 //   - *SchemaInfo: A complete schema representation of the data
 //   - error: Any error that occurred during schema generation
 func (sg *SchemaGenerator) GenerateSchema(anyValue *anypb.Any) (*SchemaInfo, error) {
-	// Unpack the Any value
+	// Unpack the Any value to get the underlying message
 	message, err := anyValue.UnmarshalNew()
 	if err != nil {
 		return nil, err
 	}
 
-	// Get the struct value
+	// Get the struct value from the message
 	structValue, ok := message.(*structpb.Struct)
 	if !ok {
 		return nil, fmt.Errorf("expected struct value")
 	}
 
-	// Get the attributes field
+	// Get the attributes field which contains the actual data
 	attributes, ok := structValue.Fields["attributes"]
 	if !ok {
 		return nil, fmt.Errorf("attributes field not found")
@@ -138,19 +138,19 @@ func (sg *SchemaGenerator) GenerateSchema(anyValue *anypb.Any) (*SchemaInfo, err
 		storageType = storageinference.ScalarData
 	}
 
-	// Then, determine the data type
+	// Determine the data type using type inference
 	typeInfo, err := sg.typeInferrer.InferType(anyValue)
 	if err != nil {
 		return nil, fmt.Errorf("failed to infer data type: %v", err)
 	}
 
-	// Create the base schema info
+	// Create the base schema info with storage type and type information
 	schema := &SchemaInfo{
 		StorageType: storageType,
 		TypeInfo:    typeInfo,
 	}
 
-	// Handle different storage types
+	// Handle different storage types with their specific processing functions
 	switch storageType {
 	case storageinference.TabularData:
 		return sg.handleTabularData(anyValue, schema)
@@ -186,19 +186,19 @@ func (sg *SchemaGenerator) GenerateSchema(anyValue *anypb.Any) (*SchemaInfo, err
 //   - *SchemaInfo: The complete schema with field information
 //   - error: Any error that occurred during processing
 func (sg *SchemaGenerator) handleTabularData(anyValue *anypb.Any, schema *SchemaInfo) (*SchemaInfo, error) {
-	// Unpack the Any value
+	// Unpack the Any value to get the underlying message
 	message, err := anyValue.UnmarshalNew()
 	if err != nil {
 		return nil, err
 	}
 
-	// Get the struct value
+	// Get the struct value from the message
 	structValue, ok := message.(*structpb.Struct)
 	if !ok {
 		return nil, fmt.Errorf("expected struct value for tabular data")
 	}
 
-	// Get the attributes field
+	// Get the attributes field which contains the field definitions
 	attributes, ok := structValue.Fields["attributes"]
 	if !ok {
 		return nil, fmt.Errorf("attributes field not found")
@@ -210,8 +210,10 @@ func (sg *SchemaGenerator) handleTabularData(anyValue *anypb.Any, schema *Schema
 		return nil, fmt.Errorf("attributes is not a struct")
 	}
 
-	// Generate schemas for each field
+	// Initialize the Fields map to store field schemas
 	schema.Fields = make(map[string]*SchemaInfo)
+
+	// Process each field in the attributes struct
 	for fieldName, fieldValue := range attrStruct.StructValue.Fields {
 		// Create a new Any value for the field
 		fieldAny, err := anypb.New(&structpb.Struct{
@@ -229,6 +231,7 @@ func (sg *SchemaGenerator) handleTabularData(anyValue *anypb.Any, schema *Schema
 			return nil, fmt.Errorf("failed to generate field schema: %v", err)
 		}
 
+		// Add the field schema to the Fields map
 		schema.Fields[fieldName] = fieldSchema
 	}
 
@@ -237,8 +240,9 @@ func (sg *SchemaGenerator) handleTabularData(anyValue *anypb.Any, schema *Schema
 
 // handleGraphData processes graph data and generates schemas for nodes and edges.
 // Graph data is expected to be a struct with an "attributes" field containing
-// a struct with "nodes" and "edges" fields, where each field is an array of objects
-// with properties.
+// a struct with "nodes" and "edges" fields, where each field can be either:
+//   - An array of objects with type and properties
+//   - A map of type to property objects
 //
 // The function:
 //  1. Extracts the attributes struct
@@ -254,19 +258,19 @@ func (sg *SchemaGenerator) handleTabularData(anyValue *anypb.Any, schema *Schema
 //   - *SchemaInfo: The complete schema with node and edge information
 //   - error: Any error that occurred during processing
 func (sg *SchemaGenerator) handleGraphData(anyValue *anypb.Any, schema *SchemaInfo) (*SchemaInfo, error) {
-	// Unpack the Any value
+	// Unpack the Any value to get the underlying message
 	message, err := anyValue.UnmarshalNew()
 	if err != nil {
 		return nil, err
 	}
 
-	// Get the struct value
+	// Get the struct value from the message
 	structValue, ok := message.(*structpb.Struct)
 	if !ok {
 		return nil, fmt.Errorf("expected struct value for graph data")
 	}
 
-	// Get the attributes field
+	// Get the attributes field which contains the graph data
 	attributes, ok := structValue.Fields["attributes"]
 	if !ok {
 		return nil, fmt.Errorf("attributes field not found")
@@ -278,7 +282,7 @@ func (sg *SchemaGenerator) handleGraphData(anyValue *anypb.Any, schema *SchemaIn
 		return nil, fmt.Errorf("attributes is not a struct")
 	}
 
-	// Initialize the schema fields
+	// Initialize the schema fields map
 	schema.Fields = make(map[string]*SchemaInfo)
 
 	// Process nodes if present
@@ -505,19 +509,19 @@ func (sg *SchemaGenerator) handleGraphData(anyValue *anypb.Any, schema *SchemaIn
 //   - *SchemaInfo: The complete schema with item information
 //   - error: Any error that occurred during processing
 func (sg *SchemaGenerator) handleListData(anyValue *anypb.Any, schema *SchemaInfo) (*SchemaInfo, error) {
-	// Unpack the Any value
+	// Unpack the Any value to get the underlying message
 	message, err := anyValue.UnmarshalNew()
 	if err != nil {
 		return nil, err
 	}
 
-	// Get the struct value
+	// Get the struct value from the message
 	structValue, ok := message.(*structpb.Struct)
 	if !ok {
 		return nil, fmt.Errorf("expected struct value for list data")
 	}
 
-	// Get the attributes field
+	// Get the attributes field which contains the list data
 	attributes, ok := structValue.Fields["attributes"]
 	if !ok {
 		return nil, fmt.Errorf("attributes field not found")
@@ -629,19 +633,19 @@ func (sg *SchemaGenerator) handleListData(anyValue *anypb.Any, schema *SchemaInf
 //   - *SchemaInfo: The complete schema with property information
 //   - error: Any error that occurred during processing
 func (sg *SchemaGenerator) handleMapData(anyValue *anypb.Any, schema *SchemaInfo) (*SchemaInfo, error) {
-	// Unpack the Any value
+	// Unpack the Any value to get the underlying message
 	message, err := anyValue.UnmarshalNew()
 	if err != nil {
 		return nil, err
 	}
 
-	// Get the struct value
+	// Get the struct value from the message
 	structValue, ok := message.(*structpb.Struct)
 	if !ok {
 		return nil, fmt.Errorf("expected struct value for map data")
 	}
 
-	// Get the attributes field
+	// Get the attributes field which contains the map data
 	attributes, ok := structValue.Fields["attributes"]
 	if !ok {
 		return nil, fmt.Errorf("attributes field not found")
@@ -674,8 +678,10 @@ func (sg *SchemaGenerator) handleMapData(anyValue *anypb.Any, schema *SchemaInfo
 		return nil, fmt.Errorf("field %s is not a struct", mapFieldName)
 	}
 
-	// Generate schemas for each property
+	// Initialize the Properties map
 	schema.Properties = make(map[string]*SchemaInfo)
+
+	// Process each property in the map
 	for propName, propValue := range mapStruct.StructValue.Fields {
 		// Create a new Any value for the property
 		propAny, err := anypb.New(&structpb.Struct{
@@ -717,19 +723,19 @@ func (sg *SchemaGenerator) handleMapData(anyValue *anypb.Any, schema *SchemaInfo
 //   - *SchemaInfo: The complete schema with type information
 //   - error: Any error that occurred during processing
 func (sg *SchemaGenerator) handleScalarData(anyValue *anypb.Any, schema *SchemaInfo) (*SchemaInfo, error) {
-	// Unpack the Any value
+	// Unpack the Any value to get the underlying message
 	message, err := anyValue.UnmarshalNew()
 	if err != nil {
 		return nil, err
 	}
 
-	// Get the struct value
+	// Get the struct value from the message
 	structValue, ok := message.(*structpb.Struct)
 	if !ok {
 		return nil, fmt.Errorf("expected struct value for scalar data")
 	}
 
-	// Get the attributes field
+	// Get the attributes field which contains the scalar data
 	attributes, ok := structValue.Fields["attributes"]
 	if !ok {
 		return nil, fmt.Errorf("attributes field not found")
