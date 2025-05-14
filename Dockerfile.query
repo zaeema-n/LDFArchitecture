@@ -1,0 +1,59 @@
+## TODO: Please complete the Dockerfile.query file
+## WORK IN PROGRESS
+
+
+FROM ballerina/ballerina:2201.11.0
+
+# Install system packages
+USER root
+RUN apk update && apk add --no-cache \
+    curl gnupg wget net-tools nano \
+    unzip netcat-openbsd iputils bind-tools \
+    dos2unix \
+    && rm -rf /var/cache/apk/*
+
+WORKDIR /app
+COPY . .
+
+# Print Ballerina version with clear formatting
+RUN echo "=========================================" \
+    && echo "Checking Ballerina version:" \
+    && bal version \
+    && echo "========================================="
+
+# Set proper permissions for the entire project
+RUN mkdir -p /app/design/query-api/target \
+    && chmod -R 755 /app
+
+# Set environment variables
+ENV CRUD_SERVICE_HOST=${CRUD_SERVICE_HOST:-crud}
+ENV CRUD_SERVICE_PORT=${CRUD_SERVICE_PORT:-50051}
+ENV QUERY_SERVICE_HOST=${QUERY_SERVICE_HOST:-0.0.0.0}
+ENV QUERY_SERVICE_PORT=${QUERY_SERVICE_PORT:-8081}
+
+# Build the Ballerina service
+RUN cd design/query-api && \
+    bal build
+
+EXPOSE 8081
+
+# Create a startup script that checks connectivity before running the service
+RUN printf '#!/bin/sh\n\
+echo "Waiting for CRUD service to be ready..."\n\
+until nc -z -w 5 ${CRUD_SERVICE_HOST} ${CRUD_SERVICE_PORT}; do\n\
+  echo "Waiting for CRUD service at ${CRUD_SERVICE_HOST}:${CRUD_SERVICE_PORT}..."\n\
+  sleep 2\n\
+done\n\
+echo "CRUD service is ready!"\n\
+\n\
+echo "Run ballerina test..."\n\
+bal test design/query-api\n\
+\n\
+echo "Starting Query service..."\n\
+exec bal run design/query-api\n' > /app/start.sh && \
+    chmod +x /app/start.sh && \
+    dos2unix /app/start.sh
+
+CMD ["/app/start.sh"]
+
+#  CMD ["tail", "-f", "/dev/null"]

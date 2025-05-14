@@ -27,6 +27,27 @@ bal grpc --mode client --input ../crud-api/protos/types_v1.proto --output .
 > 💡 **Note**  
 > At the generation make sure to remove any sample code generated to show how to use the API. Because that might add an unnecessary main file. 
 
+## Set Environmental Variables
+
+Following are the default values you should use. 
+
+```bash
+export CRUD_SERVICE_HOST=localhost
+export CRUD_SERVICE_PORT=50051
+export UPDATE_SERVICE_HOST=localhost
+export UPDATE_SERVICE_PORT=8080
+```
+
+## Development
+
+```bash
+cd design/update-api
+cp env.template .env
+# update the required fields to set the environment variables
+source .env
+bal test
+```
+
 ## Run Test
 
 Make sure the CRUD server is running. (`cd design/crud-api; ./crud-server`)

@@ -1,0 +1,81 @@
+## WORK IN PROGRESS
+## TODO: Please complete the Dockerfile.test.v1 file
+
+# This is the Dockerfile for testing the crud-api
+# Dockerfile.test
+#
+# Purpose:
+# This Dockerfile is used to create a container for running tests for the CRUD API service.
+# It sets up a Go environment with all necessary dependencies and configurations to run
+# the test suite against external services (Neo4j and MongoDB).
+#
+# Note: This service should be run on the same Docker network as Neo4j and MongoDB
+# services for proper connectivity. Use the 'crud-network' created with:
+# docker network create crud-network. Also this test suite would assume it will always have a
+# fresh database to run against. Meaning the test suite won't care if the database is empty or not.
+#
+# Usage:
+# 1. Build the test image:
+#    docker build -t crud-service-test -f Dockerfile.test .
+#
+# 2. Run the tests:
+#    docker run --rm \
+#      --network crud-network \
+#      -e NEO4J_URI=bolt://neo4j-local:7687 \
+#      -e NEO4J_USER=${NEO4J_USER} \
+#      -e NEO4J_PASSWORD=${NEO4J_PASSWORD} \
+#      -e MONGO_URI=${MONGO_URI} \
+#      crud-service-test
+#
+# Environment Variables:
+# - NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD: Connection details for Neo4j database
+# - NEO4J_TESTING_DB_URI, NEO4J_TESTING_USERNAME, NEO4J_TESTING_PASSWORD: Testing-specific Neo4j connection
+# - MONGO_URI, MONGO_DB_NAME, MONGO_COLLECTION: MongoDB connection and collection details
+# - MONGO_ADMIN_USER, MONGO_ADMIN_PASSWORD: MongoDB admin credentials
+# - MONGO_TEST_USER, MONGO_TEST_PASSWORD: MongoDB test user credentials
+#
+# Note: The container expects Neo4j and MongoDB services to be accessible,
+# preferably on the same Docker network (crud-network).
+
+
+# Test stage
+FROM golang:1.24
+
+# Set working directory
+WORKDIR /app
+
+# Copy go mod and sum files
+COPY go.mod go.sum ./
+
+# Download all dependencies
+RUN go mod download
+
+## ONLY FOR CHOREO ENVIRONMENT
+## Create a new user with UID 10014
+# RUN addgroup -g 10014 choreo && \
+#     adduser  --disabled-password  --no-create-home --uid 10014 --ingroup choreo choreouser
+
+# Copy the source code
+COPY . .
+
+# Set environment variables for testing
+ENV NEO4J_URI=${NEO4J_URI:-bolt://host.docker.internal:7687}
+ENV NEO4J_USER=${NEO4J_USER:-neo4j}
+ENV NEO4J_PASSWORD=${NEO4J_PASSWORD:-neo4j123}
+ENV NEO4J_TESTING_DB_URI=${NEO4J_TESTING_DB_URI:-bolt://host.docker.internal:7687}
+ENV NEO4J_TESTING_USERNAME=${NEO4J_TESTING_USERNAME:-neo4j}
+ENV NEO4J_TESTING_PASSWORD=${NEO4J_TESTING_PASSWORD:-neo4j123}
+
+ENV MONGO_URI=${MONGO_URI:-mongodb://host.docker.internal:27017}
+ENV MONGO_DB_NAME=${MONGO_DB_NAME:-testdb}
+ENV MONGO_COLLECTION=${MONGO_COLLECTION:-metadata}
+ENV MONGO_ADMIN_USER=${MONGO_ADMIN_USER:-admin}
+ENV MONGO_ADMIN_PASSWORD=${MONGO_ADMIN_PASSWORD:-test123456}
+ENV MONGO_TEST_USER=${MONGO_TEST_USER:-testuser}
+ENV MONGO_TEST_PASSWORD=${MONGO_TEST_PASSWORD:-test123456}
+
+## ONLY FOR CHOREO ENVIRONMENT
+# USER 10014
+
+# Run tests with verbose output
+CMD ["go", "test", "-v", "./..."]

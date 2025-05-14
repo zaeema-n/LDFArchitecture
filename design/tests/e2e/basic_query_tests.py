@@ -1,9 +1,24 @@
 import requests
 import json
 import sys
+import os
 
-QUERY_API_URL = "http://localhost:8081/v1/entities"
-UPDATE_API_URL = "http://localhost:8080/entities"
+def get_service_urls():
+    query_host = os.getenv('QUERY_SERVICE_HOST', 'localhost')
+    query_port = os.getenv('QUERY_SERVICE_PORT', '8081')
+    update_host = os.getenv('UPDATE_SERVICE_HOST', 'localhost')
+    update_port = os.getenv('UPDATE_SERVICE_PORT', '8080')
+    
+    return {
+        'query': f"http://{query_host}:{query_port}/v1/entities",
+        'update': f"http://{update_host}:{update_port}/entities"
+    }
+
+# Get service URLs from environment variables
+urls = get_service_urls()
+QUERY_API_URL = urls['query']
+UPDATE_API_URL = urls['update']
+
 ENTITY_ID = "query-test-entity"
 RELATED_ID_1 = "query-related-entity-1"
 RELATED_ID_2 = "query-related-entity-2"
