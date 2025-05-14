@@ -1,12 +1,41 @@
 import ballerina/io;
 import ballerina/test;
 import ballerina/protobuf.types.'any as pbAny;
-import ballerina/log;
+import ballerina/os;
+import ballerina/lang.'int as langint;
 
 // Before Suite Function
 @test:BeforeSuite
 function beforeSuiteFunc() {
     io:println("Starting query API service tests!");
+}
+
+// Helper function to get CRUD service URL
+function getCrudServiceUrl() returns string|error {
+    io:println("Getting CRUD service URL");
+    string crudHostname = os:getEnv("CRUD_SERVICE_HOST");
+    string crudPort = os:getEnv("CRUD_SERVICE_PORT");
+    
+    io:println("CRUD_SERVICE_HOST: " + crudHostname);
+    io:println("CRUD_SERVICE_PORT: " + crudPort);
+    
+    if crudHostname == "" {
+        return error("CRUD_SERVICE_HOST environment variable is not set");
+    }
+    
+    if crudPort == "" {
+        return error("CRUD_SERVICE_PORT environment variable is not set");
+    }
+    
+    // Validate port is a number
+    int|error portNumber = langint:fromString(crudPort);
+    if portNumber is error {
+        return error("CRUD_SERVICE_PORT must be a valid number, got: " + crudPort);
+    }
+    
+    string url = "http://" + crudHostname + ":" + crudPort;
+    io:println("Connecting to CRUD service at: " + url);
+    return url;
 }
 
 // Helper function to unpack Any values to strings
@@ -22,7 +51,11 @@ function unwrapAny(pbAny:Any anyValue) returns string|error {
 function testEntityAttributeRetrieval() returns error? {
     // TODO: Implement this test once the Data handling layer is written
     // Initialize the client
-    CrudServiceClient ep = check new ("http://localhost:50051");
+    string|error crudUrl = getCrudServiceUrl();
+    if crudUrl is error {
+        return crudUrl;
+    }
+    CrudServiceClient ep = check new (crudUrl);
     
     // Test data setup
     string testId = "test-entity-attribute";
@@ -115,7 +148,11 @@ function testEntityMetadataRetrieval() returns error? {
     // To enable, ensure the CRUD service is running and all entity fields are properly populated
     
     // Initialize the client
-    CrudServiceClient ep = check new ("http://localhost:50051");
+    string|error crudUrl = getCrudServiceUrl();
+    if crudUrl is error {
+        return crudUrl;
+    }
+    CrudServiceClient ep = check new (crudUrl);
     
     // Test data setup
     string testId = "test-entity-metadata";
@@ -199,7 +236,11 @@ function testEntityMetadataRetrieval() returns error? {
 function testEntityRelationships() returns error? {
     // TODO: Implement this test once the Relationship handling layer is written
     // Initialize the client
-    CrudServiceClient ep = check new ("http://localhost:50051");
+    string|error crudUrl = getCrudServiceUrl();
+    if crudUrl is error {
+        return crudUrl;
+    }
+    CrudServiceClient ep = check new (crudUrl);
     
     // Test data setup
     string entityId = "test-entity-relationship";
@@ -292,14 +333,14 @@ function testEntityRelationships() returns error? {
     };
     
     Entity readResponse = check ep->ReadEntity(relationshipFilter);
-    log:printInfo("Read entity with relationships: " + readResponse.toString());
+    io:println("Read entity with relationships: " + readResponse.toString());
     
     // Verify the relationship was retrieved
     boolean foundRelationship = false;
     
     foreach var relEntry in readResponse.relationships {
-        log:printInfo("Returned Relationship Key: " + relEntry.key.toString());
-        log:printInfo("Expected Relationship Key: " + relationshipId.toString());
+        io:println("Returned Relationship Key: " + relEntry.key.toString());
+        io:println("Expected Relationship Key: " + relationshipId.toString());
         if relEntry.key == relationshipId {
             Relationship rel = relEntry.value;
             
@@ -328,7 +369,11 @@ function testEntitySearch() returns error? {
     // To enable, ensure the CRUD service is running and all entity fields are properly populated
     
     // Initialize clients
-    CrudServiceClient crudClient = check new ("http://localhost:50051");
+    string|error crudUrl = getCrudServiceUrl();
+    if crudUrl is error {
+        return crudUrl;
+    }
+    CrudServiceClient crudClient = check new (crudUrl);
     
     // Create several test entities with different attributes
     string[] testIds = [];

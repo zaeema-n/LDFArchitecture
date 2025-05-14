@@ -2,11 +2,24 @@ import ballerina/io;
 import ballerina/test;
 import ballerina/protobuf.types.'any as pbAny;
 import ballerina/http;
+import ballerina/os;
+
+// Get environment variables without fallback values
+string testCrudHostname = os:getEnv("CRUD_SERVICE_HOST");
+string testCrudPort = os:getEnv("CRUD_SERVICE_PORT");
+string testUpdateHostname = os:getEnv("UPDATE_SERVICE_HOST");
+string testUpdatePort = os:getEnv("UPDATE_SERVICE_PORT");
+
+// Construct URLs using string concatenation
+string testCrudServiceUrl = "http://" + testCrudHostname + ":" + testCrudPort;
+string testUpdateServiceUrl = "http://" + testUpdateHostname + ":" + testUpdatePort;
 
 // Before Suite Function
 @test:BeforeSuite
 function beforeSuiteFunc() {
     io:println("I'm the before suite function!");
+    io:println("CRUD Service URL: " + testCrudServiceUrl);
+    io:println("Update Service URL: " + testUpdateServiceUrl);
 }
 
 // After Suite Function
@@ -23,7 +36,7 @@ function unwrapAny(pbAny:Any anyValue) returns string|error {
 @test:Config {}
 function testMetadataHandling() returns error? {
     // Initialize the client
-    CrudServiceClient ep = check new ("http://localhost:50051");
+    CrudServiceClient ep = check new (testCrudServiceUrl);
     
     // Test data setup
     string testId = "test-entity-1";
@@ -96,7 +109,7 @@ function testMetadataHandling() returns error? {
 }
 function testMetadataUnpackError() returns error? {
     // Test case to verify handling of non-existent entities
-    CrudServiceClient ep = check new ("http://localhost:50051");
+    CrudServiceClient ep = check new (testCrudServiceUrl);
     
     // Try to read a non-existent entity
     EntityId readEntityRequest = {id: "non-existent-entity"};
@@ -111,7 +124,7 @@ function testMetadataUnpackError() returns error? {
 @test:Config {}
 function testMetadataUpdating() returns error? {
     // Initialize the client
-    CrudServiceClient ep = check new ("http://localhost:50051");
+    CrudServiceClient ep = check new (testCrudServiceUrl);
     
     // Test data setup
     string testId = "test-entity-update";
@@ -231,7 +244,7 @@ function verifyMetadata(record {| string key; pbAny:Any value; |}[] metadata, ma
 @test:Config {}
 function testEntityReading() returns error? {
     // Initialize the client
-    CrudServiceClient ep = check new ("http://localhost:50051");
+    CrudServiceClient ep = check new (testCrudServiceUrl);
     
     // Test data setup
     string testId = "test-entity-read";
@@ -315,7 +328,7 @@ function testEntityReading() returns error? {
 @test:Config {}
 function testCreateMinimalGraphEntity() returns error? {
     // Initialize the client
-    CrudServiceClient ep = check new ("http://localhost:50051");
+    CrudServiceClient ep = check new (testCrudServiceUrl);
     
     // Test data setup - minimal entity with just required fields
     string testId = "test-minimal-entity";
@@ -368,7 +381,7 @@ function testCreateMinimalGraphEntity() returns error? {
 @test:Config {}
 function testCreateMinimalGraphEntityViaRest() returns error? {
     // Initialize an HTTP client for the REST API
-    http:Client restClient = check new ("http://localhost:8080");
+    http:Client restClient = check new (testUpdateServiceUrl);
     
     // Test data setup - minimal JSON entity
     string testId = "test-minimal-json-entity";
@@ -408,7 +421,7 @@ function testCreateMinimalGraphEntityViaRest() returns error? {
     test:assertEquals(check responseJson.id, testId, "Entity ID in response doesn't match");
     
     // Initialize the gRPC client to verify entity was properly created
-    CrudServiceClient ep = check new ("http://localhost:50051");
+    CrudServiceClient ep = check new (testCrudServiceUrl);
     
     // Verify entity data
     EntityId readEntityRequest = {id: testId};
@@ -441,7 +454,7 @@ function testEntityWithRelationship() returns error? {
     string targetEntityId = "test-entity-with-relationship-target";
     
     // Initialize REST client
-    http:Client restClient = check new ("http://localhost:8080");
+    http:Client restClient = check new (testUpdateServiceUrl);
     
     // Create source entity
     json sourceEntityJson = {
@@ -533,7 +546,7 @@ function testEntityWithRelationship() returns error? {
     test:assertEquals(updateHttpResponse.statusCode, 200, "Expected 200 status code for relationship update");
     
     // Initialize the gRPC client to verify relationship was properly created
-    CrudServiceClient ep = check new ("http://localhost:50051");
+    CrudServiceClient ep = check new (testCrudServiceUrl);
     
     // Read source entity to verify relationship
     EntityId readEntityRequest = {id: sourceEntityId};

@@ -3,10 +3,18 @@
 
 import ballerina/http;
 import ballerina/protobuf.types.'any;
+import ballerina/os;
+import ballerina/lang.'int as langint;
 
-listener http:Listener ep0 = new (8081, config = {host: "localhost"});
+string crudHostname = os:getEnv("CRUD_SERVICE_HOST");
+string queryHostname = os:getEnv("QUERY_SERVICE_HOST");
+string crudPort = os:getEnv("CRUD_SERVICE_PORT");
+string queryPort = os:getEnv("QUERY_SERVICE_PORT");
 
-CrudServiceClient ep = check new ("http://localhost:50051");
+listener http:Listener ep0 = new (check langint:fromString(queryPort), config = {host: queryHostname});
+
+string crudServiceUrl = "http://" + crudHostname + ":" + crudPort;
+CrudServiceClient ep = check new (crudServiceUrl);
 
 // Helper function to extract string representation based on typeUrl
 function extractValueAsString('any:Any anyValue) returns string {
