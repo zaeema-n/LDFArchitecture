@@ -55,5 +55,11 @@ message EntityId {
     string id = 1;
 }
 
+// Request message for reading an entity
+message ReadEntityRequest {
+    string id = 1;
+    repeated string output_fields = 2; // Array of fields to return: "metadata", "relationships", "attributes"
+}
+
 // Empty message response
 message Empty {}

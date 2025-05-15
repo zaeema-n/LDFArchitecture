@@ -46,9 +46,16 @@ message TimeBasedValueList {
 // Service definition for CRUD operations
 service CrudService {
     rpc CreateEntity(Entity) returns (Entity);
-    rpc ReadEntity(Entity) returns (Entity);
+    rpc ReadEntity(ReadEntityRequest) returns (Entity);
     rpc UpdateEntity(UpdateEntityRequest) returns (Entity);
     rpc DeleteEntity(EntityId) returns (Empty);
+}
+
+// Request message for reading an entity
+message ReadEntityRequest{
+    string id = 1;
+    Entity entity = 2;
+    repeated string output = 3;
 }
 
 // Request message for deleting an entity by ID
