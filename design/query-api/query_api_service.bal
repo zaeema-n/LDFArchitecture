@@ -80,8 +80,15 @@ service /v1 on ep0 {
             relationships: []
         };
         
-        // Read the entity using the crud service with attribute filter
-        Entity entity = check ep->ReadEntity(entityFilter);
+        // Create ReadEntityRequest with output field set to attributes only
+        ReadEntityRequest request = {
+            id: entityId,
+            entity: entityFilter,
+            output: ["attributes"]  // Only request attributes field
+        };
+        
+        // Read the entity using the crud service
+        Entity entity = check ep->ReadEntity(request);
         
         // Process the filtered entity
         foreach var attrEntry in entity.attributes {
@@ -130,7 +137,7 @@ service /v1 on ep0 {
     #
     # + return - Entity metadata 
     resource function get entities/[string entityId]/metadata() returns EntitiesEntityIdMetadataResponse|error {
-        // Create entity filter
+        // Create entity filter with empty fields
         Entity entityFilter = {
             id: entityId,
             kind: {
@@ -147,13 +154,20 @@ service /v1 on ep0 {
                     value: ""
                 }
             },
-            metadata: [],  // Empty metadata array to indicate we want metadata
+            metadata: [],
             attributes: [],
             relationships: []
         };
+
+        // Create ReadEntityRequest with output field set to metadata only
+        ReadEntityRequest request = {
+            id: entityId,
+            entity: entityFilter,
+            output: ["metadata"]  // Only request metadata field
+        };
         
         // Read the entity using the crud service
-        Entity entity = check ep->ReadEntity(entityFilter);
+        Entity entity = check ep->ReadEntity(request);
         
         // Convert metadata to generic JSON object
         map<json> metadataJson = {};
@@ -200,8 +214,15 @@ service /v1 on ep0 {
             relationships: []  // No filtering criteria for relationships
         };
 
+        // Create ReadEntityRequest with output field set to relationships only
+        ReadEntityRequest request = {
+            id: entityId,
+            entity: entityFilter,
+            output: ["relationships"]  // Only request relationships field
+        };
+
         // Read the entity using the crud service
-        Entity entity = check ep->ReadEntity(entityFilter);
+        Entity entity = check ep->ReadEntity(request);
 
         // Process the relationships returned by the backend
         inline_response_200_2[] relationships = [];
@@ -259,8 +280,15 @@ service /v1 on ep0 {
             ]
         };
         
-        // Read the entity using the crud service with relationship filtering
-        Entity entity = check ep->ReadEntity(entityFilter);
+        // Create ReadEntityRequest with output field set to relationships only
+        ReadEntityRequest request = {
+            id: entityId,
+            entity: entityFilter,
+            output: ["relationships"]  // Only request relationships field
+        };
+        
+        // Read the entity using the crud service
+        Entity entity = check ep->ReadEntity(request);
         
         // Process the relationships returned by the backend
         inline_response_200_2[] relationships = [];
