@@ -111,7 +111,13 @@ function testEntityAttributeRetrieval() returns error? {
         ]
     };
     
-    Entity readResponse = check ep->ReadEntity(attributeFilter);
+    ReadEntityRequest readRequest = {
+        id: testId,
+        entity: attributeFilter,
+        output: ["attributes"]
+    };
+    
+    Entity readResponse = check ep->ReadEntity(readRequest);
     
     // Verify the attribute was retrieved correctly
     boolean foundAttribute = false;
@@ -164,6 +170,9 @@ function testEntityMetadataRetrieval() returns error? {
     metadataArray.push({key: "manufacturer", value: packedValue1});
     metadataArray.push({key: "model", value: packedValue2});
 
+    io:println("Debug - Metadata array before creating entity:");
+    io:println(metadataArray.toString());
+
     // Create entity request
     Entity createEntityRequest = {
         id: testId,
@@ -183,9 +192,13 @@ function testEntityMetadataRetrieval() returns error? {
         attributes: []
     };
 
+    io:println("Debug - Create entity request:");
+    io:println(createEntityRequest.toString());
+
     // Create entity
     Entity createEntityResponse = check ep->CreateEntity(createEntityRequest);
-    io:println("Entity created with ID: " + createEntityResponse.id);
+    io:println("Debug - Create entity response:");
+    io:println(createEntityResponse.toString());
     
     // Read entity with metadata filter
     Entity metadataFilter = {
@@ -206,7 +219,22 @@ function testEntityMetadataRetrieval() returns error? {
         attributes: []
     };
     
-    Entity readResponse = check ep->ReadEntity(metadataFilter);
+    ReadEntityRequest readRequest = {
+        id: testId,
+        entity: metadataFilter,
+        output: ["metadata"]
+    };
+    
+    io:println("Debug - Read request details:");
+    io:println("  id: " + readRequest.id);
+    io:println("  output field length: " + readRequest.output.length().toString());
+    io:println("  output contents: " + readRequest.output.toString());
+    
+    io:println("Debug - Read request:");
+    io:println(readRequest.toString());
+    
+    Entity readResponse = check ep->ReadEntity(readRequest);
+    io:println("Received read response: " + readResponse.toString());
     
     // Verify metadata values
     map<string> actualValues = {};
@@ -332,7 +360,13 @@ function testEntityRelationships() returns error? {
         ]
     };
     
-    Entity readResponse = check ep->ReadEntity(relationshipFilter);
+    ReadEntityRequest readRequest = {
+        id: entityId,
+        entity: relationshipFilter,
+        output: ["relationships"]
+    };
+    
+    Entity readResponse = check ep->ReadEntity(readRequest);
     io:println("Read entity with relationships: " + readResponse.toString());
     
     // Verify the relationship was retrieved

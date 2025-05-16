@@ -96,14 +96,17 @@ func (s *Server) ReadEntity(ctx context.Context, req *pb.ReadEntityRequest) (*pb
 
 	// Process each requested output field
 	for _, field := range req.Output {
+		log.Printf("[DEBUG] Entering switch statement for entity ID: %s", req.Id)
 		switch field {
 		case "metadata":
+			log.Printf("[DEBUG] Processing metadata field for entity ID: %s", req.Id)
 			// Get metadata from MongoDB
 			metadata, err := s.mongoRepo.GetMetadata(ctx, req.Id)
 			if err != nil {
 				log.Printf("Error fetching metadata: %v", err)
 				// Continue with other fields even if metadata fails
 			} else {
+				log.Printf("[DEBUG] Retrieved metadata: %+v", metadata)
 				response.Metadata = metadata
 			}
 
