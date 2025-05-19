@@ -64,6 +64,7 @@ service / on ep0 {
         return result;
     }
 
+    # FIXME: https://github.com/LDFLK/nexoan/issues/135 
     # TODO: Remove/Don't expose this endpoint from Ingest API (has been only added for testing purposes)
     # Read an entity by ID
     #
@@ -71,7 +72,11 @@ service / on ep0 {
     # + return - The entity or an error
     resource function get entities/[string id]() returns Entity|error {
         // Call the ReadEntity function with the ID
-        EntityId readEntityRequest = {id: id};
+        ReadEntityRequest readEntityRequest = {
+            id: id,
+            entity: {},
+            output: ["metadata", "attributes", "relationships"]
+        };
         Entity|error result = ep->ReadEntity(readEntityRequest);
         
         if result is error {
@@ -80,6 +85,9 @@ service / on ep0 {
         
         // Successfully retrieved the entity
         io:println("Retrieved entity with ID: ", id);
+        io:println("Entity metadata: ", result.metadata);
+        io:println("Entity attributes: ", result.attributes);
+        io:println("Entity relationships: ", result.relationships);
         return result;
     }
 }

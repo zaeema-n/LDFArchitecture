@@ -42,10 +42,10 @@ public isolated client class CrudServiceClient {
         return {content: <Entity>result, headers: respHeaders};
     }
 
-    isolated remote function ReadEntity(EntityId|ContextEntityId req) returns Entity|grpc:Error {
+    isolated remote function ReadEntity(ReadEntityRequest|ContextReadEntityRequest req) returns Entity|grpc:Error {
         map<string|string[]> headers = {};
-        EntityId message;
-        if req is ContextEntityId {
+        ReadEntityRequest message;
+        if req is ContextReadEntityRequest {
             message = req.content;
             headers = req.headers;
         } else {
@@ -56,10 +56,10 @@ public isolated client class CrudServiceClient {
         return <Entity>result;
     }
 
-    isolated remote function ReadEntityContext(EntityId|ContextEntityId req) returns ContextEntity|grpc:Error {
+    isolated remote function ReadEntityContext(ReadEntityRequest|ContextReadEntityRequest req) returns ContextEntity|grpc:Error {
         map<string|string[]> headers = {};
-        EntityId message;
-        if req is ContextEntityId {
+        ReadEntityRequest message;
+        if req is ContextReadEntityRequest {
             message = req.content;
             headers = req.headers;
         } else {
@@ -147,6 +147,12 @@ public type ContextUpdateEntityRequest record {|
     map<string|string[]> headers;
 |};
 
+public type ContextReadEntityRequest record {|
+    ReadEntityRequest content;
+    map<string|string[]> headers;
+|};
+
+
 @protobuf:Descriptor {value: TYPES_V1_DESC}
 public type EntityId record {|
     string id = "";
@@ -199,4 +205,11 @@ public type Relationship record {|
     string endTime = "";
     string id = "";
     string name = "";
+|};
+
+@protobuf:Descriptor {value: TYPES_V1_DESC}
+public type ReadEntityRequest record {|
+    string id = "";
+    Entity entity = {};
+    string[] output = [];
 |};
