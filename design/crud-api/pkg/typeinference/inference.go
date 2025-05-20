@@ -67,12 +67,14 @@ func (ti *TypeInferrer) InferType(anyValue *anypb.Any) (*TypeInfo, error) {
 
 	// Handle structpb.Struct
 	if structValue, ok := message.(*structpb.Struct); ok {
-		// Check if attributes field exists
-		attributes, exists := structValue.Fields["attributes"]
-		if !exists {
-			return &TypeInfo{Type: NullType, IsNullable: true}, nil
+		// If it's a struct with a single field, use that field's value
+		if len(structValue.Fields) == 1 {
+			for _, value := range structValue.Fields {
+				return ti.inferTypeFromValue(value)
+			}
 		}
-		return ti.inferTypeFromValue(attributes)
+		// Otherwise, treat the entire struct as a map
+		return &TypeInfo{Type: StringType}, nil
 	}
 
 	// If not a structpb.Struct, infer type directly

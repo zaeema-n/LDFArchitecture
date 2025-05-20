@@ -17,17 +17,70 @@ func JSONToAny(jsonStr string) (*anypb.Any, error) {
 		return nil, fmt.Errorf("failed to unmarshal JSON: %v", err)
 	}
 
-	structValue, err := structpb.NewStruct(data.(map[string]interface{}))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create struct: %v", err)
+	// Handle scalar values
+	switch v := data.(type) {
+	case float64:
+		// Check if it's an integer
+		if v == float64(int64(v)) {
+			structValue, err := structpb.NewStruct(map[string]interface{}{
+				"value": int64(v),
+			})
+			if err != nil {
+				return nil, fmt.Errorf("failed to create struct: %v", err)
+			}
+			return anypb.New(structValue)
+		}
+		structValue, err := structpb.NewStruct(map[string]interface{}{
+			"value": v,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to create struct: %v", err)
+		}
+		return anypb.New(structValue)
+	case string:
+		structValue, err := structpb.NewStruct(map[string]interface{}{
+			"value": v,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to create struct: %v", err)
+		}
+		return anypb.New(structValue)
+	case bool:
+		structValue, err := structpb.NewStruct(map[string]interface{}{
+			"value": v,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to create struct: %v", err)
+		}
+		return anypb.New(structValue)
+	case nil:
+		structValue, err := structpb.NewStruct(map[string]interface{}{
+			"value": nil,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to create struct: %v", err)
+		}
+		return anypb.New(structValue)
+	case []interface{}:
+		structValue, err := structpb.NewStruct(map[string]interface{}{
+			"value": v,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to create struct: %v", err)
+		}
+		return anypb.New(structValue)
 	}
 
-	anyValue, err := anypb.New(structValue)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create Any: %v", err)
+	// Handle objects
+	if obj, ok := data.(map[string]interface{}); ok {
+		structValue, err := structpb.NewStruct(obj)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create struct: %v", err)
+		}
+		return anypb.New(structValue)
 	}
 
-	return anyValue, nil
+	return nil, fmt.Errorf("unsupported data type: %T", data)
 }
 
 // TestScalarTypes tests type inference for scalar data types
@@ -37,40 +90,40 @@ func TestScalarTypes(t *testing.T) {
 		expected DataType
 	}{
 		"empty_string": {
-			json:     `{"attributes": ""}`,
+			json:     `""`,
 			expected: StringType,
 		},
 		"zero_int": {
-			json:     `{"attributes": 0}`,
+			json:     `0`,
 			expected: IntType,
 		},
 		"zero_float": {
-			json:     `{"attributes": 0.1}`,
+			json:     `0.1`,
 			expected: FloatType,
 		},
 		"integer": {
-			json:     `{"attributes": 42}`,
+			json:     `42`,
 			expected: IntType,
 		},
 		"float": {
-			json:     `{"attributes": 3.14}`,
+			json:     `3.14`,
 			expected: FloatType,
 		},
 		"string": {
-			json:     `{"attributes": "hello"}`,
+			json:     `"hello"`,
 			expected: StringType,
 		},
 		"boolean": {
-			json:     `{"attributes": true}`,
+			json:     `true`,
 			expected: BoolType,
 		},
 		"null": {
-			json:     `{"attributes": null}`,
+			json:     `null`,
 			expected: NullType,
 		},
-		"missing_attributes": {
+		"empty_object": {
 			json:     `{}`,
-			expected: NullType,
+			expected: StringType,
 		},
 	}
 
@@ -94,14 +147,14 @@ func TestListTypes(t *testing.T) {
 		expected *TypeInfo
 	}{
 		"empty_list": {
-			json: `{"attributes": []}`,
+			json: `[]`,
 			expected: &TypeInfo{
 				Type:    StringType,
 				IsArray: true,
 			},
 		},
 		"list_with_empty_values": {
-			json: `{"attributes": ["", 0, 0.0, null]}`,
+			json: `["", 0, 0.0, null]`,
 			expected: &TypeInfo{
 				Type:    StringType,
 				IsArray: true,
@@ -111,7 +164,7 @@ func TestListTypes(t *testing.T) {
 			},
 		},
 		"list_of_integers": {
-			json: `{"attributes": [1, 2, 3]}`,
+			json: `[1, 2, 3]`,
 			expected: &TypeInfo{
 				Type:    StringType,
 				IsArray: true,
@@ -121,7 +174,7 @@ func TestListTypes(t *testing.T) {
 			},
 		},
 		"list_of_strings": {
-			json: `{"attributes": ["a", "b", "c"]}`,
+			json: `["a", "b", "c"]`,
 			expected: &TypeInfo{
 				Type:    StringType,
 				IsArray: true,
@@ -131,7 +184,7 @@ func TestListTypes(t *testing.T) {
 			},
 		},
 		"list_with_null": {
-			json: `{"attributes": null}`,
+			json: `null`,
 			expected: &TypeInfo{
 				Type:       NullType,
 				IsNullable: true,
@@ -164,25 +217,25 @@ func TestMapTypes(t *testing.T) {
 		expected *TypeInfo
 	}{
 		"empty_map": {
-			json: `{"attributes": {}}`,
+			json: `{}`,
 			expected: &TypeInfo{
 				Type: StringType,
 			},
 		},
 		"map_with_empty_values": {
-			json: `{"attributes": {"empty_str": "", "zero": 0, "null_val": null}}`,
+			json: `{"empty_str": "", "zero": 0, "null_val": null}`,
 			expected: &TypeInfo{
 				Type: StringType,
 			},
 		},
 		"simple_map": {
-			json: `{"attributes": {"key": "value"}}`,
+			json: `{"key": "value"}`,
 			expected: &TypeInfo{
 				Type: StringType,
 			},
 		},
 		"map_with_null": {
-			json: `{"attributes": null}`,
+			json: `null`,
 			expected: &TypeInfo{
 				Type:       NullType,
 				IsNullable: true,

@@ -30,27 +30,12 @@ type StorageInferrer struct{}
 //
 //   - Handles any unmarshaling errors that might occur
 //
-//     2. For structpb.Struct messages (most common case):
-//     a. Checks for the presence of an "attributes" field
-//     b. Based on the kind of the attributes field:
-//
-//   - If it's a StructValue:
-//
+// 2. For structpb.Struct messages:
 //   - Checks for tabular structure (has both "columns" and "rows" fields)
-//
 //   - Checks for graph structure (has both "nodes" and "edges" fields)
-//
-//   - Checks for list structure (has "items" field with ListValue)
-//
+//   - Checks for list structure (has "value" field with ListValue)
 //   - Checks for scalar structure (single field with scalar value)
-//
 //   - If none of the above, defaults to MapData
-//
-//   - If it's a ListValue: returns ListData
-//
-//   - If it's a NumberValue, StringValue, or BoolValue: returns ScalarData
-//
-//   - For other cases: defaults to ScalarData
 //
 // 3. For non-structpb.Struct messages:
 //   - Uses reflection to determine the type:
@@ -70,45 +55,31 @@ type StorageInferrer struct{}
 // TabularData:
 //
 //	{
-//	  "attributes": {
-//	    "columns": ["id", "name"],
-//	    "rows": [[1, "John"], [2, "Jane"]]
-//	  }
+//	  "columns": ["id", "name"],
+//	  "rows": [[1, "John"], [2, "Jane"]]
 //	}
 //
 // GraphData:
 //
 //	{
-//	  "attributes": {
-//	    "nodes": [{"id": "1", "type": "user"}],
-//	    "edges": [{"source": "1", "target": "2"}]
-//	  }
+//	  "nodes": [{"id": "1", "type": "user"}],
+//	  "edges": [{"source": "1", "target": "2"}]
 //	}
 //
 // ListData:
 //
-//	{
-//	  "attributes": {
-//	    "items": [1, 2, 3]
-//	  }
-//	}
+//	[1, 2, 3]
 //
 // MapData:
 //
 //	{
-//	  "attributes": {
-//	    "key1": "value1",
-//	    "key2": "value2"
-//	  }
+//	  "key1": "value1",
+//	  "key2": "value2"
 //	}
 //
 // ScalarData:
 //
-//	{
-//	  "attributes": {
-//	    "value": 42
-//	  }
-//	}
+//	42
 //
 // Error handling:
 // - Returns error if Any value cannot be unmarshaled
@@ -133,38 +104,25 @@ func (ti *StorageInferrer) InferType(anyValue *anypb.Any) (StorageType, error) {
 
 	// Handle structpb.Struct
 	if structValue, ok := message.(*structpb.Struct); ok {
-		// Get the attributes field
-		if attributes, ok := structValue.Fields["attributes"]; ok {
-			switch attributes.GetKind().(type) {
-			case *structpb.Value_StructValue:
-				attrStruct := attributes.GetStructValue()
-				// Check if it's a tabular structure
-				if isTabular(attrStruct) {
-					return TabularData, nil
-				}
-				// Check if it's a graph structure
-				if isGraph(attrStruct) {
-					return GraphData, nil
-				}
-				// Check if it's a list structure (has "items" field)
-				if items, ok := attrStruct.Fields["items"]; ok {
-					if _, ok := items.GetKind().(*structpb.Value_ListValue); ok {
-						return ListData, nil
-					}
-				}
-				// Check if it's a scalar structure
-				if isScalar(attrStruct) {
-					return ScalarData, nil
-				}
-				return MapData, nil
-			case *structpb.Value_ListValue:
+		// Check if it's a tabular structure
+		if isTabular(structValue) {
+			return TabularData, nil
+		}
+		// Check if it's a graph structure
+		if isGraph(structValue) {
+			return GraphData, nil
+		}
+		// Check if it's a list structure (has "value" field with ListValue)
+		if value, ok := structValue.Fields["value"]; ok {
+			if _, ok := value.GetKind().(*structpb.Value_ListValue); ok {
 				return ListData, nil
-			case *structpb.Value_NumberValue, *structpb.Value_StringValue, *structpb.Value_BoolValue:
-				return ScalarData, nil
-			default:
-				return ScalarData, nil
 			}
 		}
+		// Check if it's a scalar structure
+		if isScalar(structValue) {
+			return ScalarData, nil
+		}
+		return MapData, nil
 	}
 
 	// If not a structpb.Struct, check the direct type
