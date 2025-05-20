@@ -2,6 +2,7 @@ package schema
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -98,17 +99,72 @@ func JSONToAny(jsonStr string) (*anypb.Any, error) {
 		return nil, err
 	}
 
-	structValue, err := structpb.NewStruct(data.(map[string]interface{}))
-	if err != nil {
-		return nil, err
+	// Handle scalar values
+	switch v := data.(type) {
+	case float64:
+		// Check if it's an integer
+		if v == float64(int64(v)) {
+			structValue, err := structpb.NewStruct(map[string]interface{}{
+				"value": int64(v),
+			})
+			if err != nil {
+				return nil, err
+			}
+			return anypb.New(structValue)
+		}
+		structValue, err := structpb.NewStruct(map[string]interface{}{
+			"value": v,
+		})
+		if err != nil {
+			return nil, err
+		}
+		return anypb.New(structValue)
+	case string:
+		structValue, err := structpb.NewStruct(map[string]interface{}{
+			"value": v,
+		})
+		if err != nil {
+			return nil, err
+		}
+		return anypb.New(structValue)
+	case bool:
+		structValue, err := structpb.NewStruct(map[string]interface{}{
+			"value": v,
+		})
+		if err != nil {
+			return nil, err
+		}
+		return anypb.New(structValue)
+	case nil:
+		structValue, err := structpb.NewStruct(map[string]interface{}{
+			"value": nil,
+		})
+		if err != nil {
+			return nil, err
+		}
+		return anypb.New(structValue)
+	case []interface{}:
+		// For arrays, create a struct with a "value" field containing the array
+		structValue, err := structpb.NewStruct(map[string]interface{}{
+			"value": v,
+		})
+		if err != nil {
+			return nil, err
+		}
+		return anypb.New(structValue)
 	}
 
-	anyValue, err := anypb.New(structValue)
-	if err != nil {
-		return nil, err
+	// Handle objects
+	if obj, ok := data.(map[string]interface{}); ok {
+		// For objects, create a struct directly
+		structValue, err := structpb.NewStruct(obj)
+		if err != nil {
+			return nil, err
+		}
+		return anypb.New(structValue)
 	}
 
-	return anyValue, nil
+	return nil, fmt.Errorf("unsupported data type: %T", data)
 }
 
 // TestSchemaGeneration tests the schema generation for different data structures
@@ -119,9 +175,7 @@ func TestSchemaGeneration(t *testing.T) {
 	}{
 		"scalar_data": {
 			input: `{
-				"attributes": {
-					"value": 42
-				}
+				"value": 42
 			}`,
 			expected: `{
 				"storage_type": "scalar",
@@ -132,9 +186,7 @@ func TestSchemaGeneration(t *testing.T) {
 		},
 		"list_data": {
 			input: `{
-				"attributes": {
-					"numbers": [1, 2, 3]
-				}
+				"numbers": [1, 2, 3]
 			}`,
 			expected: `{
 				"storage_type": "list",
@@ -155,9 +207,7 @@ func TestSchemaGeneration(t *testing.T) {
 		},
 		"list_data_with_different_name": {
 			input: `{
-				"attributes": {
-					"values": [1, 2, 3]
-				}
+				"values": [1, 2, 3]
 			}`,
 			expected: `{
 				"storage_type": "list",
@@ -178,12 +228,10 @@ func TestSchemaGeneration(t *testing.T) {
 		},
 		"map_data": {
 			input: `{
-				"attributes": {
-					"properties": {
-						"name": "John",
-						"age": 30,
-						"active": true
-					}
+				"properties": {
+					"name": "John",
+					"age": 30,
+					"active": true
 				}
 			}`,
 			expected: `{
@@ -215,12 +263,10 @@ func TestSchemaGeneration(t *testing.T) {
 		},
 		"empty_values": {
 			input: `{
-				"attributes": {
-					"properties": {
-						"empty_str": "",
-						"zero": 0,
-						"null_val": null
-					}
+				"properties": {
+					"empty_str": "",
+					"zero": 0,
+					"null_val": null
 				}
 			}`,
 			expected: `{
@@ -253,13 +299,11 @@ func TestSchemaGeneration(t *testing.T) {
 		},
 		"graph_data_with_nodes": {
 			input: `{
-				"attributes": {
-					"nodes": {
-						"person": {
-							"name": "John",
-							"age": 30,
-							"active": true
-						}
+				"nodes": {
+					"person": {
+						"name": "John",
+						"age": 30,
+						"active": true
 					}
 				}
 			}`,
@@ -308,12 +352,10 @@ func TestSchemaGeneration(t *testing.T) {
 		},
 		"graph_data_with_edges": {
 			input: `{
-				"attributes": {
-					"edges": {
-						"knows": {
-							"since": "2020-01-01",
-							"strength": 0.8
-						}
+				"edges": {
+					"knows": {
+						"since": "2020-01-01",
+						"strength": 0.8
 					}
 				}
 			}`,
@@ -356,17 +398,15 @@ func TestSchemaGeneration(t *testing.T) {
 		},
 		"graph_data_with_both": {
 			input: `{
-				"attributes": {
-					"nodes": {
-						"person": {
-							"name": "John",
-							"age": 30
-						}
-					},
-					"edges": {
-						"knows": {
-							"since": "2020-01-01"
-						}
+				"nodes": {
+					"person": {
+						"name": "John",
+						"age": 30
+					}
+				},
+				"edges": {
+					"knows": {
+						"since": "2020-01-01"
 					}
 				}
 			}`,
@@ -431,22 +471,20 @@ func TestSchemaGeneration(t *testing.T) {
 		},
 		"social_network": {
 			input: `{
-				"attributes": {
-					"nodes": [
-						{"id": "user1", "type": "user", "properties": {"name": "Alice", "age": 30, "location": "NY"}},
-						{"id": "user2", "type": "user", "properties": {"name": "Bob", "age": 25, "location": "SF"}},
-						{"id": "user3", "type": "user", "properties": {"name": "Charlie", "age": 35, "location": "LA"}},
-						{"id": "post1", "type": "post", "properties": {"title": "Hello", "content": "World", "created": "2024-03-20"}},
-						{"id": "post2", "type": "post", "properties": {"title": "Graph", "content": "DB", "created": "2024-03-21"}}
-					],
-					"edges": [
-						{"source": "user1", "target": "user2", "type": "follows", "properties": {"since": "2024-01-01"}},
-						{"source": "user2", "target": "user3", "type": "follows", "properties": {"since": "2024-02-01"}},
-						{"source": "user1", "target": "post1", "type": "created", "properties": {"timestamp": "2024-03-20T10:00:00Z"}},
-						{"source": "user2", "target": "post1", "type": "likes", "properties": {"timestamp": "2024-03-20T11:00:00Z"}},
-						{"source": "user3", "target": "post2", "type": "created", "properties": {"timestamp": "2024-03-21T09:00:00Z"}}
-					]
-				}
+				"nodes": [
+					{"id": "user1", "type": "user", "properties": {"name": "Alice", "age": 30, "location": "NY"}},
+					{"id": "user2", "type": "user", "properties": {"name": "Bob", "age": 25, "location": "SF"}},
+					{"id": "user3", "type": "user", "properties": {"name": "Charlie", "age": 35, "location": "LA"}},
+					{"id": "post1", "type": "post", "properties": {"title": "Hello", "content": "World", "created": "2024-03-20"}},
+					{"id": "post2", "type": "post", "properties": {"title": "Graph", "content": "DB", "created": "2024-03-21"}}
+				],
+				"edges": [
+					{"source": "user1", "target": "user2", "type": "follows", "properties": {"since": "2024-01-01"}},
+					{"source": "user2", "target": "user3", "type": "follows", "properties": {"since": "2024-02-01"}},
+					{"source": "user1", "target": "post1", "type": "created", "properties": {"timestamp": "2024-03-20T10:00:00Z"}},
+					{"source": "user2", "target": "post1", "type": "likes", "properties": {"timestamp": "2024-03-20T11:00:00Z"}},
+					{"source": "user3", "target": "post2", "type": "created", "properties": {"timestamp": "2024-03-21T09:00:00Z"}}
+				]
 			}`,
 			expected: `{
 				"storage_type": "graph",
@@ -569,20 +607,18 @@ func TestSchemaGeneration(t *testing.T) {
 		},
 		"dependency_graph": {
 			input: `{
-				"attributes": {
-					"nodes": [
-						{"id": "pkg1", "type": "package", "properties": {"name": "core", "version": "1.0.0"}},
-						{"id": "pkg2", "type": "package", "properties": {"name": "utils", "version": "2.1.0"}},
-						{"id": "pkg3", "type": "package", "properties": {"name": "network", "version": "1.5.0"}},
-						{"id": "pkg4", "type": "package", "properties": {"name": "database", "version": "3.0.0"}}
-					],
-					"edges": [
-						{"source": "pkg2", "target": "pkg1", "type": "depends_on", "properties": {"version": ">=1.0.0"}},
-						{"source": "pkg3", "target": "pkg1", "type": "depends_on", "properties": {"version": ">=1.0.0"}},
-						{"source": "pkg4", "target": "pkg2", "type": "depends_on", "properties": {"version": ">=2.0.0"}},
-						{"source": "pkg4", "target": "pkg3", "type": "depends_on", "properties": {"version": ">=1.5.0"}}
-					]
-				}
+				"nodes": [
+					{"id": "pkg1", "type": "package", "properties": {"name": "core", "version": "1.0.0"}},
+					{"id": "pkg2", "type": "package", "properties": {"name": "utils", "version": "2.1.0"}},
+					{"id": "pkg3", "type": "package", "properties": {"name": "network", "version": "1.5.0"}},
+					{"id": "pkg4", "type": "package", "properties": {"name": "database", "version": "3.0.0"}}
+				],
+				"edges": [
+					{"source": "pkg2", "target": "pkg1", "type": "depends_on", "properties": {"version": ">=1.0.0"}},
+					{"source": "pkg3", "target": "pkg1", "type": "depends_on", "properties": {"version": ">=1.0.0"}},
+					{"source": "pkg4", "target": "pkg2", "type": "depends_on", "properties": {"version": ">=2.0.0"}},
+					{"source": "pkg4", "target": "pkg3", "type": "depends_on", "properties": {"version": ">=1.5.0"}}
+				]
 			}`,
 			expected: `{
 				"storage_type": "graph",

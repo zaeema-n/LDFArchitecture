@@ -16,6 +16,7 @@ package schema
 
 import (
 	"fmt"
+	"time"
 
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/structpb"
@@ -90,51 +91,80 @@ func (sg *SchemaGenerator) GenerateSchema(anyValue *anypb.Any) (*SchemaInfo, err
 	// Get the struct value from the message
 	structValue, ok := message.(*structpb.Struct)
 	if !ok {
-		return nil, fmt.Errorf("expected struct value")
-	}
-
-	// Get the attributes field which contains the actual data
-	attributes, ok := structValue.Fields["attributes"]
-	if !ok {
-		return nil, fmt.Errorf("attributes field not found")
-	}
-
-	// Determine storage type based on the structure of attributes
-	var storageType storageinference.StorageType
-	switch attr := attributes.GetKind().(type) {
-	case *structpb.Value_ListValue:
-		// Direct list values are always ListData
-		storageType = storageinference.ListData
-	case *structpb.Value_StructValue:
-		// Check if it's a graph (has nodes or edges field)
-		if _, hasNodes := attr.StructValue.Fields["nodes"]; hasNodes {
-			storageType = storageinference.GraphData
-		} else if _, hasEdges := attr.StructValue.Fields["edges"]; hasEdges {
-			storageType = storageinference.GraphData
-		} else {
-			// Check if it's a list (has any list field)
-			for _, field := range attr.StructValue.Fields {
-				if _, ok := field.GetKind().(*structpb.Value_ListValue); ok {
-					storageType = storageinference.ListData
-					break
+		// If not a struct, check if it's a scalar value
+		switch m := message.(type) {
+		case *structpb.Value:
+			// Create a schema directly for the scalar value
+			schema := &SchemaInfo{
+				StorageType: storageinference.ScalarData,
+				TypeInfo:    &typeinference.TypeInfo{},
+			}
+			switch m.GetKind().(type) {
+			case *structpb.Value_StringValue:
+				schema.TypeInfo.Type = typeinference.StringType
+			case *structpb.Value_NumberValue:
+				num := m.GetNumberValue()
+				if num == float64(int64(num)) {
+					schema.TypeInfo.Type = typeinference.IntType
+				} else {
+					schema.TypeInfo.Type = typeinference.FloatType
 				}
+			case *structpb.Value_BoolValue:
+				schema.TypeInfo.Type = typeinference.BoolType
+			case *structpb.Value_NullValue:
+				schema.TypeInfo.Type = typeinference.NullType
+				schema.TypeInfo.IsNullable = true
+			default:
+				return nil, fmt.Errorf("unsupported scalar type")
 			}
-			// If not a list, check if it's a map (has any struct field)
-			if storageType == "" {
-				for _, field := range attr.StructValue.Fields {
-					if _, ok := field.GetKind().(*structpb.Value_StructValue); ok {
-						storageType = storageinference.MapData
-						break
-					}
-				}
-			}
-			// If no list or map found, treat as scalar
-			if storageType == "" {
-				storageType = storageinference.ScalarData
-			}
+			return schema, nil
+		default:
+			return nil, fmt.Errorf("expected struct value")
 		}
+	}
+
+	// Check if this is a scalar value wrapped in a struct
+	if len(structValue.Fields) == 1 {
+		if value, ok := structValue.Fields["value"]; ok {
+			// Create a schema directly for the scalar value
+			schema := &SchemaInfo{
+				StorageType: storageinference.ScalarData,
+				TypeInfo:    &typeinference.TypeInfo{},
+			}
+			switch value.GetKind().(type) {
+			case *structpb.Value_StringValue:
+				schema.TypeInfo.Type = typeinference.StringType
+			case *structpb.Value_NumberValue:
+				num := value.GetNumberValue()
+				if num == float64(int64(num)) {
+					schema.TypeInfo.Type = typeinference.IntType
+				} else {
+					schema.TypeInfo.Type = typeinference.FloatType
+				}
+			case *structpb.Value_BoolValue:
+				schema.TypeInfo.Type = typeinference.BoolType
+			case *structpb.Value_NullValue:
+				schema.TypeInfo.Type = typeinference.NullType
+				schema.TypeInfo.IsNullable = true
+			default:
+				return nil, fmt.Errorf("unsupported scalar type")
+			}
+			return schema, nil
+		}
+	}
+
+	// Determine storage type based on the structure of the data
+	var storageType storageinference.StorageType
+	switch {
+	case hasGraphStructure(structValue):
+		storageType = storageinference.GraphData
+	case hasListStructure(structValue):
+		storageType = storageinference.ListData
+	case hasMapStructure(structValue):
+		storageType = storageinference.MapData
+	case hasTabularStructure(structValue):
+		storageType = storageinference.TabularData
 	default:
-		// Any other value type is treated as scalar
 		storageType = storageinference.ScalarData
 	}
 
@@ -153,18 +183,85 @@ func (sg *SchemaGenerator) GenerateSchema(anyValue *anypb.Any) (*SchemaInfo, err
 	// Handle different storage types with their specific processing functions
 	switch storageType {
 	case storageinference.TabularData:
-		return sg.handleTabularData(anyValue, schema)
+		return sg.handleTabularData(structValue, schema)
 	case storageinference.GraphData:
-		return sg.handleGraphData(anyValue, schema)
+		return sg.handleGraphData(structValue, schema)
 	case storageinference.ListData:
-		return sg.handleListData(anyValue, schema)
+		return sg.handleListData(structValue, schema)
 	case storageinference.MapData:
-		return sg.handleMapData(anyValue, schema)
+		return sg.handleMapData(structValue, schema)
 	case storageinference.ScalarData:
-		return sg.handleScalarData(anyValue, schema)
+		return sg.handleScalarData(structValue, schema)
 	default:
 		return nil, fmt.Errorf("unknown storage type: %v", storageType)
 	}
+}
+
+// Helper functions to determine data structure type
+func hasGraphStructure(structValue *structpb.Struct) bool {
+	// Check for nodes or edges fields
+	if _, hasNodes := structValue.Fields["nodes"]; hasNodes {
+		return true
+	}
+	if _, hasEdges := structValue.Fields["edges"]; hasEdges {
+		return true
+	}
+	return false
+}
+
+func hasListStructure(structValue *structpb.Struct) bool {
+	// Check if any field is a list
+	for _, field := range structValue.Fields {
+		if _, ok := field.GetKind().(*structpb.Value_ListValue); ok {
+			return true
+		}
+	}
+	return false
+}
+
+func hasMapStructure(structValue *structpb.Struct) bool {
+	// Check if any field is a struct
+	for _, field := range structValue.Fields {
+		if _, ok := field.GetKind().(*structpb.Value_StructValue); ok {
+			return true
+		}
+	}
+	return false
+}
+
+func hasTabularStructure(structValue *structpb.Struct) bool {
+	// Check for tabular data structure
+	// Tabular data should have fields that are all of the same type
+	// and should not be a graph, list, or map structure
+	if hasGraphStructure(structValue) || hasListStructure(structValue) || hasMapStructure(structValue) {
+		return false
+	}
+
+	// Check if all fields are of the same type
+	var firstFieldType interface{}
+	for _, field := range structValue.Fields {
+		fieldType := field.GetKind()
+		if firstFieldType == nil {
+			firstFieldType = fieldType
+		} else if fmt.Sprintf("%T", fieldType) != fmt.Sprintf("%T", firstFieldType) {
+			return false
+		}
+	}
+
+	return len(structValue.Fields) > 0
+}
+
+// Helper function to detect if a string is a date or datetime
+func isDateOrDateTime(str string) (bool, bool) {
+	// Try parsing as date (YYYY-MM-DD)
+	if _, err := time.Parse("2006-01-02", str); err == nil {
+		return true, false
+	}
+	// Try parsing as datetime (YYYY-MM-DDTHH:MM:SSZ)
+	if _, err := time.Parse(time.RFC3339, str); err == nil {
+		return true, true
+	}
+	return false, false
 }
 
 // handleTabularData processes tabular data and generates field schemas.
@@ -179,48 +276,20 @@ func (sg *SchemaGenerator) GenerateSchema(anyValue *anypb.Any) (*SchemaInfo, err
 //     - Adds the field schema to the Fields map
 //
 // Parameters:
-//   - anyValue: The protobuf Any value containing tabular data
+//   - structValue: The protobuf struct value containing tabular data
 //   - schema: The base schema to populate with field information
 //
 // Returns:
 //   - *SchemaInfo: The complete schema with field information
 //   - error: Any error that occurred during processing
-func (sg *SchemaGenerator) handleTabularData(anyValue *anypb.Any, schema *SchemaInfo) (*SchemaInfo, error) {
-	// Unpack the Any value to get the underlying message
-	message, err := anyValue.UnmarshalNew()
-	if err != nil {
-		return nil, err
-	}
-
-	// Get the struct value from the message
-	structValue, ok := message.(*structpb.Struct)
-	if !ok {
-		return nil, fmt.Errorf("expected struct value for tabular data")
-	}
-
-	// Get the attributes field which contains the field definitions
-	attributes, ok := structValue.Fields["attributes"]
-	if !ok {
-		return nil, fmt.Errorf("attributes field not found")
-	}
-
-	// Get the struct value from attributes
-	attrStruct, ok := attributes.GetKind().(*structpb.Value_StructValue)
-	if !ok {
-		return nil, fmt.Errorf("attributes is not a struct")
-	}
-
-	// Initialize the Fields map to store field schemas
+func (sg *SchemaGenerator) handleTabularData(structValue *structpb.Struct, schema *SchemaInfo) (*SchemaInfo, error) {
+	// Initialize the Fields map
 	schema.Fields = make(map[string]*SchemaInfo)
 
-	// Process each field in the attributes struct
-	for fieldName, fieldValue := range attrStruct.StructValue.Fields {
+	// Process each field in the struct
+	for fieldName, fieldValue := range structValue.Fields {
 		// Create a new Any value for the field
-		fieldAny, err := anypb.New(&structpb.Struct{
-			Fields: map[string]*structpb.Value{
-				"attributes": fieldValue,
-			},
-		})
+		fieldAny, err := anypb.New(fieldValue)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create field Any value: %v", err)
 		}
@@ -231,7 +300,6 @@ func (sg *SchemaGenerator) handleTabularData(anyValue *anypb.Any, schema *Schema
 			return nil, fmt.Errorf("failed to generate field schema: %v", err)
 		}
 
-		// Add the field schema to the Fields map
 		schema.Fields[fieldName] = fieldSchema
 	}
 
@@ -239,54 +307,28 @@ func (sg *SchemaGenerator) handleTabularData(anyValue *anypb.Any, schema *Schema
 }
 
 // handleGraphData processes graph data and generates schemas for nodes and edges.
-// Graph data is expected to be a struct with an "attributes" field containing
-// a struct with "nodes" and "edges" fields, where each field can be either:
+// Graph data is expected to be a struct with "nodes" and "edges" fields, where each field can be either:
 //   - An array of objects with type and properties
 //   - A map of type to property objects
 //
 // The function:
-//  1. Extracts the attributes struct
-//  2. Processes node schemas from the "nodes" field
-//  3. Processes edge schemas from the "edges" field
-//  4. Combines them into a complete graph schema
+//  1. Processes node schemas from the "nodes" field
+//  2. Processes edge schemas from the "edges" field
+//  3. Combines them into a complete graph schema
 //
 // Parameters:
-//   - anyValue: The protobuf Any value containing graph data
+//   - structValue: The protobuf struct value containing graph data
 //   - schema: The base schema to populate with graph information
 //
 // Returns:
 //   - *SchemaInfo: The complete schema with node and edge information
 //   - error: Any error that occurred during processing
-func (sg *SchemaGenerator) handleGraphData(anyValue *anypb.Any, schema *SchemaInfo) (*SchemaInfo, error) {
-	// Unpack the Any value to get the underlying message
-	message, err := anyValue.UnmarshalNew()
-	if err != nil {
-		return nil, err
-	}
-
-	// Get the struct value from the message
-	structValue, ok := message.(*structpb.Struct)
-	if !ok {
-		return nil, fmt.Errorf("expected struct value for graph data")
-	}
-
-	// Get the attributes field which contains the graph data
-	attributes, ok := structValue.Fields["attributes"]
-	if !ok {
-		return nil, fmt.Errorf("attributes field not found")
-	}
-
-	// Get the struct value from attributes
-	attrStruct, ok := attributes.GetKind().(*structpb.Value_StructValue)
-	if !ok {
-		return nil, fmt.Errorf("attributes is not a struct")
-	}
-
+func (sg *SchemaGenerator) handleGraphData(structValue *structpb.Struct, schema *SchemaInfo) (*SchemaInfo, error) {
 	// Initialize the schema fields map
 	schema.Fields = make(map[string]*SchemaInfo)
 
 	// Process nodes if present
-	if nodes, ok := attrStruct.StructValue.Fields["nodes"]; ok {
+	if nodes, ok := structValue.Fields["nodes"]; ok {
 		// Create a map schema for nodes
 		nodeSchema := &SchemaInfo{
 			StorageType: storageinference.MapData,
@@ -308,37 +350,105 @@ func (sg *SchemaGenerator) handleGraphData(anyValue *anypb.Any, schema *SchemaIn
 						}
 					}
 
-					// Get node properties
+					// Create a map schema for node properties
+					propSchema := &SchemaInfo{
+						StorageType: storageinference.MapData,
+						TypeInfo:    &typeinference.TypeInfo{Type: typeinference.StringType},
+						Properties:  make(map[string]*SchemaInfo),
+					}
+
+					// Process properties - either directly in the node or in a properties field
+					var properties *structpb.Struct
 					if props, ok := nodeStruct.StructValue.Fields["properties"]; ok {
 						if propStruct, ok := props.GetKind().(*structpb.Value_StructValue); ok {
-							// Create a map schema for node properties
-							propSchema := &SchemaInfo{
-								StorageType: storageinference.MapData,
-								TypeInfo:    &typeinference.TypeInfo{Type: typeinference.StringType},
-								Properties:  make(map[string]*SchemaInfo),
+							properties = propStruct.StructValue
+						}
+					} else {
+						// Use the node struct itself as properties, excluding type and id fields
+						properties = &structpb.Struct{
+							Fields: make(map[string]*structpb.Value),
+						}
+						for k, v := range nodeStruct.StructValue.Fields {
+							if k != "type" && k != "id" {
+								properties.Fields[k] = v
 							}
+						}
+					}
 
-							// Process each property
-							for propName, propValue := range propStruct.StructValue.Fields {
-								// Create a new Any value for the property
+					if properties != nil {
+						// Process each property
+						for propName, propValue := range properties.Fields {
+							// Create a schema for the property based on its type
+							var propTypeSchema *SchemaInfo
+							switch propValue.GetKind().(type) {
+							case *structpb.Value_StringValue:
+								str := propValue.GetStringValue()
+								if isDate, isDateTime := isDateOrDateTime(str); isDate {
+									if isDateTime {
+										propTypeSchema = &SchemaInfo{
+											StorageType: storageinference.ScalarData,
+											TypeInfo:    &typeinference.TypeInfo{Type: typeinference.DateTimeType},
+										}
+									} else {
+										propTypeSchema = &SchemaInfo{
+											StorageType: storageinference.ScalarData,
+											TypeInfo:    &typeinference.TypeInfo{Type: typeinference.DateType},
+										}
+									}
+								} else {
+									propTypeSchema = &SchemaInfo{
+										StorageType: storageinference.ScalarData,
+										TypeInfo:    &typeinference.TypeInfo{Type: typeinference.StringType},
+									}
+								}
+							case *structpb.Value_NumberValue:
+								num := propValue.GetNumberValue()
+								if num == float64(int64(num)) {
+									propTypeSchema = &SchemaInfo{
+										StorageType: storageinference.ScalarData,
+										TypeInfo:    &typeinference.TypeInfo{Type: typeinference.IntType},
+									}
+								} else {
+									propTypeSchema = &SchemaInfo{
+										StorageType: storageinference.ScalarData,
+										TypeInfo:    &typeinference.TypeInfo{Type: typeinference.FloatType},
+									}
+								}
+							case *structpb.Value_BoolValue:
+								propTypeSchema = &SchemaInfo{
+									StorageType: storageinference.ScalarData,
+									TypeInfo:    &typeinference.TypeInfo{Type: typeinference.BoolType},
+								}
+							case *structpb.Value_NullValue:
+								propTypeSchema = &SchemaInfo{
+									StorageType: storageinference.ScalarData,
+									TypeInfo:    &typeinference.TypeInfo{Type: typeinference.NullType, IsNullable: true},
+								}
+							case *structpb.Value_StructValue:
+								// For struct values, create a new Any value and generate schema
 								propAny, err := anypb.New(&structpb.Struct{
-									Fields: map[string]*structpb.Value{
-										"attributes": propValue,
-									},
+									Fields: propValue.GetStructValue().Fields,
 								})
 								if err != nil {
 									return nil, fmt.Errorf("failed to create property Any value: %v", err)
 								}
-
-								// Generate schema for the property
-								propTypeSchema, err := sg.GenerateSchema(propAny)
+								propTypeSchema, err = sg.GenerateSchema(propAny)
 								if err != nil {
 									return nil, fmt.Errorf("failed to generate property schema: %v", err)
 								}
-
-								propSchema.Properties[propName] = propTypeSchema
+							default:
+								return nil, fmt.Errorf("unsupported property type")
 							}
 
+							propSchema.Properties[propName] = propTypeSchema
+						}
+
+						// If we already have a schema for this node type, merge the properties
+						if existingSchema, exists := nodeSchema.Properties[nodeType]; exists {
+							for propName, propSchema := range propSchema.Properties {
+								existingSchema.Properties[propName] = propSchema
+							}
+						} else {
 							nodeSchema.Properties[nodeType] = propSchema
 						}
 					}
@@ -357,20 +467,66 @@ func (sg *SchemaGenerator) handleGraphData(anyValue *anypb.Any, schema *SchemaIn
 
 					// Process each property
 					for propName, propValue := range nodeStruct.StructValue.Fields {
-						// Create a new Any value for the property
-						propAny, err := anypb.New(&structpb.Struct{
-							Fields: map[string]*structpb.Value{
-								"attributes": propValue,
-							},
-						})
-						if err != nil {
-							return nil, fmt.Errorf("failed to create property Any value: %v", err)
-						}
-
-						// Generate schema for the property
-						propTypeSchema, err := sg.GenerateSchema(propAny)
-						if err != nil {
-							return nil, fmt.Errorf("failed to generate property schema: %v", err)
+						// Create a schema for the property based on its type
+						var propTypeSchema *SchemaInfo
+						switch propValue.GetKind().(type) {
+						case *structpb.Value_StringValue:
+							str := propValue.GetStringValue()
+							if isDate, isDateTime := isDateOrDateTime(str); isDate {
+								if isDateTime {
+									propTypeSchema = &SchemaInfo{
+										StorageType: storageinference.ScalarData,
+										TypeInfo:    &typeinference.TypeInfo{Type: typeinference.DateTimeType},
+									}
+								} else {
+									propTypeSchema = &SchemaInfo{
+										StorageType: storageinference.ScalarData,
+										TypeInfo:    &typeinference.TypeInfo{Type: typeinference.DateType},
+									}
+								}
+							} else {
+								propTypeSchema = &SchemaInfo{
+									StorageType: storageinference.ScalarData,
+									TypeInfo:    &typeinference.TypeInfo{Type: typeinference.StringType},
+								}
+							}
+						case *structpb.Value_NumberValue:
+							num := propValue.GetNumberValue()
+							if num == float64(int64(num)) {
+								propTypeSchema = &SchemaInfo{
+									StorageType: storageinference.ScalarData,
+									TypeInfo:    &typeinference.TypeInfo{Type: typeinference.IntType},
+								}
+							} else {
+								propTypeSchema = &SchemaInfo{
+									StorageType: storageinference.ScalarData,
+									TypeInfo:    &typeinference.TypeInfo{Type: typeinference.FloatType},
+								}
+							}
+						case *structpb.Value_BoolValue:
+							propTypeSchema = &SchemaInfo{
+								StorageType: storageinference.ScalarData,
+								TypeInfo:    &typeinference.TypeInfo{Type: typeinference.BoolType},
+							}
+						case *structpb.Value_NullValue:
+							propTypeSchema = &SchemaInfo{
+								StorageType: storageinference.ScalarData,
+								TypeInfo:    &typeinference.TypeInfo{Type: typeinference.NullType, IsNullable: true},
+							}
+						case *structpb.Value_StructValue:
+							// For struct values, create a new Any value and generate schema
+							propAny, err := anypb.New(&structpb.Struct{
+								Fields: propValue.GetStructValue().Fields,
+							})
+							if err != nil {
+								return nil, fmt.Errorf("failed to create property Any value: %v", err)
+							}
+							propTypeSchema, err = sg.GenerateSchema(propAny)
+							if err != nil {
+								return nil, fmt.Errorf("failed to generate property schema: %v", err)
+							}
+						default:
+							return nil, fmt.Errorf("unsupported property type")
 						}
 
 						propSchema.Properties[propName] = propTypeSchema
@@ -385,7 +541,7 @@ func (sg *SchemaGenerator) handleGraphData(anyValue *anypb.Any, schema *SchemaIn
 	}
 
 	// Process edges if present
-	if edges, ok := attrStruct.StructValue.Fields["edges"]; ok {
+	if edges, ok := structValue.Fields["edges"]; ok {
 		// Create a map schema for edges
 		edgeSchema := &SchemaInfo{
 			StorageType: storageinference.MapData,
@@ -407,37 +563,105 @@ func (sg *SchemaGenerator) handleGraphData(anyValue *anypb.Any, schema *SchemaIn
 						}
 					}
 
-					// Get edge properties
+					// Create a map schema for edge properties
+					propSchema := &SchemaInfo{
+						StorageType: storageinference.MapData,
+						TypeInfo:    &typeinference.TypeInfo{Type: typeinference.StringType},
+						Properties:  make(map[string]*SchemaInfo),
+					}
+
+					// Process properties - either directly in the edge or in a properties field
+					var properties *structpb.Struct
 					if props, ok := edgeStruct.StructValue.Fields["properties"]; ok {
 						if propStruct, ok := props.GetKind().(*structpb.Value_StructValue); ok {
-							// Create a map schema for edge properties
-							propSchema := &SchemaInfo{
-								StorageType: storageinference.MapData,
-								TypeInfo:    &typeinference.TypeInfo{Type: typeinference.StringType},
-								Properties:  make(map[string]*SchemaInfo),
+							properties = propStruct.StructValue
+						}
+					} else {
+						// Use the edge struct itself as properties, excluding type, source, and target fields
+						properties = &structpb.Struct{
+							Fields: make(map[string]*structpb.Value),
+						}
+						for k, v := range edgeStruct.StructValue.Fields {
+							if k != "type" && k != "source" && k != "target" {
+								properties.Fields[k] = v
 							}
+						}
+					}
 
-							// Process each property
-							for propName, propValue := range propStruct.StructValue.Fields {
-								// Create a new Any value for the property
+					if properties != nil {
+						// Process each property
+						for propName, propValue := range properties.Fields {
+							// Create a schema for the property based on its type
+							var propTypeSchema *SchemaInfo
+							switch propValue.GetKind().(type) {
+							case *structpb.Value_StringValue:
+								str := propValue.GetStringValue()
+								if isDate, isDateTime := isDateOrDateTime(str); isDate {
+									if isDateTime {
+										propTypeSchema = &SchemaInfo{
+											StorageType: storageinference.ScalarData,
+											TypeInfo:    &typeinference.TypeInfo{Type: typeinference.DateTimeType},
+										}
+									} else {
+										propTypeSchema = &SchemaInfo{
+											StorageType: storageinference.ScalarData,
+											TypeInfo:    &typeinference.TypeInfo{Type: typeinference.DateType},
+										}
+									}
+								} else {
+									propTypeSchema = &SchemaInfo{
+										StorageType: storageinference.ScalarData,
+										TypeInfo:    &typeinference.TypeInfo{Type: typeinference.StringType},
+									}
+								}
+							case *structpb.Value_NumberValue:
+								num := propValue.GetNumberValue()
+								if num == float64(int64(num)) {
+									propTypeSchema = &SchemaInfo{
+										StorageType: storageinference.ScalarData,
+										TypeInfo:    &typeinference.TypeInfo{Type: typeinference.IntType},
+									}
+								} else {
+									propTypeSchema = &SchemaInfo{
+										StorageType: storageinference.ScalarData,
+										TypeInfo:    &typeinference.TypeInfo{Type: typeinference.FloatType},
+									}
+								}
+							case *structpb.Value_BoolValue:
+								propTypeSchema = &SchemaInfo{
+									StorageType: storageinference.ScalarData,
+									TypeInfo:    &typeinference.TypeInfo{Type: typeinference.BoolType},
+								}
+							case *structpb.Value_NullValue:
+								propTypeSchema = &SchemaInfo{
+									StorageType: storageinference.ScalarData,
+									TypeInfo:    &typeinference.TypeInfo{Type: typeinference.NullType, IsNullable: true},
+								}
+							case *structpb.Value_StructValue:
+								// For struct values, create a new Any value and generate schema
 								propAny, err := anypb.New(&structpb.Struct{
-									Fields: map[string]*structpb.Value{
-										"attributes": propValue,
-									},
+									Fields: propValue.GetStructValue().Fields,
 								})
 								if err != nil {
 									return nil, fmt.Errorf("failed to create property Any value: %v", err)
 								}
-
-								// Generate schema for the property
-								propTypeSchema, err := sg.GenerateSchema(propAny)
+								propTypeSchema, err = sg.GenerateSchema(propAny)
 								if err != nil {
 									return nil, fmt.Errorf("failed to generate property schema: %v", err)
 								}
-
-								propSchema.Properties[propName] = propTypeSchema
+							default:
+								return nil, fmt.Errorf("unsupported property type")
 							}
 
+							propSchema.Properties[propName] = propTypeSchema
+						}
+
+						// If we already have a schema for this edge type, merge the properties
+						if existingSchema, exists := edgeSchema.Properties[edgeType]; exists {
+							for propName, propSchema := range propSchema.Properties {
+								existingSchema.Properties[propName] = propSchema
+							}
+						} else {
 							edgeSchema.Properties[edgeType] = propSchema
 						}
 					}
@@ -456,20 +680,66 @@ func (sg *SchemaGenerator) handleGraphData(anyValue *anypb.Any, schema *SchemaIn
 
 					// Process each property
 					for propName, propValue := range edgeStruct.StructValue.Fields {
-						// Create a new Any value for the property
-						propAny, err := anypb.New(&structpb.Struct{
-							Fields: map[string]*structpb.Value{
-								"attributes": propValue,
-							},
-						})
-						if err != nil {
-							return nil, fmt.Errorf("failed to create property Any value: %v", err)
-						}
-
-						// Generate schema for the property
-						propTypeSchema, err := sg.GenerateSchema(propAny)
-						if err != nil {
-							return nil, fmt.Errorf("failed to generate property schema: %v", err)
+						// Create a schema for the property based on its type
+						var propTypeSchema *SchemaInfo
+						switch propValue.GetKind().(type) {
+						case *structpb.Value_StringValue:
+							str := propValue.GetStringValue()
+							if isDate, isDateTime := isDateOrDateTime(str); isDate {
+								if isDateTime {
+									propTypeSchema = &SchemaInfo{
+										StorageType: storageinference.ScalarData,
+										TypeInfo:    &typeinference.TypeInfo{Type: typeinference.DateTimeType},
+									}
+								} else {
+									propTypeSchema = &SchemaInfo{
+										StorageType: storageinference.ScalarData,
+										TypeInfo:    &typeinference.TypeInfo{Type: typeinference.DateType},
+									}
+								}
+							} else {
+								propTypeSchema = &SchemaInfo{
+									StorageType: storageinference.ScalarData,
+									TypeInfo:    &typeinference.TypeInfo{Type: typeinference.StringType},
+								}
+							}
+						case *structpb.Value_NumberValue:
+							num := propValue.GetNumberValue()
+							if num == float64(int64(num)) {
+								propTypeSchema = &SchemaInfo{
+									StorageType: storageinference.ScalarData,
+									TypeInfo:    &typeinference.TypeInfo{Type: typeinference.IntType},
+								}
+							} else {
+								propTypeSchema = &SchemaInfo{
+									StorageType: storageinference.ScalarData,
+									TypeInfo:    &typeinference.TypeInfo{Type: typeinference.FloatType},
+								}
+							}
+						case *structpb.Value_BoolValue:
+							propTypeSchema = &SchemaInfo{
+								StorageType: storageinference.ScalarData,
+								TypeInfo:    &typeinference.TypeInfo{Type: typeinference.BoolType},
+							}
+						case *structpb.Value_NullValue:
+							propTypeSchema = &SchemaInfo{
+								StorageType: storageinference.ScalarData,
+								TypeInfo:    &typeinference.TypeInfo{Type: typeinference.NullType, IsNullable: true},
+							}
+						case *structpb.Value_StructValue:
+							// For struct values, create a new Any value and generate schema
+							propAny, err := anypb.New(&structpb.Struct{
+								Fields: propValue.GetStructValue().Fields,
+							})
+							if err != nil {
+								return nil, fmt.Errorf("failed to create property Any value: %v", err)
+							}
+							propTypeSchema, err = sg.GenerateSchema(propAny)
+							if err != nil {
+								return nil, fmt.Errorf("failed to generate property schema: %v", err)
+							}
+						default:
+							return nil, fmt.Errorf("unsupported property type")
 						}
 
 						propSchema.Properties[propName] = propTypeSchema
@@ -502,115 +772,105 @@ func (sg *SchemaGenerator) handleGraphData(anyValue *anypb.Any, schema *SchemaIn
 //  3. Sets the IsArray and ArrayType fields in the TypeInfo
 //
 // Parameters:
-//   - anyValue: The protobuf Any value containing list data
+//   - structValue: The protobuf struct value containing list data
 //   - schema: The base schema to populate with item information
 //
 // Returns:
 //   - *SchemaInfo: The complete schema with item information
 //   - error: Any error that occurred during processing
-func (sg *SchemaGenerator) handleListData(anyValue *anypb.Any, schema *SchemaInfo) (*SchemaInfo, error) {
-	// Unpack the Any value to get the underlying message
-	message, err := anyValue.UnmarshalNew()
-	if err != nil {
-		return nil, err
-	}
-
-	// Get the struct value from the message
-	structValue, ok := message.(*structpb.Struct)
-	if !ok {
-		return nil, fmt.Errorf("expected struct value for list data")
-	}
-
-	// Get the attributes field which contains the list data
-	attributes, ok := structValue.Fields["attributes"]
-	if !ok {
-		return nil, fmt.Errorf("attributes field not found")
-	}
-
-	// Handle both direct list values and lists wrapped in a struct
-	switch attr := attributes.GetKind().(type) {
-	case *structpb.Value_ListValue:
-		// If attributes is a direct list, use it
-		if len(attr.ListValue.Values) == 0 {
-			schema.TypeInfo.IsArray = true
-			schema.TypeInfo.ArrayType = &typeinference.TypeInfo{Type: typeinference.StringType}
-			return schema, nil
+func (sg *SchemaGenerator) handleListData(structValue *structpb.Struct, schema *SchemaInfo) (*SchemaInfo, error) {
+	// Find the first list field
+	var listField *structpb.Value
+	for _, field := range structValue.Fields {
+		if _, ok := field.GetKind().(*structpb.Value_ListValue); ok {
+			listField = field
+			break
 		}
+	}
 
-		// Create a new Any value for the first item
+	if listField == nil {
+		return nil, fmt.Errorf("no list field found")
+	}
+
+	// Get the list value
+	listVal, ok := listField.GetKind().(*structpb.Value_ListValue)
+	if !ok {
+		return nil, fmt.Errorf("field is not a list")
+	}
+
+	// If the list is empty, return the schema as is
+	if len(listVal.ListValue.Values) == 0 {
+		schema.TypeInfo.IsArray = true
+		schema.TypeInfo.ArrayType = &typeinference.TypeInfo{Type: typeinference.StringType}
+		return schema, nil
+	}
+
+	// Get the first item's value
+	firstItem := listVal.ListValue.Values[0]
+
+	// Create a schema for the item based on its type
+	var itemSchema *SchemaInfo
+	switch itemValue := firstItem.GetKind().(type) {
+	case *structpb.Value_StructValue:
+		// For struct values, create a new Any value and generate schema
 		itemAny, err := anypb.New(&structpb.Struct{
-			Fields: map[string]*structpb.Value{
-				"attributes": attr.ListValue.Values[0],
-			},
+			Fields: itemValue.StructValue.Fields,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to create item Any value: %v", err)
 		}
-
-		// Generate schema for the item
-		itemSchema, err := sg.GenerateSchema(itemAny)
+		itemSchema, err = sg.GenerateSchema(itemAny)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate item schema: %v", err)
 		}
-
-		schema.Items = itemSchema
-		schema.TypeInfo.IsArray = true
-		schema.TypeInfo.ArrayType = itemSchema.TypeInfo
-		return schema, nil
-
-	case *structpb.Value_StructValue:
-		// If attributes is a struct, find the first list field
-		var listField *structpb.Value
-		var listFieldName string
-		for name, field := range attr.StructValue.Fields {
-			if _, ok := field.GetKind().(*structpb.Value_ListValue); ok {
-				listField = field
-				listFieldName = name
-				break
+	case *structpb.Value_StringValue:
+		// For string values
+		itemSchema = &SchemaInfo{
+			StorageType: storageinference.ScalarData,
+			TypeInfo:    &typeinference.TypeInfo{Type: typeinference.StringType},
+		}
+	case *structpb.Value_NumberValue:
+		// For number values, check if it's an integer
+		num := itemValue.NumberValue
+		if num == float64(int64(num)) {
+			itemSchema = &SchemaInfo{
+				StorageType: storageinference.ScalarData,
+				TypeInfo:    &typeinference.TypeInfo{Type: typeinference.IntType},
+			}
+		} else {
+			itemSchema = &SchemaInfo{
+				StorageType: storageinference.ScalarData,
+				TypeInfo:    &typeinference.TypeInfo{Type: typeinference.FloatType},
 			}
 		}
-
-		if listField == nil {
-			return nil, fmt.Errorf("no list field found in attributes")
+	case *structpb.Value_BoolValue:
+		// For boolean values
+		itemSchema = &SchemaInfo{
+			StorageType: storageinference.ScalarData,
+			TypeInfo:    &typeinference.TypeInfo{Type: typeinference.BoolType},
 		}
-
-		// Get the list value
-		listVal, ok := listField.GetKind().(*structpb.Value_ListValue)
-		if !ok {
-			return nil, fmt.Errorf("field %s is not a list", listFieldName)
+	case *structpb.Value_NullValue:
+		// For null values
+		itemSchema = &SchemaInfo{
+			StorageType: storageinference.ScalarData,
+			TypeInfo:    &typeinference.TypeInfo{Type: typeinference.NullType, IsNullable: true},
 		}
-
-		// If the list is empty, return the schema as is
-		if len(listVal.ListValue.Values) == 0 {
-			schema.TypeInfo.IsArray = true
-			schema.TypeInfo.ArrayType = &typeinference.TypeInfo{Type: typeinference.StringType}
-			return schema, nil
-		}
-
-		// Create a new Any value for the first item
-		itemAny, err := anypb.New(&structpb.Struct{
-			Fields: map[string]*structpb.Value{
-				"attributes": listVal.ListValue.Values[0],
-			},
-		})
+	default:
+		// For other types, create a new Any value and generate schema
+		itemAny, err := anypb.New(firstItem)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create item Any value: %v", err)
 		}
-
-		// Generate schema for the item
-		itemSchema, err := sg.GenerateSchema(itemAny)
+		itemSchema, err = sg.GenerateSchema(itemAny)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate item schema: %v", err)
 		}
-
-		schema.Items = itemSchema
-		schema.TypeInfo.IsArray = true
-		schema.TypeInfo.ArrayType = itemSchema.TypeInfo
-		return schema, nil
-
-	default:
-		return nil, fmt.Errorf("attributes is not a list or struct containing a list")
 	}
+
+	schema.Items = itemSchema
+	schema.TypeInfo.IsArray = true
+	schema.TypeInfo.ArrayType = itemSchema.TypeInfo
+	return schema, nil
 }
 
 // handleMapData processes map data and generates property schemas.
@@ -626,80 +886,92 @@ func (sg *SchemaGenerator) handleListData(anyValue *anypb.Any, schema *SchemaInf
 //     - Adds the property schema to the Properties map
 //
 // Parameters:
-//   - anyValue: The protobuf Any value containing map data
+//   - structValue: The protobuf struct value containing map data
 //   - schema: The base schema to populate with property information
 //
 // Returns:
 //   - *SchemaInfo: The complete schema with property information
 //   - error: Any error that occurred during processing
-func (sg *SchemaGenerator) handleMapData(anyValue *anypb.Any, schema *SchemaInfo) (*SchemaInfo, error) {
-	// Unpack the Any value to get the underlying message
-	message, err := anyValue.UnmarshalNew()
-	if err != nil {
-		return nil, err
-	}
-
-	// Get the struct value from the message
-	structValue, ok := message.(*structpb.Struct)
-	if !ok {
-		return nil, fmt.Errorf("expected struct value for map data")
-	}
-
-	// Get the attributes field which contains the map data
-	attributes, ok := structValue.Fields["attributes"]
-	if !ok {
-		return nil, fmt.Errorf("attributes field not found")
-	}
-
-	// Get the struct value from attributes
-	attrStruct, ok := attributes.GetKind().(*structpb.Value_StructValue)
-	if !ok {
-		return nil, fmt.Errorf("attributes is not a struct")
-	}
-
-	// Find the first struct field that contains key-value pairs
-	var mapField *structpb.Value
-	var mapFieldName string
-	for name, field := range attrStruct.StructValue.Fields {
-		if _, ok := field.GetKind().(*structpb.Value_StructValue); ok {
-			mapField = field
-			mapFieldName = name
-			break
-		}
-	}
-
-	if mapField == nil {
-		return nil, fmt.Errorf("no map field found in attributes")
-	}
-
-	// Get the struct value from the map field
-	mapStruct, ok := mapField.GetKind().(*structpb.Value_StructValue)
-	if !ok {
-		return nil, fmt.Errorf("field %s is not a struct", mapFieldName)
-	}
-
+func (sg *SchemaGenerator) handleMapData(structValue *structpb.Struct, schema *SchemaInfo) (*SchemaInfo, error) {
 	// Initialize the Properties map
 	schema.Properties = make(map[string]*SchemaInfo)
 
-	// Process each property in the map
-	for propName, propValue := range mapStruct.StructValue.Fields {
-		// Create a new Any value for the property
-		propAny, err := anypb.New(&structpb.Struct{
-			Fields: map[string]*structpb.Value{
-				"attributes": propValue,
-			},
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to create property Any value: %v", err)
+	// Check if we have a "properties" field
+	if props, ok := structValue.Fields["properties"]; ok {
+		if propStruct, ok := props.GetKind().(*structpb.Value_StructValue); ok {
+			// Process properties from the properties field
+			for fieldName, fieldValue := range propStruct.StructValue.Fields {
+				if _, ok := fieldValue.GetKind().(*structpb.Value_StructValue); ok {
+					// Property is a struct, recurse as before
+					propStruct := &structpb.Struct{
+						Fields: map[string]*structpb.Value{
+							fieldName: fieldValue,
+						},
+					}
+					propAny, err := anypb.New(propStruct)
+					if err != nil {
+						return nil, fmt.Errorf("failed to create property Any value: %v", err)
+					}
+					propTypeSchema, err := sg.GenerateSchema(propAny)
+					if err != nil {
+						return nil, fmt.Errorf("failed to generate property schema: %v", err)
+					}
+					schema.Properties[fieldName] = propTypeSchema
+				} else {
+					// Property is a scalar, handle directly
+					scalarStruct := &structpb.Struct{
+						Fields: map[string]*structpb.Value{
+							fieldName: fieldValue,
+						},
+					}
+					scalarSchema, err := sg.handleScalarData(scalarStruct, &SchemaInfo{
+						StorageType: storageinference.ScalarData,
+						TypeInfo:    &typeinference.TypeInfo{},
+					})
+					if err != nil {
+						return nil, fmt.Errorf("failed to generate scalar property schema: %v", err)
+					}
+					schema.Properties[fieldName] = scalarSchema
+				}
+			}
+			return schema, nil
 		}
+	}
 
-		// Generate schema for the property
-		propSchema, err := sg.GenerateSchema(propAny)
-		if err != nil {
-			return nil, fmt.Errorf("failed to generate property schema: %v", err)
+	// If no properties field, process fields directly
+	for fieldName, fieldValue := range structValue.Fields {
+		if _, ok := fieldValue.GetKind().(*structpb.Value_StructValue); ok {
+			// Property is a struct, recurse as before
+			propStruct := &structpb.Struct{
+				Fields: map[string]*structpb.Value{
+					fieldName: fieldValue,
+				},
+			}
+			propAny, err := anypb.New(propStruct)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create property Any value: %v", err)
+			}
+			propTypeSchema, err := sg.GenerateSchema(propAny)
+			if err != nil {
+				return nil, fmt.Errorf("failed to generate property schema: %v", err)
+			}
+			schema.Properties[fieldName] = propTypeSchema
+		} else {
+			// Property is a scalar, handle directly
+			scalarStruct := &structpb.Struct{
+				Fields: map[string]*structpb.Value{
+					fieldName: fieldValue,
+				},
+			}
+			scalarSchema, err := sg.handleScalarData(scalarStruct, &SchemaInfo{
+				StorageType: storageinference.ScalarData,
+				TypeInfo:    &typeinference.TypeInfo{},
+			})
+			if err != nil {
+				return nil, fmt.Errorf("failed to generate scalar property schema: %v", err)
+			}
+			schema.Properties[fieldName] = scalarSchema
 		}
-
-		schema.Properties[propName] = propSchema
 	}
 
 	return schema, nil
@@ -716,82 +988,45 @@ func (sg *SchemaGenerator) handleMapData(anyValue *anypb.Any, schema *SchemaInfo
 //  3. Updates the schema with the inferred type information
 //
 // Parameters:
-//   - anyValue: The protobuf Any value containing scalar data
+//   - structValue: The protobuf struct value containing scalar data
 //   - schema: The base schema to populate with type information
 //
 // Returns:
 //   - *SchemaInfo: The complete schema with type information
 //   - error: Any error that occurred during processing
-func (sg *SchemaGenerator) handleScalarData(anyValue *anypb.Any, schema *SchemaInfo) (*SchemaInfo, error) {
-	// Unpack the Any value to get the underlying message
-	message, err := anyValue.UnmarshalNew()
-	if err != nil {
-		return nil, err
+func (sg *SchemaGenerator) handleScalarData(structValue *structpb.Struct, schema *SchemaInfo) (*SchemaInfo, error) {
+	// Find the first scalar field
+	var scalarField *structpb.Value
+	for _, field := range structValue.Fields {
+		switch field.GetKind().(type) {
+		case *structpb.Value_StringValue, *structpb.Value_NumberValue, *structpb.Value_BoolValue, *structpb.Value_NullValue:
+			scalarField = field
+			break
+		}
 	}
 
-	// Get the struct value from the message
-	structValue, ok := message.(*structpb.Struct)
-	if !ok {
-		return nil, fmt.Errorf("expected struct value for scalar data")
+	if scalarField == nil {
+		return nil, fmt.Errorf("no scalar field found")
 	}
 
-	// Get the attributes field which contains the scalar data
-	attributes, ok := structValue.Fields["attributes"]
-	if !ok {
-		return nil, fmt.Errorf("attributes field not found")
+	// Create a schema based on the scalar type
+	switch scalarField.GetKind().(type) {
+	case *structpb.Value_StringValue:
+		schema.TypeInfo.Type = typeinference.StringType
+	case *structpb.Value_NumberValue:
+		// Check if the number is an integer
+		num := scalarField.GetNumberValue()
+		if num == float64(int64(num)) {
+			schema.TypeInfo.Type = typeinference.IntType
+		} else {
+			schema.TypeInfo.Type = typeinference.FloatType
+		}
+	case *structpb.Value_BoolValue:
+		schema.TypeInfo.Type = typeinference.BoolType
+	case *structpb.Value_NullValue:
+		schema.TypeInfo.Type = typeinference.NullType
+		schema.TypeInfo.IsNullable = true
 	}
 
-	// Handle both direct values and values wrapped in a struct
-	switch attr := attributes.GetKind().(type) {
-	case *structpb.Value_StructValue:
-		// If attributes is a struct, find the first scalar field
-		var scalarField *structpb.Value
-		for _, field := range attr.StructValue.Fields {
-			// Check if the field is a scalar value (not a struct or list)
-			switch field.GetKind().(type) {
-			case *structpb.Value_NumberValue, *structpb.Value_StringValue,
-				*structpb.Value_BoolValue, *structpb.Value_NullValue:
-				scalarField = field
-			}
-		}
-
-		if scalarField == nil {
-			return nil, fmt.Errorf("no scalar field found in attributes")
-		}
-
-		// Create a new Any value for the scalar value
-		valueAny, err := anypb.New(&structpb.Struct{
-			Fields: map[string]*structpb.Value{
-				"attributes": scalarField,
-			},
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to create value Any: %v", err)
-		}
-		// Use type inference directly
-		typeInfo, err := sg.typeInferrer.InferType(valueAny)
-		if err != nil {
-			return nil, fmt.Errorf("failed to infer type: %v", err)
-		}
-		schema.TypeInfo = typeInfo
-		return schema, nil
-
-	default:
-		// If attributes is a direct value, use it directly
-		valueAny, err := anypb.New(&structpb.Struct{
-			Fields: map[string]*structpb.Value{
-				"attributes": attributes,
-			},
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to create value Any: %v", err)
-		}
-		// Use type inference directly
-		typeInfo, err := sg.typeInferrer.InferType(valueAny)
-		if err != nil {
-			return nil, fmt.Errorf("failed to infer type: %v", err)
-		}
-		schema.TypeInfo = typeInfo
-		return schema, nil
-	}
+	return schema, nil
 }
