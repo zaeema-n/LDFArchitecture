@@ -74,14 +74,32 @@ function testMetadataHandling() returns error? {
     // Create entity
     Entity createEntityResponse = check ep->CreateEntity(createEntityRequest);
     io:println("Entity created with ID: " + createEntityResponse.id);
+    io:println("Created entity metadata: ", createEntityResponse.metadata);
     
     // Read entity
     ReadEntityRequest readEntityRequest = {
         id: testId,
-        entity: {},
+        entity: {
+            id: testId,
+            kind: {},
+            created: "",
+            terminated: "",
+            name: {
+                startTime: "",
+                endTime: "",
+                value: check pbAny:pack("")
+            },
+            metadata: [],
+            attributes: [],
+            relationships: []
+        },
         output: ["metadata"]
     };
+    io:println("ReadEntityRequest: ", readEntityRequest);
     Entity readEntityResponse = check ep->ReadEntity(readEntityRequest);
+    io:println("Entity retrieved, verifying data...");
+    io:println("Retrieved entity: ", readEntityResponse);
+    io:println("Retrieved entity metadata: ", readEntityResponse.metadata);
     
     // Verify metadata values
     map<string> actualValues = {};
@@ -118,7 +136,20 @@ function testMetadataUnpackError() returns error? {
     // Try to read a non-existent entity
     ReadEntityRequest readEntityRequest = {
         id: "non-existent-entity",
-        entity: {},
+        entity: {
+            id: "non-existent-entity",
+            kind: {},
+            created: "",
+            terminated: "",
+            name: {
+                startTime: "",
+                endTime: "",
+                value: check pbAny:pack("")
+            },
+            metadata: [],
+            attributes: [],
+            relationships: []
+        },
         output: ["metadata"]
     };
     Entity|error response = ep->ReadEntity(readEntityRequest);
@@ -177,7 +208,20 @@ function testMetadataUpdating() returns error? {
     // Verify initial metadata
     ReadEntityRequest readEntityRequest = {
         id: testId,
-        entity: {},
+        entity: {
+            id: testId,
+            kind: {},
+            created: "",
+            terminated: "",
+            name: {
+                startTime: "",
+                endTime: "",
+                value: check pbAny:pack("")
+            },
+            metadata: [],
+            attributes: [],
+            relationships: []
+        },
         output: ["metadata"]
     };
     Entity initialReadResponse = check ep->ReadEntity(readEntityRequest);
@@ -221,7 +265,20 @@ function testMetadataUpdating() returns error? {
     // Verify updated metadata
     ReadEntityRequest updatedReadRequest = {
         id: testId,
-        entity: {},
+        entity: {
+            id: testId,
+            kind: {},
+            created: "",
+            terminated: "",
+            name: {
+                startTime: "",
+                endTime: "",
+                value: check pbAny:pack("")
+            },
+            metadata: [],
+            attributes: [],
+            relationships: []
+        },
         output: ["metadata"]
     };
     Entity updatedReadResponse = check ep->ReadEntity(updatedReadRequest);
@@ -294,15 +351,32 @@ function testEntityReading() returns error? {
     // Create entity
     Entity createEntityResponse = check ep->CreateEntity(createEntityRequest);
     io:println("Test entity created with ID: " + createEntityResponse.id);
+    io:println("Created entity metadata: ", createEntityResponse.metadata);
     
     // Read the entity
     ReadEntityRequest readEntityRequest = {
         id: testId,
-        entity: {},
+        entity: {
+            id: testId,
+            kind: {},
+            created: "",
+            terminated: "",
+            name: {
+                startTime: "",
+                endTime: "",
+                value: check pbAny:pack("")
+            },
+            metadata: [],
+            attributes: [],
+            relationships: []
+        },
         output: ["metadata"]
     };
+    io:println("ReadEntityRequest: ", readEntityRequest);
     Entity readEntityResponse = check ep->ReadEntity(readEntityRequest);
     io:println("Entity retrieved, verifying data...");
+    io:println("Retrieved entity: ", readEntityResponse);
+    io:println("Retrieved entity metadata: ", readEntityResponse.metadata);
     
     // Verify entity fields
     test:assertEquals(readEntityResponse.id, testId, "Entity ID mismatch");
@@ -326,7 +400,20 @@ function testEntityReading() returns error? {
     string nonExistentId = "non-existent-entity-" + testId;
     ReadEntityRequest nonExistentRequest = {
         id: nonExistentId,
-        entity: {},
+        entity: {
+            id: nonExistentId,
+            kind: {},
+            created: "",
+            terminated: "",
+            name: {
+                startTime: "",
+                endTime: "",
+                value: check pbAny:pack("")
+            },
+            metadata: [],
+            attributes: [],
+            relationships: []
+        },
         output: ["metadata"]
     };
     Entity nonExistentEntity = check ep->ReadEntity(nonExistentRequest);
@@ -384,8 +471,21 @@ function testCreateMinimalGraphEntity() returns error? {
     // Verify entity was created correctly
     ReadEntityRequest readEntityRequest = {
         id: testId,
-        entity: {},
-        output: ["id", "kind", "metadata", "attributes", "relationships"]
+        entity: {
+            id: testId,
+            kind: {},
+            created: "",
+            terminated: "",
+            name: {
+                startTime: "",
+                endTime: "",
+                value: check pbAny:pack("")
+            },
+            metadata: [],
+            attributes: [],
+            relationships: []
+        },
+        output: ["metadata", "attributes", "relationships"]
     };
     Entity readEntityResponse = check ep->ReadEntity(readEntityRequest);
     
@@ -455,8 +555,21 @@ function testCreateMinimalGraphEntityViaRest() returns error? {
     // Verify entity data
     ReadEntityRequest readEntityRequest = {
         id: testId,
-        entity: {},
-        output: ["id", "kind", "metadata", "attributes", "relationships"]
+        entity: {
+            id: testId,
+            kind: {},
+            created: "",
+            terminated: "",
+            name: {
+                startTime: "",
+                endTime: "",
+                value: check pbAny:pack("")
+            },
+            metadata: [],
+            attributes: [],
+            relationships: []
+        },
+        output: ["metadata","attributes", "relationships"]
     };
     Entity readEntityResponse = check ep->ReadEntity(readEntityRequest);
     
@@ -584,7 +697,20 @@ function testEntityWithRelationship() returns error? {
     // Read source entity to verify relationship
     ReadEntityRequest readEntityRequest = {
         id: sourceEntityId,
-        entity: {},
+        entity: {
+            id: sourceEntityId,
+            kind: {},
+            created: "",
+            terminated: "",
+            name: {
+                startTime: "",
+                endTime: "",
+                value: check pbAny:pack("")
+            },
+            metadata: [],
+            attributes: [],
+            relationships: []
+        },
         output: ["relationships"]
     };
     Entity readEntityResponse = check ep->ReadEntity(readEntityRequest);

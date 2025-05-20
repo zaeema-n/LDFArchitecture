@@ -63,7 +63,7 @@ func (s *Server) CreateEntity(ctx context.Context, req *pb.Entity) (*pb.Entity, 
 
 // ReadEntity retrieves an entity's metadata
 func (s *Server) ReadEntity(ctx context.Context, req *pb.ReadEntityRequest) (*pb.Entity, error) {
-	log.Printf("Reading Entity: %s with output fields: %v", req.Id, req.Output)
+	log.Printf(">>>> Reading Entity: %s with output fields: %v", req.Id, req.Output)
 
 	// Initialize a complete response entity with empty fields
 	response := &pb.Entity{
