@@ -744,4 +744,212 @@ function testEntityWithRelationship() returns error? {
     return;
 }
 
+@test:Config {
+    groups: ["entity", "attributes"]
+}
+function testEntityWithTabularAttributes() returns error? {
+    // Test ID for entity
+    string testId = "test-entity-tabular";
+    
+    // Initialize the gRPC client to verify entity
+    CrudServiceClient ep = check new (testCrudServiceUrl);
+    
+    // Create entity with tabular data in attributes
+    json salaryGraph = {
+        "nodes": [
+            {"id": "salary_2024", "type": "salary_record", "properties": {"year": "2024", "amount": "100000", "bonus": "10000", "department": "Engineering"}},
+            {"id": "salary_2023", "type": "salary_record", "properties": {"year": "2023", "amount": "90000", "bonus": "8000", "department": "Engineering"}},
+            {"id": "salary_2022", "type": "salary_record", "properties": {"year": "2022", "amount": "80000", "bonus": "5000", "department": "Engineering"}},
+            {"id": "dept_eng", "type": "department", "properties": {"name": "Engineering", "location": "HQ"}}
+        ],
+        "edges": [
+            {"source": "salary_2024", "target": "dept_eng", "type": "belongs_to", "properties": {"effective_date": "2024-01-01"}},
+            {"source": "salary_2023", "target": "dept_eng", "type": "belongs_to", "properties": {"effective_date": "2023-01-01"}},
+            {"source": "salary_2022", "target": "dept_eng", "type": "belongs_to", "properties": {"effective_date": "2022-01-01"}},
+            {"source": "salary_2024", "target": "salary_2023", "type": "promotion", "properties": {"date": "2024-01-01", "increase": "10000"}},
+            {"source": "salary_2023", "target": "salary_2022", "type": "promotion", "properties": {"date": "2023-01-01", "increase": "10000"}}
+        ]
+    };
+
+    json projectGraph = {
+        "nodes": [
+            {"id": "proj_redesign", "type": "project", "properties": {"id": "P001", "name": "System Redesign", "status": "active"}},
+            {"id": "proj_migration", "type": "project", "properties": {"id": "P002", "name": "API Migration", "status": "completed"}},
+            {"id": "proj_audit", "type": "project", "properties": {"id": "P003", "name": "Security Audit", "status": "completed"}},
+            {"id": "role_lead", "type": "role", "properties": {"title": "Lead Developer", "level": "senior"}},
+            {"id": "role_dev", "type": "role", "properties": {"title": "Developer", "level": "mid"}}
+        ],
+        "edges": [
+            {"source": "proj_redesign", "target": "role_lead", "type": "has_role", "properties": {"start_date": "2024-01-01", "end_date": ""}},
+            {"source": "proj_migration", "target": "role_dev", "type": "has_role", "properties": {"start_date": "2023-06-01", "end_date": "2023-12-31"}},
+            {"source": "proj_audit", "target": "role_dev", "type": "has_role", "properties": {"start_date": "2023-01-01", "end_date": "2023-05-31"}},
+            {"source": "proj_redesign", "target": "proj_migration", "type": "follows", "properties": {"transition_date": "2023-12-31"}},
+            {"source": "proj_migration", "target": "proj_audit", "type": "follows", "properties": {"transition_date": "2023-05-31"}}
+        ]
+    };
+
+    Entity createEntityRequest = {
+        id: testId,
+        kind: {
+            major: "test",
+            minor: "graph"
+        },
+        created: "2024-01-01T00:00:00Z",
+        terminated: "",
+        name: {
+            startTime: "2024-01-01T00:00:00Z",
+            endTime: "",
+            value: check pbAny:pack("test-entity")
+        },
+        metadata: [
+            {
+                key: "test_metadata",
+                value: check pbAny:pack("test_value")
+            }
+        ],
+        attributes: [
+            {
+                key: "employee_salary_history",
+                value: {
+                    values: [
+                        {
+                            startTime: "2024-01-01T00:00:00Z",
+                            endTime: "",
+                            value: check pbAny:pack(salaryGraph.toJsonString())
+                        }
+                    ]
+                }
+            },
+            {
+                key: "project_assignments",
+                value: {
+                    values: [
+                        {
+                            startTime: "2024-01-01T00:00:00Z",
+                            endTime: "",
+                            value: check pbAny:pack(projectGraph.toJsonString())
+                        }
+                    ]
+                }
+            }
+        ],
+        relationships: []
+    };
+
+    // Create entity via gRPC
+    Entity createEntityResponse = check ep->CreateEntity(createEntityRequest);
+    io:println("Entity created with ID: " + createEntityResponse.id);
+    
+    // Read entity to verify attributes
+    EntityId readEntityRequest = {id: testId};
+    Entity readEntityResponse = check ep->ReadEntity(readEntityRequest);
+
+    io:println("Entity: " + readEntityResponse.toJsonString());
+    
+    // Verify basic entity data
+    test:assertEquals(readEntityResponse.id, testId, "Entity ID doesn't match");
+    test:assertEquals(readEntityResponse.kind.major, "test", "Entity kind.major doesn't match");
+    test:assertEquals(readEntityResponse.kind.minor, "graph", "Entity kind.minor doesn't match");
+    
+    // Verify metadata
+    test:assertTrue(readEntityResponse.metadata.length() > 0, "Entity should have metadata");
+    boolean foundMetadata = false;
+    foreach var item in readEntityResponse.metadata {
+        if item.key == "test_metadata" {
+            string|error unwrapped = unwrapAny(item.value);
+            if unwrapped is string {
+                test:assertEquals(unwrapped.trim(), "test_value", "Metadata value doesn't match");
+                foundMetadata = true;
+            }
+        }
+    }
+    test:assertTrue(foundMetadata, "Expected metadata key not found");
+    
+    // Verify attributes
+    test:assertTrue(readEntityResponse.attributes.length() > 0, "Entity should have attributes");
+    boolean foundSalaryHistory = false;
+    boolean foundProjectAssignments = false;
+    
+    foreach var attr in readEntityResponse.attributes {
+        if attr.key == "employee_salary_history" {
+            foundSalaryHistory = true;
+            test:assertTrue(attr.value.values.length() > 0, "Salary history should have values");
+            
+            // Parse the graph data
+            json|error graphData = check unwrapAny(attr.value.values[0].value);
+            if graphData is json {
+                json parsedData = <json>graphData;
+                test:assertTrue(parsedData is map<json>, "Graph data should be a map");
+                
+                // Verify nodes
+                map<json> dataMap = <map<json>>parsedData;
+                json nodesJson = dataMap["nodes"];
+                json[] nodes = <json[]>nodesJson;
+                test:assertEquals(nodes.length(), 4, "Should have 4 nodes");
+                
+                // Verify first node data
+                map<json> firstNode = <map<json>>nodes[0];
+                test:assertEquals(firstNode["id"], "salary_2024", "First node id should be 'salary_2024'");
+                test:assertEquals(firstNode["type"], "salary_record", "First node type should be 'salary_record'");
+                
+                // Verify node properties
+                map<json> properties = <map<json>>firstNode["properties"];
+                test:assertEquals(properties["year"], "2024", "Year should be 2024");
+                test:assertEquals(properties["amount"], "100000", "Amount should be 100000");
+            }
+        }
+        if attr.key == "project_assignments" {
+            foundProjectAssignments = true;
+            test:assertTrue(attr.value.values.length() > 0, "Project assignments should have values");
+            
+            // Parse the graph data
+            json|error graphData = check unwrapAny(attr.value.values[0].value);
+            if graphData is json {
+                json parsedData = <json>graphData;
+                test:assertTrue(parsedData is map<json>, "Graph data should be a map");
+                
+                // Verify nodes
+                map<json> dataMap = <map<json>>parsedData;
+                json nodesJson = dataMap["nodes"];
+                json[] nodes = <json[]>nodesJson;
+                test:assertEquals(nodes.length(), 5, "Should have 5 nodes");
+                
+                // Verify first node data
+                map<json> firstNode = <map<json>>nodes[0];
+                test:assertEquals(firstNode["id"], "proj_redesign", "First node id should be 'proj_redesign'");
+                test:assertEquals(firstNode["type"], "project", "First node type should be 'project'");
+                
+                // Verify node properties
+                map<json> properties = <map<json>>firstNode["properties"];
+                test:assertEquals(properties["id"], "P001", "Project ID should be P001");
+                test:assertEquals(properties["name"], "System Redesign", "Project name should be System Redesign");
+            }
+        }
+    }
+    
+    test:assertTrue(foundSalaryHistory, "Salary history attribute not found");
+    test:assertTrue(foundProjectAssignments, "Project assignments attribute not found");
+    
+    // Verify relationships
+    test:assertTrue(readEntityResponse.relationships.length() > 0, "Entity should have relationships");
+    boolean foundRelationship = false;
+    foreach var rel in readEntityResponse.relationships {
+        if rel.key == "reports_to" {
+            foundRelationship = true;
+            test:assertEquals(rel.value.relatedEntityId, "manager123", "Related entity ID doesn't match");
+            test:assertEquals(rel.value.name, "reports_to", "Relationship name doesn't match");
+            test:assertEquals(rel.value.startTime, "2024-01-01T00:00:00Z", "Relationship start time doesn't match");
+            test:assertEquals(rel.value.id, "rel123", "Relationship ID doesn't match");
+        }
+    }
+    test:assertTrue(foundRelationship, "Expected relationship not found");
+    
+    // Clean up
+    Empty _ = check ep->DeleteEntity(readEntityRequest);
+    Empty _ = check ep->DeleteEntity({id: testId});
+    io:println("Test entity with graph attributes deleted");
+    
+    return;
+}
+
 

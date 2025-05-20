@@ -12,6 +12,7 @@ import (
 
 	mongorepository "lk/datafoundation/crud-api/db/repository/mongo"
 	neo4jrepository "lk/datafoundation/crud-api/db/repository/neo4j"
+	postgres "lk/datafoundation/crud-api/db/repository/postgres"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -59,6 +60,7 @@ func (s *Server) CreateEntity(ctx context.Context, req *pb.Entity) (*pb.Entity, 
 	}
 
 	// TODO: Add logic to handle attributes
+	postgres.HandleAttributes(req.Attributes)
 	return req, nil
 }
 

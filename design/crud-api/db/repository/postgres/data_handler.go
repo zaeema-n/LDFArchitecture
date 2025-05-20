@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"log"
 
+	pb "lk/datafoundation/crud-api/lk/datafoundation/crud-api"
+	"lk/datafoundation/crud-api/pkg/schema"
+
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 )
@@ -27,15 +30,17 @@ func UnmarshalTimeBasedValueList(anyValue *anypb.Any) ([]interface{}, error) {
 		return nil, nil
 	}
 
-	// TODO: Replace with your actual TimeBasedValueList message type
-	var timeBasedValueList any // Replace with actual type
+	var timeBasedValueList pb.TimeBasedValueList
 	if err := anyValue.UnmarshalTo(&timeBasedValueList); err != nil {
 		return nil, fmt.Errorf("error unmarshaling to TimeBasedValueList: %v", err)
 	}
 
-	// TODO: Convert timeBasedValueList to []interface{} based on your actual type
-	// This is a placeholder - you'll need to implement the actual conversion
-	return nil, nil
+	// Convert TimeBasedValueList to []interface{}
+	result := make([]interface{}, len(timeBasedValueList.Values))
+	for i, v := range timeBasedValueList.Values {
+		result[i] = v
+	}
+	return result, nil
 }
 
 // UnmarshalEntityAttributes unmarshals the attributes map from a protobuf Entity
@@ -65,5 +70,83 @@ func UnmarshalEntityAttributes(attributes map[string]*anypb.Any) (map[string]int
 		log.Printf("Warning: Could not unmarshal attribute %s with type %s", key, value.TypeUrl)
 	}
 
+	return result, nil
+}
+
+func HandleAttributes(attributes map[string]*pb.TimeBasedValueList) (map[string]interface{}, error) {
+	log.Printf("--------------Handling Attributes------------------")
+	log.Printf("Handling attributes: %v", attributes)
+
+	if attributes == nil {
+		return nil, nil
+	}
+
+	// Print each attribute's key and values
+	for key, value := range attributes {
+		if value != nil {
+			log.Printf("Attribute - Key: %s, Values: %v", key, value.Values)
+		}
+		log.Printf("Attribute - Key: %s", key)
+		log.Printf("Attribute - Values: %v", value.Values)
+	}
+
+	result := make(map[string]interface{})
+	for key, value := range attributes {
+		if value != nil {
+			values := value.Values
+			for i, val := range values {
+				log.Printf("Processing value %d: %v", i, val)
+				if val != nil {
+					log.Printf("Value details - StartTime: %s, EndTime: %s, Value: %v",
+						val.GetStartTime(),
+						val.GetEndTime(),
+						val.GetValue())
+
+					// Handle StringValue type
+					if val.GetValue().TypeUrl == "type.googleapis.com/google.protobuf.StringValue" {
+						var stringValue wrapperspb.StringValue
+						if err := val.GetValue().UnmarshalTo(&stringValue); err != nil {
+							log.Printf("Failed to unmarshal StringValue: %v", err)
+							continue
+						}
+						log.Printf("StringValue details - TypeUrl: %s, Value: %q, IsEmpty: %v",
+							val.GetValue().TypeUrl,
+							stringValue.Value,
+							stringValue.Value == "")
+
+						// Try to get raw value
+						rawValue, err := val.GetValue().UnmarshalNew()
+						if err != nil {
+							log.Printf("Failed to get raw value: %v", err)
+						} else {
+							log.Printf("Raw value: %+v", rawValue)
+						}
+					}
+
+					// Create a new Any value from the current value
+					anyValue, err := anypb.New(val.GetValue())
+					if err != nil {
+						log.Printf("Failed to create Any value: %v", err)
+						continue
+					}
+
+					// Generate schema for this value
+					schemaGenerator := schema.NewSchemaGenerator()
+					schemaInfo, err := schemaGenerator.GenerateSchema(anyValue)
+					if err != nil {
+						log.Printf("Failed to generate schema: %v", err)
+						continue
+					}
+
+					// Log the schema information
+					log.Printf("Schema for value %d: StorageType=%v, TypeInfo=%v",
+						i,
+						schemaInfo.StorageType,
+						schemaInfo.TypeInfo)
+				}
+			}
+			result[key] = values
+		}
+	}
 	return result, nil
 }
