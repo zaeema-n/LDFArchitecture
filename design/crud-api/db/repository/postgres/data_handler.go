@@ -102,37 +102,9 @@ func HandleAttributes(attributes map[string]*pb.TimeBasedValueList) (map[string]
 						val.GetEndTime(),
 						val.GetValue())
 
-					// Handle StringValue type
-					if val.GetValue().TypeUrl == "type.googleapis.com/google.protobuf.StringValue" {
-						var stringValue wrapperspb.StringValue
-						if err := val.GetValue().UnmarshalTo(&stringValue); err != nil {
-							log.Printf("Failed to unmarshal StringValue: %v", err)
-							continue
-						}
-						log.Printf("StringValue details - TypeUrl: %s, Value: %q, IsEmpty: %v",
-							val.GetValue().TypeUrl,
-							stringValue.Value,
-							stringValue.Value == "")
-
-						// Try to get raw value
-						rawValue, err := val.GetValue().UnmarshalNew()
-						if err != nil {
-							log.Printf("Failed to get raw value: %v", err)
-						} else {
-							log.Printf("Raw value: %+v", rawValue)
-						}
-					}
-
-					// Create a new Any value from the current value
-					anyValue, err := anypb.New(val.GetValue())
-					if err != nil {
-						log.Printf("Failed to create Any value: %v", err)
-						continue
-					}
-
-					// Generate schema for this value
+					// Generate schema directly from the Any value
 					schemaGenerator := schema.NewSchemaGenerator()
-					schemaInfo, err := schemaGenerator.GenerateSchema(anyValue)
+					schemaInfo, err := schemaGenerator.GenerateSchema(val.GetValue())
 					if err != nil {
 						log.Printf("Failed to generate schema: %v", err)
 						continue

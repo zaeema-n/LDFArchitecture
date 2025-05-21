@@ -50,7 +50,7 @@ func (s *Server) CreateEntity(ctx context.Context, req *pb.Entity) (*pb.Entity, 
 		log.Printf("[server.CreateEntity] Successfully saved entity in Neo4j for entity: %s", req.Id)
 	}
 
-	// TODO: Add logic to handle relationships
+	// Handle relationships
 	err = s.neo4jRepo.HandleGraphRelationshipsCreate(ctx, req)
 	if err != nil {
 		log.Printf("[server.CreateEntity] Error saving relationships in Neo4j: %v", err)
@@ -59,8 +59,14 @@ func (s *Server) CreateEntity(ctx context.Context, req *pb.Entity) (*pb.Entity, 
 		log.Printf("[server.CreateEntity] Successfully saved relationships in Neo4j for entity: %s", req.Id)
 	}
 
-	// TODO: Add logic to handle attributes
-	postgres.HandleAttributes(req.Attributes)
+	// Handle attributes
+	_, err = postgres.HandleAttributes(req.Attributes)
+	if err != nil {
+		log.Printf("[server.CreateEntity] Error handling attributes: %v", err)
+		return nil, err
+	}
+
+	// Return the complete entity including attributes
 	return req, nil
 }
 
