@@ -6,166 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"google.golang.org/protobuf/types/known/anypb"
-	"google.golang.org/protobuf/types/known/structpb"
-
-	"lk/datafoundation/crud-api/pkg/typeinference"
 )
-
-// SchemaInfoJSON represents the JSON structure of SchemaInfo
-type SchemaInfoJSON struct {
-	StorageType string                     `json:"storage_type"`
-	TypeInfo    *TypeInfoJSON              `json:"type_info"`
-	Fields      map[string]*SchemaInfoJSON `json:"fields,omitempty"`
-	Items       *SchemaInfoJSON            `json:"items,omitempty"`
-	Properties  map[string]*SchemaInfoJSON `json:"properties,omitempty"`
-}
-
-// TypeInfoJSON represents the JSON structure of TypeInfo
-type TypeInfoJSON struct {
-	Type       string        `json:"type"`
-	IsNullable bool          `json:"is_nullable,omitempty"`
-	IsArray    bool          `json:"is_array,omitempty"`
-	ArrayType  *TypeInfoJSON `json:"array_type,omitempty"`
-}
-
-// SchemaInfoToJSON converts a SchemaInfo to its JSON representation
-func SchemaInfoToJSON(schema *SchemaInfo) (*SchemaInfoJSON, error) {
-	if schema == nil {
-		return nil, nil
-	}
-
-	jsonSchema := &SchemaInfoJSON{
-		StorageType: string(schema.StorageType),
-		TypeInfo:    TypeInfoToJSON(schema.TypeInfo),
-	}
-
-	if schema.Fields != nil {
-		jsonSchema.Fields = make(map[string]*SchemaInfoJSON)
-		for k, v := range schema.Fields {
-			fieldJSON, err := SchemaInfoToJSON(v)
-			if err != nil {
-				return nil, err
-			}
-			jsonSchema.Fields[k] = fieldJSON
-		}
-	}
-
-	if schema.Items != nil {
-		itemsJSON, err := SchemaInfoToJSON(schema.Items)
-		if err != nil {
-			return nil, err
-		}
-		jsonSchema.Items = itemsJSON
-	}
-
-	if schema.Properties != nil {
-		jsonSchema.Properties = make(map[string]*SchemaInfoJSON)
-		for k, v := range schema.Properties {
-			propJSON, err := SchemaInfoToJSON(v)
-			if err != nil {
-				return nil, err
-			}
-			jsonSchema.Properties[k] = propJSON
-		}
-	}
-
-	return jsonSchema, nil
-}
-
-// TypeInfoToJSON converts a TypeInfo to its JSON representation
-func TypeInfoToJSON(typeInfo *typeinference.TypeInfo) *TypeInfoJSON {
-	if typeInfo == nil {
-		return nil
-	}
-
-	jsonTypeInfo := &TypeInfoJSON{
-		Type:       string(typeInfo.Type),
-		IsNullable: typeInfo.IsNullable,
-		IsArray:    typeInfo.IsArray,
-	}
-
-	if typeInfo.ArrayType != nil {
-		jsonTypeInfo.ArrayType = TypeInfoToJSON(typeInfo.ArrayType)
-	}
-
-	return jsonTypeInfo
-}
-
-// JSONToAny converts a JSON string to a protobuf Any value
-func JSONToAny(jsonStr string) (*anypb.Any, error) {
-	var data interface{}
-	if err := json.Unmarshal([]byte(jsonStr), &data); err != nil {
-		return nil, err
-	}
-
-	// Handle scalar values
-	switch v := data.(type) {
-	case float64:
-		// Check if it's an integer
-		if v == float64(int64(v)) {
-			structValue, err := structpb.NewStruct(map[string]interface{}{
-				"value": int64(v),
-			})
-			if err != nil {
-				return nil, err
-			}
-			return anypb.New(structValue)
-		}
-		structValue, err := structpb.NewStruct(map[string]interface{}{
-			"value": v,
-		})
-		if err != nil {
-			return nil, err
-		}
-		return anypb.New(structValue)
-	case string:
-		structValue, err := structpb.NewStruct(map[string]interface{}{
-			"value": v,
-		})
-		if err != nil {
-			return nil, err
-		}
-		return anypb.New(structValue)
-	case bool:
-		structValue, err := structpb.NewStruct(map[string]interface{}{
-			"value": v,
-		})
-		if err != nil {
-			return nil, err
-		}
-		return anypb.New(structValue)
-	case nil:
-		structValue, err := structpb.NewStruct(map[string]interface{}{
-			"value": nil,
-		})
-		if err != nil {
-			return nil, err
-		}
-		return anypb.New(structValue)
-	case []interface{}:
-		// For arrays, create a struct with a "value" field containing the array
-		structValue, err := structpb.NewStruct(map[string]interface{}{
-			"value": v,
-		})
-		if err != nil {
-			return nil, err
-		}
-		return anypb.New(structValue)
-	}
-
-	// Handle objects
-	if obj, ok := data.(map[string]interface{}); ok {
-		// For objects, create a struct directly
-		structValue, err := structpb.NewStruct(obj)
-		if err != nil {
-			return nil, err
-		}
-		return anypb.New(structValue)
-	}
-
-	return nil, fmt.Errorf("unsupported data type: %T", data)
-}
 
 // TestSchemaGeneration tests the schema generation for different data structures
 func TestSchemaGeneration(t *testing.T) {
@@ -686,10 +527,17 @@ func TestSchemaGeneration(t *testing.T) {
 		t.Run(testName, func(t *testing.T) {
 			// Parse input
 			anyValue, err := JSONToAny(tc.input)
+			fmt.Println(">>>>>>> Go Converted JSON to Any")
+			fmt.Println(anyValue)
+			fmt.Println(">>>>>>>")
+
 			assert.NoError(t, err)
 
 			// Generate schema
 			schema, err := generator.GenerateSchema(anyValue)
+			fmt.Println(">>>>>>> Go Generated Schema")
+			fmt.Println(schema)
+			fmt.Println(">>>>>>>")
 			assert.NoError(t, err)
 
 			// Convert schema to JSON
