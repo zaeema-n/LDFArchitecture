@@ -7,6 +7,8 @@ import (
 	pb "lk/datafoundation/crud-api/lk/datafoundation/crud-api"
 	"lk/datafoundation/crud-api/pkg/schema"
 
+	"encoding/json"
+
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 )
@@ -73,6 +75,42 @@ func UnmarshalEntityAttributes(attributes map[string]*anypb.Any) (map[string]int
 	return result, nil
 }
 
+// generateSchema generates schema information for a value
+func generateSchema(value *anypb.Any) (*schema.SchemaInfo, error) {
+	// Generate schema directly from the Any value
+	schemaGenerator := schema.NewSchemaGenerator()
+	return schemaGenerator.GenerateSchema(value)
+}
+
+// logSchemaInfo logs schema information in a readable format
+func logSchemaInfo(schemaInfo *schema.SchemaInfo) {
+	if schemaInfo == nil {
+		log.Printf("Schema is nil")
+		return
+	}
+
+	// Log the schema information
+	log.Printf("Schema: StorageType=%v, TypeInfo=%v",
+		schemaInfo.StorageType,
+		schemaInfo.TypeInfo)
+
+	// Convert schema to JSON for logging
+	schemaJSON, err := schema.SchemaInfoToJSON(schemaInfo)
+	if err != nil {
+		log.Printf("Failed to convert schema to JSON: %v", err)
+		return
+	}
+
+	// Marshal to pretty JSON for better readability
+	prettyJSON, err := json.MarshalIndent(schemaJSON, "", "  ")
+	if err != nil {
+		log.Printf("Failed to marshal schema to JSON: %v", err)
+		return
+	}
+
+	log.Printf("Schema JSON:\n%s", string(prettyJSON))
+}
+
 func HandleAttributes(attributes map[string]*pb.TimeBasedValueList) (map[string]interface{}, error) {
 	log.Printf("--------------Handling Attributes------------------")
 	log.Printf("Handling attributes: %v", attributes)
@@ -102,19 +140,15 @@ func HandleAttributes(attributes map[string]*pb.TimeBasedValueList) (map[string]
 						val.GetEndTime(),
 						val.GetValue())
 
-					// Generate schema directly from the Any value
-					schemaGenerator := schema.NewSchemaGenerator()
-					schemaInfo, err := schemaGenerator.GenerateSchema(val.GetValue())
+					// Generate schema
+					schemaInfo, err := generateSchema(val.GetValue())
 					if err != nil {
 						log.Printf("Failed to generate schema: %v", err)
 						continue
 					}
 
-					// Log the schema information
-					log.Printf("Schema for value %d: StorageType=%v, TypeInfo=%v",
-						i,
-						schemaInfo.StorageType,
-						schemaInfo.TypeInfo)
+					// Log schema information
+					logSchemaInfo(schemaInfo)
 				}
 			}
 			result[key] = values
