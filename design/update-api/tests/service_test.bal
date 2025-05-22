@@ -74,10 +74,32 @@ function testMetadataHandling() returns error? {
     // Create entity
     Entity createEntityResponse = check ep->CreateEntity(createEntityRequest);
     io:println("Entity created with ID: " + createEntityResponse.id);
+    io:println("Created entity metadata: ", createEntityResponse.metadata);
     
     // Read entity
-    EntityId readEntityRequest = {id: testId};
+    ReadEntityRequest readEntityRequest = {
+        id: testId,
+        entity: {
+            id: testId,
+            kind: {},
+            created: "",
+            terminated: "",
+            name: {
+                startTime: "",
+                endTime: "",
+                value: check pbAny:pack("")
+            },
+            metadata: [],
+            attributes: [],
+            relationships: []
+        },
+        output: ["metadata"]
+    };
+    io:println("ReadEntityRequest: ", readEntityRequest);
     Entity readEntityResponse = check ep->ReadEntity(readEntityRequest);
+    io:println("Entity retrieved, verifying data...");
+    io:println("Retrieved entity: ", readEntityResponse);
+    io:println("Retrieved entity metadata: ", readEntityResponse.metadata);
     
     // Verify metadata values
     map<string> actualValues = {};
@@ -95,7 +117,7 @@ function testMetadataHandling() returns error? {
     test:assertEquals(actualValues["key2"], expectedValue2, "Metadata value for key2 doesn't match");
     
     // Clean up
-    Empty _ = check ep->DeleteEntity(readEntityRequest);
+    Empty _ = check ep->DeleteEntity({id: testId});
     Empty _ = check ep->DeleteEntity({id: testId});
     io:println("Test entity deleted");
     
@@ -112,7 +134,24 @@ function testMetadataUnpackError() returns error? {
     CrudServiceClient ep = check new (testCrudServiceUrl);
     
     // Try to read a non-existent entity
-    EntityId readEntityRequest = {id: "non-existent-entity"};
+    ReadEntityRequest readEntityRequest = {
+        id: "non-existent-entity",
+        entity: {
+            id: "non-existent-entity",
+            kind: {},
+            created: "",
+            terminated: "",
+            name: {
+                startTime: "",
+                endTime: "",
+                value: check pbAny:pack("")
+            },
+            metadata: [],
+            attributes: [],
+            relationships: []
+        },
+        output: ["metadata"]
+    };
     Entity|error response = ep->ReadEntity(readEntityRequest);
     
     // Assert that we get an error for non-existent entity
@@ -167,7 +206,24 @@ function testMetadataUpdating() returns error? {
     io:println("Entity created with ID: " + createEntityResponse.id);
     
     // Verify initial metadata
-    EntityId readEntityRequest = {id: testId};
+    ReadEntityRequest readEntityRequest = {
+        id: testId,
+        entity: {
+            id: testId,
+            kind: {},
+            created: "",
+            terminated: "",
+            name: {
+                startTime: "",
+                endTime: "",
+                value: check pbAny:pack("")
+            },
+            metadata: [],
+            attributes: [],
+            relationships: []
+        },
+        output: ["metadata"]
+    };
     Entity initialReadResponse = check ep->ReadEntity(readEntityRequest);
     verifyMetadata(initialReadResponse.metadata, {"key1": initialValue1, "key2": initialValue2});
     io:println("Initial metadata verified");
@@ -207,7 +263,25 @@ function testMetadataUpdating() returns error? {
     io:println("Entity updated with ID: " + updateEntityResponse.id);
     
     // Verify updated metadata
-    Entity updatedReadResponse = check ep->ReadEntity(readEntityRequest);
+    ReadEntityRequest updatedReadRequest = {
+        id: testId,
+        entity: {
+            id: testId,
+            kind: {},
+            created: "",
+            terminated: "",
+            name: {
+                startTime: "",
+                endTime: "",
+                value: check pbAny:pack("")
+            },
+            metadata: [],
+            attributes: [],
+            relationships: []
+        },
+        output: ["metadata"]
+    };
+    Entity updatedReadResponse = check ep->ReadEntity(updatedReadRequest);
     verifyMetadata(updatedReadResponse.metadata, {
         "key1": updatedValue1, 
         "key2": updatedValue2,
@@ -216,7 +290,7 @@ function testMetadataUpdating() returns error? {
     io:println("Updated metadata verified");
     
     // Clean up
-    Empty _ = check ep->DeleteEntity(readEntityRequest);
+    Empty _ = check ep->DeleteEntity({id: testId});
     Empty _ = check ep->DeleteEntity({id: testId});
     io:println("Test entity deleted");
     
@@ -277,11 +351,32 @@ function testEntityReading() returns error? {
     // Create entity
     Entity createEntityResponse = check ep->CreateEntity(createEntityRequest);
     io:println("Test entity created with ID: " + createEntityResponse.id);
+    io:println("Created entity metadata: ", createEntityResponse.metadata);
     
     // Read the entity
-    EntityId readEntityRequest = {id: testId};
+    ReadEntityRequest readEntityRequest = {
+        id: testId,
+        entity: {
+            id: testId,
+            kind: {},
+            created: "",
+            terminated: "",
+            name: {
+                startTime: "",
+                endTime: "",
+                value: check pbAny:pack("")
+            },
+            metadata: [],
+            attributes: [],
+            relationships: []
+        },
+        output: ["metadata"]
+    };
+    io:println("ReadEntityRequest: ", readEntityRequest);
     Entity readEntityResponse = check ep->ReadEntity(readEntityRequest);
     io:println("Entity retrieved, verifying data...");
+    io:println("Retrieved entity: ", readEntityResponse);
+    io:println("Retrieved entity metadata: ", readEntityResponse.metadata);
     
     // Verify entity fields
     test:assertEquals(readEntityResponse.id, testId, "Entity ID mismatch");
@@ -303,7 +398,24 @@ function testEntityReading() returns error? {
     
     // Test reading non-existent entity
     string nonExistentId = "non-existent-entity-" + testId;
-    EntityId nonExistentRequest = {id: nonExistentId};
+    ReadEntityRequest nonExistentRequest = {
+        id: nonExistentId,
+        entity: {
+            id: nonExistentId,
+            kind: {},
+            created: "",
+            terminated: "",
+            name: {
+                startTime: "",
+                endTime: "",
+                value: check pbAny:pack("")
+            },
+            metadata: [],
+            attributes: [],
+            relationships: []
+        },
+        output: ["metadata"]
+    };
     Entity nonExistentEntity = check ep->ReadEntity(nonExistentRequest);
     io:println("Non-existent entity: " + nonExistentEntity.id);
     io:println("Non-existent entity metadata: ", nonExistentEntity.metadata);
@@ -318,7 +430,7 @@ function testEntityReading() returns error? {
     // test:assertTrue(nonExistentResponse is error, "Expected error for non-existent entity ID");
     
     // Clean up
-    Empty _ = check ep->DeleteEntity(readEntityRequest);
+    Empty _ = check ep->DeleteEntity({id: testId});
     Empty _ = check ep->DeleteEntity({id: testId});
     io:println("Test entity deleted");
     
@@ -357,7 +469,24 @@ function testCreateMinimalGraphEntity() returns error? {
     io:println("Minimal entity created with ID: " + createEntityResponse.id);
     
     // Verify entity was created correctly
-    EntityId readEntityRequest = {id: testId};
+    ReadEntityRequest readEntityRequest = {
+        id: testId,
+        entity: {
+            id: testId,
+            kind: {},
+            created: "",
+            terminated: "",
+            name: {
+                startTime: "",
+                endTime: "",
+                value: check pbAny:pack("")
+            },
+            metadata: [],
+            attributes: [],
+            relationships: []
+        },
+        output: ["metadata", "attributes", "relationships"]
+    };
     Entity readEntityResponse = check ep->ReadEntity(readEntityRequest);
     
     // Basic entity verification
@@ -371,7 +500,7 @@ function testCreateMinimalGraphEntity() returns error? {
     test:assertEquals(readEntityResponse.relationships.length(), 0, "Relationships should be empty");
     
     // Clean up
-    Empty _ = check ep->DeleteEntity(readEntityRequest);
+    Empty _ = check ep->DeleteEntity({id: testId});
     Empty _ = check ep->DeleteEntity({id: testId});
     io:println("Test minimal entity deleted");
     
@@ -424,7 +553,24 @@ function testCreateMinimalGraphEntityViaRest() returns error? {
     CrudServiceClient ep = check new (testCrudServiceUrl);
     
     // Verify entity data
-    EntityId readEntityRequest = {id: testId};
+    ReadEntityRequest readEntityRequest = {
+        id: testId,
+        entity: {
+            id: testId,
+            kind: {},
+            created: "",
+            terminated: "",
+            name: {
+                startTime: "",
+                endTime: "",
+                value: check pbAny:pack("")
+            },
+            metadata: [],
+            attributes: [],
+            relationships: []
+        },
+        output: ["metadata","attributes", "relationships"]
+    };
     Entity readEntityResponse = check ep->ReadEntity(readEntityRequest);
     
     // Basic entity verification
@@ -438,7 +584,7 @@ function testCreateMinimalGraphEntityViaRest() returns error? {
     test:assertEquals(readEntityResponse.relationships.length(), 0, "Relationships should be empty");
     
     // Clean up
-    Empty _ = check ep->DeleteEntity(readEntityRequest);
+    Empty _ = check ep->DeleteEntity({id: testId});
     Empty _ = check ep->DeleteEntity({id: testId});
     io:println("Test minimal JSON entity deleted");
     
@@ -549,7 +695,24 @@ function testEntityWithRelationship() returns error? {
     CrudServiceClient ep = check new (testCrudServiceUrl);
     
     // Read source entity to verify relationship
-    EntityId readEntityRequest = {id: sourceEntityId};
+    ReadEntityRequest readEntityRequest = {
+        id: sourceEntityId,
+        entity: {
+            id: sourceEntityId,
+            kind: {},
+            created: "",
+            terminated: "",
+            name: {
+                startTime: "",
+                endTime: "",
+                value: check pbAny:pack("")
+            },
+            metadata: [],
+            attributes: [],
+            relationships: []
+        },
+        output: ["relationships"]
+    };
     Entity readEntityResponse = check ep->ReadEntity(readEntityRequest);
     
     // Verify relationship data
@@ -573,7 +736,7 @@ function testEntityWithRelationship() returns error? {
     test:assertEquals(relationship.id, relationshipId, "Relationship ID doesn't match");
     
     // Clean up
-    Empty _ = check ep->DeleteEntity(readEntityRequest);
+    Empty _ = check ep->DeleteEntity({id: sourceEntityId});
     Empty _ = check ep->DeleteEntity({id: sourceEntityId});
     Empty _ = check ep->DeleteEntity({id: targetEntityId});
     io:println("Test entities with relationship deleted");

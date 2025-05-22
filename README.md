@@ -1,4 +1,4 @@
-# αGraph 
+# Nexoan
 
 > 💡 **Note (α)**  
 > Name needs to be proposed, voted and finalized. 
@@ -95,6 +95,27 @@ curl -X GET "http://localhost:8081/v1/entities/12345/metadata"
 ## Run E2E Tests
 
 Make sure the CRUD server and the API server are running. 
+
+Note when making a call to ReadEntity, the ReadEntityRequest must be in the following format (output can be one or more of metadata, relationships, attributes):
+
+ReadEntityRequest readEntityRequest = {
+    id: entityId,
+    entity: {
+        id: entityId,
+        kind: {},
+        created: "",
+        terminated: "",
+        name: {
+            startTime: "",
+            endTime: "",
+            value: check pbAny:pack("")
+        },
+        metadata: [],
+        attributes: [],
+        relationships: []
+    },
+    output: ["relationships"]
+};
 
 ### Run Update API Tests
 

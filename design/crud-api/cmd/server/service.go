@@ -62,72 +62,105 @@ func (s *Server) CreateEntity(ctx context.Context, req *pb.Entity) (*pb.Entity, 
 }
 
 // ReadEntity retrieves an entity's metadata
-func (s *Server) ReadEntity(ctx context.Context, req *pb.Entity) (*pb.Entity, error) {
-	log.Printf("Reading Entity metadata: %s", req.Id)
-	debugMetadata(req)
+func (s *Server) ReadEntity(ctx context.Context, req *pb.ReadEntityRequest) (*pb.Entity, error) {
+	log.Printf(">>>> Reading Entity: %s with output fields: %v", req.Id, req.Output)
 
-	// Get the entity from MongoDB - error handling and logging now in repository
-	metadata, _ := s.mongoRepo.GetMetadata(ctx, req.Id)
+	// Initialize a complete response entity with empty fields
+	response := &pb.Entity{
+		Id:            req.Id,
+		Kind:          &pb.Kind{},
+		Name:          &pb.TimeBasedValue{},
+		Created:       "",
+		Terminated:    "",
+		Metadata:      make(map[string]*anypb.Any),
+		Attributes:    make(map[string]*pb.TimeBasedValueList),
+		Relationships: make(map[string]*pb.Relationship),
+	}
 
-	// Try to get additional entity information from Neo4j
-	kind, name, created, terminated, _ := s.neo4jRepo.GetGraphEntity(ctx, req.Id)
-
-	// Initialize the relationships map
-	relationships := make(map[string]*pb.Relationship)
-
-	// Handle relationships based on the input
-	if len(req.Relationships) == 0 {
-		// Case 1: If Relationships is empty, call GetGraphRelationships
-		log.Printf("Fetching all relationships for entity %s", req.Id)
-		graphRelationships, err := s.neo4jRepo.GetGraphRelationships(ctx, req.Id)
-		if err != nil {
-			log.Printf("Error fetching relationships for entity %s: %v", req.Id, err)
-			return nil, err
-		}
-		relationships = graphRelationships
+	// Always fetch basic entity info from Neo4j
+	kind, name, created, terminated, err := s.neo4jRepo.GetGraphEntity(ctx, req.Id)
+	if err != nil {
+		log.Printf("Error fetching entity info: %v", err)
+		// Continue processing as we might still be able to get other information
 	} else {
+		response.Kind = kind
+		response.Name = name
+		response.Created = created
+		response.Terminated = terminated
+	}
 
-		// Case 2: Validate that all relationships have a Name field
-		for _, rel := range req.Relationships {
-			if rel.Name == "" {
-				return nil, fmt.Errorf("invalid relationship: all relationships must have a Name field")
-			}
-		}
+	// If no output fields specified, return the entity with basic info
+	if len(req.Output) == 0 {
+		return response, nil
+	}
 
-		// Call GetEntityIdsByRelationship for each relationship
-		for _, rel := range req.Relationships {
-
-			log.Printf("Fetching related entity IDs for entity %s with relationship %s and start time %s", req.Id, rel.Name, rel.StartTime)
-			relsByName, err := s.neo4jRepo.GetRelationshipsByName(ctx, req.Id, rel.Name, rel.StartTime)
+	// Process each requested output field
+	for _, field := range req.Output {
+		log.Printf("[DEBUG] Entering switch statement for entity ID: %s", req.Id)
+		switch field {
+		case "metadata":
+			log.Printf("[DEBUG] Processing metadata field for entity ID: %s", req.Id)
+			// Get metadata from MongoDB
+			metadata, err := s.mongoRepo.GetMetadata(ctx, req.Id)
 			if err != nil {
-				log.Printf("Error fetching related entity IDs for entity %s: %v", req.Id, err)
-				return nil, err
+				log.Printf("Error fetching metadata: %v", err)
+				// Continue with other fields even if metadata fails
+			} else {
+				log.Printf("[DEBUG] Retrieved metadata: %+v", metadata)
+				response.Metadata = metadata
 			}
 
-			// Populate the relationships map with only ID and Name
-			for _, relByName := range relsByName {
-				relationships[relByName.Id] = &pb.Relationship{
-					Id:              relByName.Id, // No relationship ID available in this case
-					Name:            relByName.Name,
-					RelatedEntityId: relByName.RelatedEntityId,
-					StartTime:       relByName.StartTime,
-					EndTime:         relByName.EndTime,
+		case "relationships":
+			// Handle relationships based on the input entity
+			if req.Entity != nil && len(req.Entity.Relationships) > 0 {
+				// Case 1: Validate that all relationships have a Name field
+				for _, rel := range req.Entity.Relationships {
+					if rel.Name == "" {
+						return nil, fmt.Errorf("invalid relationship: all relationships must have a Name field")
+					}
+				}
+
+				// Case 2: Call GetRelationshipsByName for each relationship
+				for _, rel := range req.Entity.Relationships {
+					log.Printf("Fetching related entity IDs for entity %s with relationship %s and start time %s", req.Id, rel.Name, rel.StartTime)
+					relsByName, err := s.neo4jRepo.GetRelationshipsByName(ctx, req.Id, rel.Name, rel.StartTime)
+					if err != nil {
+						log.Printf("Error fetching related entity IDs for entity %s: %v", req.Id, err)
+						continue // Continue with other relationships even if one fails
+					}
+
+					// Add the relationships to the response
+					for id, relationship := range relsByName {
+						response.Relationships[id] = relationship
+					}
+				}
+			} else {
+				// Case 3: If no specific relationships requested, get all relationships
+				log.Printf("Fetching all relationships for entity %s", req.Id)
+				graphRelationships, err := s.neo4jRepo.GetGraphRelationships(ctx, req.Id)
+				if err != nil {
+					log.Printf("Error fetching relationships for entity %s: %v", req.Id, err)
+					// Continue with other fields even if relationships fail
+				} else {
+					response.Relationships = graphRelationships
 				}
 			}
+
+		case "attributes":
+			// TODO: Implement attribute fetching when available
+			log.Printf("Attribute fetching not yet implemented")
+			// Attributes map is already initialized
+
+		case "kind", "name", "created", "terminated":
+			// These fields are already fetched at the start
+			continue
+
+		default:
+			log.Printf("Unknown output field requested: %s", field)
 		}
 	}
 
-	// Return entity with all available fields
-	return &pb.Entity{
-		Id:            req.Id,
-		Kind:          kind,
-		Name:          name,
-		Created:       created,
-		Terminated:    terminated,
-		Metadata:      metadata,
-		Attributes:    make(map[string]*pb.TimeBasedValueList), // Empty attributes
-		Relationships: relationships,                           // Dynamically populated relationships
-	}, nil
+	return response, nil
 }
 
 // UpdateEntity modifies existing metadata
