@@ -60,13 +60,9 @@ function jsonToAny(json data) returns pbAny:Any|error {
         };
         return pbAny:pack(structMap);
     } else if data is () {
-        // For null values, create a proper null_value field
+        // For null values
         map<json> structMap = {
-            "fields": {
-                "null_value": {
-                    "null_value": "NULL_VALUE"
-                }
-            }
+            "null_value": ()
         };
         return pbAny:pack(structMap);
     } else if data is json[] {
@@ -1477,6 +1473,7 @@ function testEntityWithEmptyMapValues() returns error? {
     CrudServiceClient ep = check new (testCrudServiceUrl);
     
     // Create entity with map data containing empty values
+    // FIXME: https://github.com/LDFLK/nexoan/issues/137
     json emptyValuesMap = {
         "properties": {
             "empty_str": "",
