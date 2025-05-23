@@ -158,12 +158,12 @@ func (sg *SchemaGenerator) GenerateSchema(anyValue *anypb.Any) (*SchemaInfo, err
 	switch {
 	case hasGraphStructure(structValue):
 		storageType = storageinference.GraphData
-	case hasListStructure(structValue):
-		storageType = storageinference.ListData
-	case hasMapStructure(structValue):
-		storageType = storageinference.MapData
 	case hasTabularStructure(structValue):
 		storageType = storageinference.TabularData
+	case hasMapStructure(structValue):
+		storageType = storageinference.MapData
+	case hasListStructure(structValue):
+		storageType = storageinference.ListData
 	default:
 		storageType = storageinference.ScalarData
 	}
@@ -230,25 +230,26 @@ func hasMapStructure(structValue *structpb.Struct) bool {
 }
 
 func hasTabularStructure(structValue *structpb.Struct) bool {
-	// Check for tabular data structure
-	// Tabular data should have fields that are all of the same type
-	// and should not be a graph, list, or map structure
-	if hasGraphStructure(structValue) || hasListStructure(structValue) || hasMapStructure(structValue) {
+	// Check for both columns and rows fields directly in the struct
+	columnsField, hasColumns := structValue.Fields["columns"]
+	rowsField, hasRows := structValue.Fields["rows"]
+	if !hasColumns || !hasRows {
 		return false
 	}
 
-	// Check if all fields are of the same type
-	var firstFieldType interface{}
-	for _, field := range structValue.Fields {
-		fieldType := field.GetKind()
-		if firstFieldType == nil {
-			firstFieldType = fieldType
-		} else if fmt.Sprintf("%T", fieldType) != fmt.Sprintf("%T", firstFieldType) {
-			return false
-		}
+	// Verify columns is a list
+	_, isColumnsList := columnsField.GetKind().(*structpb.Value_ListValue)
+	if !isColumnsList {
+		return false
 	}
 
-	return len(structValue.Fields) > 0
+	// Verify rows is a list
+	_, isRowsList := rowsField.GetKind().(*structpb.Value_ListValue)
+	if !isRowsList {
+		return false
+	}
+
+	return true
 }
 
 // Helper function to detect if a string is a date or datetime
@@ -265,42 +266,91 @@ func isDateOrDateTime(str string) (bool, bool) {
 }
 
 // handleTabularData processes tabular data and generates field schemas.
-// Tabular data is expected to be a struct with an "attributes" field containing
-// a struct with field definitions.
-//
-// The function:
-//  1. Extracts the attributes struct
-//  2. For each field in the struct:
-//     - Creates a new Any value for the field
-//     - Recursively generates a schema for the field
-//     - Adds the field schema to the Fields map
-//
-// Parameters:
-//   - structValue: The protobuf struct value containing tabular data
-//   - schema: The base schema to populate with field information
-//
-// Returns:
-//   - *SchemaInfo: The complete schema with field information
-//   - error: Any error that occurred during processing
 func (sg *SchemaGenerator) handleTabularData(structValue *structpb.Struct, schema *SchemaInfo) (*SchemaInfo, error) {
 	// Initialize the Fields map
 	schema.Fields = make(map[string]*SchemaInfo)
 
-	// Process each field in the struct
-	for fieldName, fieldValue := range structValue.Fields {
-		// Create a new Any value for the field
-		fieldAny, err := anypb.New(fieldValue)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create field Any value: %v", err)
+	// Get columns and rows directly from the struct
+	columnsField, hasColumns := structValue.Fields["columns"]
+	rowsField, hasRows := structValue.Fields["rows"]
+	if !hasColumns || !hasRows {
+		return nil, fmt.Errorf("table must have both columns and rows")
+	}
+
+	// Verify columns is a list
+	columnsList, ok := columnsField.GetKind().(*structpb.Value_ListValue)
+	if !ok {
+		return nil, fmt.Errorf("columns must be a list")
+	}
+
+	// Verify rows is a list
+	rowsList, ok := rowsField.GetKind().(*structpb.Value_ListValue)
+	if !ok {
+		return nil, fmt.Errorf("rows must be a list")
+	}
+
+	// Get column names
+	columnNames := make([]string, len(columnsList.ListValue.Values))
+	for i, col := range columnsList.ListValue.Values {
+		if strVal, ok := col.GetKind().(*structpb.Value_StringValue); ok {
+			columnNames[i] = strVal.StringValue
+		} else {
+			return nil, fmt.Errorf("column names must be strings")
+		}
+	}
+
+	// Process first row to determine types
+	if len(rowsList.ListValue.Values) == 0 {
+		return nil, fmt.Errorf("table must have at least one row")
+	}
+
+	firstRow := rowsList.ListValue.Values[0]
+	rowValues, ok := firstRow.GetKind().(*structpb.Value_ListValue)
+	if !ok {
+		return nil, fmt.Errorf("row must be a list")
+	}
+
+	if len(rowValues.ListValue.Values) != len(columnNames) {
+		return nil, fmt.Errorf("row length does not match number of columns")
+	}
+
+	// Create field schemas based on first row values
+	for i, value := range rowValues.ListValue.Values {
+		columnName := columnNames[i]
+		fieldSchema := &SchemaInfo{
+			StorageType: storageinference.ScalarData,
+			TypeInfo:    &typeinference.TypeInfo{},
 		}
 
-		// Generate schema for the field
-		fieldSchema, err := sg.GenerateSchema(fieldAny)
-		if err != nil {
-			return nil, fmt.Errorf("failed to generate field schema: %v", err)
+		switch value.GetKind().(type) {
+		case *structpb.Value_StringValue:
+			str := value.GetStringValue()
+			if isDate, isDateTime := isDateOrDateTime(str); isDate {
+				if isDateTime {
+					fieldSchema.TypeInfo.Type = typeinference.DateTimeType
+				} else {
+					fieldSchema.TypeInfo.Type = typeinference.DateType
+				}
+			} else {
+				fieldSchema.TypeInfo.Type = typeinference.StringType
+			}
+		case *structpb.Value_NumberValue:
+			num := value.GetNumberValue()
+			if num == float64(int64(num)) {
+				fieldSchema.TypeInfo.Type = typeinference.IntType
+			} else {
+				fieldSchema.TypeInfo.Type = typeinference.FloatType
+			}
+		case *structpb.Value_BoolValue:
+			fieldSchema.TypeInfo.Type = typeinference.BoolType
+		case *structpb.Value_NullValue:
+			fieldSchema.TypeInfo.Type = typeinference.NullType
+			fieldSchema.TypeInfo.IsNullable = true
+		default:
+			return nil, fmt.Errorf("unsupported value type in row")
 		}
 
-		schema.Fields[fieldName] = fieldSchema
+		schema.Fields[columnName] = fieldSchema
 	}
 
 	return schema, nil

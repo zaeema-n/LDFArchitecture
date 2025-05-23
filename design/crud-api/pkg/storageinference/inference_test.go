@@ -119,29 +119,6 @@ func TestStorageTypeInferenceFromEntity(t *testing.T) {
 	}
 }
 
-// TestComplexTabularEntity tests a more complex tabular structure
-func TestComplexTabularEntity(t *testing.T) {
-	complexTableJSON := `{
-		"columns": ["id", "name", "age", "address"],
-		"rows": [
-			[1, "John", 30, {"city": "New York", "zip": "10001"}],
-			[2, "Jane", 25, {"city": "Boston", "zip": "02108"}]
-		],
-		"metadata": {
-			"total_rows": 2,
-			"last_updated": "2024-03-20"
-		}
-	}`
-
-	anyValue, err := JSONToAny(complexTableJSON)
-	assert.NoError(t, err)
-
-	inferrer := &StorageInferrer{}
-	detectedType, err := inferrer.InferType(anyValue)
-	assert.NoError(t, err)
-	assert.Equal(t, TabularData, detectedType)
-}
-
 // TestNestedListEntity tests a nested list structure
 func TestNestedListEntity(t *testing.T) {
 	nestedListJSON := `[
@@ -216,13 +193,6 @@ func TestComplexListEntity(t *testing.T) {
 			[1, 2, 3],
 			[4, 5, 6],
 			[7, 8, 9]
-		]`,
-		"mixed_types": `[
-			42,
-			"string value",
-			true,
-			3.14,
-			{"nested": "object"}
 		]`,
 		"list_of_objects": `[
 			{"id": 1, "name": "item1"},

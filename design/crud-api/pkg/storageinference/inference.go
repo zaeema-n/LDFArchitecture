@@ -1,7 +1,7 @@
 package storageinference
 
 import (
-	"reflect"
+	"fmt"
 
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/structpb"
@@ -16,6 +16,7 @@ const (
 	ListData    StorageType = "list"
 	MapData     StorageType = "map"
 	GraphData   StorageType = "graph"
+	UnknownData StorageType = "unknown"
 )
 
 // TypeInferrer provides functionality to infer data types from protobuf Any values
@@ -89,59 +90,78 @@ type StorageInferrer struct{}
 // Note: The function prioritizes specific structures over generic ones.
 // For example, if a structure has both "items" and "nodes"/"edges",
 // it will be classified based on the more specific structure first.
-func (ti *StorageInferrer) InferType(anyValue *anypb.Any) (StorageType, error) {
+func (si *StorageInferrer) InferType(anyValue *anypb.Any) (StorageType, error) {
 	// Unpack the Any value to get the underlying message
 	message, err := anyValue.UnmarshalNew()
 	if err != nil {
-		return "", err
+		return UnknownData, err
 	}
 
-	// Get the reflection value of the message
-	rv := reflect.ValueOf(message)
-	if rv.Kind() == reflect.Ptr {
-		rv = rv.Elem()
+	// Get the struct value from the message
+	structValue, ok := message.(*structpb.Struct)
+	if !ok {
+		return UnknownData, fmt.Errorf("expected struct value")
 	}
 
-	// Handle structpb.Struct
-	if structValue, ok := message.(*structpb.Struct); ok {
-		// Check if it's a tabular structure
-		if isTabular(structValue) {
-			return TabularData, nil
-		}
-		// Check if it's a graph structure
-		if isGraph(structValue) {
-			return GraphData, nil
-		}
-		// Check if it's a list structure (has "value" field with ListValue)
-		if value, ok := structValue.Fields["value"]; ok {
-			if _, ok := value.GetKind().(*structpb.Value_ListValue); ok {
-				return ListData, nil
-			}
-		}
-		// Check if it's a scalar structure
-		if isScalar(structValue) {
-			return ScalarData, nil
-		}
-		return MapData, nil
+	// Check storage types in order of precedence:
+	// 1. Tabular (highest priority)
+	// 2. Graph
+	// 3. List
+	// 4. Scalar
+	// 5. Map
+	// 6. Unknown (lowest priority)
+
+	// Check for tabular data first (highest priority)
+	if isTabular(structValue) {
+		return TabularData, nil
 	}
 
-	// If not a structpb.Struct, check the direct type
-	switch rv.Kind() {
-	case reflect.Slice, reflect.Array:
+	// Check for graph data (second priority)
+	if isGraph(structValue) {
+		return GraphData, nil
+	}
+
+	// Check for list data (third priority)
+	if isList(structValue) {
 		return ListData, nil
-	case reflect.Map:
-		return MapData, nil
-	default:
+	}
+
+	// Check for scalar data (fourth priority)
+	if isScalar(structValue) {
 		return ScalarData, nil
 	}
+
+	// Check for map data (fifth priority)
+	if len(structValue.Fields) > 0 {
+		return MapData, nil
+	}
+
+	// If none of the above, it's unknown data (lowest priority)
+	return UnknownData, nil
 }
 
 // isTabular checks if a struct represents tabular data
 func isTabular(structValue *structpb.Struct) bool {
-	// A struct is considered tabular if it has both columns and rows fields
-	_, hasColumns := structValue.Fields["columns"]
-	_, hasRows := structValue.Fields["rows"]
-	return hasColumns && hasRows
+	// Check if the struct has both columns and rows fields
+	columnsField, hasColumns := structValue.Fields["columns"]
+	rowsField, hasRows := structValue.Fields["rows"]
+	if !hasColumns || !hasRows {
+		return false
+	}
+
+	// Verify columns is a list
+	_, isColumnsList := columnsField.GetKind().(*structpb.Value_ListValue)
+	if !isColumnsList {
+		return false
+	}
+
+	// Verify rows is a list
+	_, isRowsList := rowsField.GetKind().(*structpb.Value_ListValue)
+	if !isRowsList {
+		return false
+	}
+
+	return true
 }
 
 // isGraph checks if a struct represents graph data
@@ -152,25 +172,37 @@ func isGraph(structValue *structpb.Struct) bool {
 	return hasNodes && hasEdges
 }
 
-// isScalar checks if a struct represents scalar data
-func isScalar(structValue *structpb.Struct) bool {
-	// A struct is considered scalar if it has exactly one field with a scalar value
+// isList checks if a struct represents list data
+func isList(structValue *structpb.Struct) bool {
+	// A struct is considered a list if:
+	// 1. It has exactly one field
+	// 2. That field contains a list value
 	if len(structValue.Fields) != 1 {
 		return false
 	}
 
-	// Get the single value
-	var value *structpb.Value
+	// Get the single field value
+	var listValue *structpb.Value
 	for _, v := range structValue.Fields {
-		value = v
+		listValue = v
 		break
 	}
 
-	// Check if the value is scalar
-	switch value.GetKind().(type) {
-	case *structpb.Value_NumberValue, *structpb.Value_StringValue, *structpb.Value_BoolValue:
-		return true
-	default:
-		return false
+	// Check if the value is a list
+	_, ok := listValue.GetKind().(*structpb.Value_ListValue)
+	return ok
+}
+
+// isScalar checks if a struct represents scalar data
+func isScalar(structValue *structpb.Struct) bool {
+	// Check if the struct has a single field with a scalar value
+	if len(structValue.Fields) == 1 {
+		for _, value := range structValue.Fields {
+			switch value.GetKind().(type) {
+			case *structpb.Value_NumberValue, *structpb.Value_StringValue, *structpb.Value_BoolValue, *structpb.Value_NullValue:
+				return true
+			}
+		}
 	}
+	return false
 }

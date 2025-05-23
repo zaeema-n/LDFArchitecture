@@ -520,6 +520,41 @@ func TestSchemaGeneration(t *testing.T) {
 				}
 			}`,
 		},
+		"simple_tabular_data": {
+			input: `{
+				"columns": ["id", "name", "age"],
+				"rows": [
+					[1, "Alice", 30],
+					[2, "Bob", 25]
+				]
+			}`,
+			expected: `{
+				"storage_type": "tabular",
+				"type_info": {
+					"type": "string"
+				},
+				"fields": {
+					"id": {
+						"storage_type": "scalar",
+						"type_info": {
+							"type": "int"
+						}
+					},
+					"name": {
+						"storage_type": "scalar",
+						"type_info": {
+							"type": "string"
+						}
+					},
+					"age": {
+						"storage_type": "scalar",
+						"type_info": {
+							"type": "int"
+						}
+					}
+				}
+			}`,
+		},
 	}
 
 	generator := NewSchemaGenerator()

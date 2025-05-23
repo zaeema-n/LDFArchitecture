@@ -210,6 +210,8 @@ func ValidateSchema(value interface{}, schema *SchemaInfo) error {
 		return validateMapValue(value, schema)
 	case GraphData:
 		return validateGraphValue(value, schema)
+	case TabularData:
+		return validateTabularValue(value, schema)
 	default:
 		return fmt.Errorf("unsupported storage type: %v", schema.StorageType)
 	}
@@ -311,6 +313,75 @@ func validateGraphValue(value interface{}, schema *SchemaInfo) error {
 	if edges, exists := obj["edges"]; exists {
 		if err := ValidateSchema(edges, schema.Fields["edges"]); err != nil {
 			return fmt.Errorf("invalid edges: %v", err)
+		}
+	}
+
+	return nil
+}
+
+// validateTabularValue validates a value against a tabular schema
+func validateTabularValue(value interface{}, schema *SchemaInfo) error {
+	// Convert value to map
+	valueMap, ok := value.(map[string]interface{})
+	if !ok {
+		return fmt.Errorf("tabular data must be a map")
+	}
+
+	// Check for table field
+	tableValue, ok := valueMap["table"]
+	if !ok {
+		return fmt.Errorf("tabular data must contain a 'table' field")
+	}
+
+	// Validate table structure
+	tableMap, ok := tableValue.(map[string]interface{})
+	if !ok {
+		return fmt.Errorf("table field must be a map")
+	}
+
+	// Check for columns
+	columns, ok := tableMap["columns"]
+	if !ok {
+		return fmt.Errorf("table must contain 'columns' field")
+	}
+
+	// Check for rows
+	rows, ok := tableMap["rows"]
+	if !ok {
+		return fmt.Errorf("table must contain 'rows' field")
+	}
+
+	// Validate columns
+	columnsList, ok := columns.([]interface{})
+	if !ok {
+		return fmt.Errorf("columns must be a list")
+	}
+
+	// Validate rows
+	rowsList, ok := rows.([]interface{})
+	if !ok {
+		return fmt.Errorf("rows must be a list")
+	}
+
+	// Validate that each row has the same number of columns
+	expectedColumns := len(columnsList)
+	for i, row := range rowsList {
+		rowList, ok := row.([]interface{})
+		if !ok {
+			return fmt.Errorf("row %d must be a list", i)
+		}
+		if len(rowList) != expectedColumns {
+			return fmt.Errorf("row %d has %d columns, expected %d", i, len(rowList), expectedColumns)
+		}
+
+		// Validate each cell against its column's schema
+		for j, cell := range rowList {
+			columnName := columnsList[j].(string)
+			if fieldSchema, exists := schema.Fields[columnName]; exists {
+				if err := validateScalarValue(cell, fieldSchema.TypeInfo); err != nil {
+					return fmt.Errorf("invalid value in row %d, column %s: %v", i, columnName, err)
+				}
+			}
 		}
 	}
 

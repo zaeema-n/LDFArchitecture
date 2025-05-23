@@ -423,3 +423,162 @@ func TestValidateSchema(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateTabularData(t *testing.T) {
+	// Create a schema for tabular data
+	schema := &SchemaInfo{
+		StorageType: TabularData,
+		TypeInfo:    &typeinference.TypeInfo{Type: typeinference.StringType},
+		Fields: map[string]*SchemaInfo{
+			"id": {
+				StorageType: ScalarData,
+				TypeInfo:    &typeinference.TypeInfo{Type: typeinference.IntType},
+			},
+			"name": {
+				StorageType: ScalarData,
+				TypeInfo:    &typeinference.TypeInfo{Type: typeinference.StringType},
+			},
+			"age": {
+				StorageType: ScalarData,
+				TypeInfo:    &typeinference.TypeInfo{Type: typeinference.IntType},
+			},
+		},
+	}
+
+	testCases := []struct {
+		name        string
+		input       interface{}
+		expectError bool
+		errorMsg    string
+	}{
+		{
+			name: "valid tabular data",
+			input: map[string]interface{}{
+				"table": map[string]interface{}{
+					"columns": []interface{}{"id", "name", "age"},
+					"rows": []interface{}{
+						[]interface{}{1, "Alice", 30},
+						[]interface{}{2, "Bob", 25},
+					},
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "missing table field",
+			input: map[string]interface{}{
+				"data": map[string]interface{}{
+					"columns": []interface{}{"id", "name"},
+					"rows":    []interface{}{[]interface{}{1, "Alice"}},
+				},
+			},
+			expectError: true,
+			errorMsg:    "tabular data must contain a 'table' field",
+		},
+		{
+			name: "table field not a map",
+			input: map[string]interface{}{
+				"table": "not a map",
+			},
+			expectError: true,
+			errorMsg:    "table field must be a map",
+		},
+		{
+			name: "missing columns field",
+			input: map[string]interface{}{
+				"table": map[string]interface{}{
+					"rows": []interface{}{[]interface{}{1, "Alice"}},
+				},
+			},
+			expectError: true,
+			errorMsg:    "table must contain 'columns' field",
+		},
+		{
+			name: "missing rows field",
+			input: map[string]interface{}{
+				"table": map[string]interface{}{
+					"columns": []interface{}{"id", "name"},
+				},
+			},
+			expectError: true,
+			errorMsg:    "table must contain 'rows' field",
+		},
+		{
+			name: "columns not a list",
+			input: map[string]interface{}{
+				"table": map[string]interface{}{
+					"columns": "not a list",
+					"rows":    []interface{}{[]interface{}{1, "Alice"}},
+				},
+			},
+			expectError: true,
+			errorMsg:    "columns must be a list",
+		},
+		{
+			name: "rows not a list",
+			input: map[string]interface{}{
+				"table": map[string]interface{}{
+					"columns": []interface{}{"id", "name"},
+					"rows":    "not a list",
+				},
+			},
+			expectError: true,
+			errorMsg:    "rows must be a list",
+		},
+		{
+			name: "row not a list",
+			input: map[string]interface{}{
+				"table": map[string]interface{}{
+					"columns": []interface{}{"id", "name"},
+					"rows": []interface{}{
+						"not a list",
+					},
+				},
+			},
+			expectError: true,
+			errorMsg:    "row 0 must be a list",
+		},
+		{
+			name: "row length mismatch",
+			input: map[string]interface{}{
+				"table": map[string]interface{}{
+					"columns": []interface{}{"id", "name", "age"},
+					"rows": []interface{}{
+						[]interface{}{1, "Alice"}, // Missing age
+						[]interface{}{2, "Bob", 25},
+					},
+				},
+			},
+			expectError: true,
+			errorMsg:    "row 0 has 2 columns, expected 3",
+		},
+		{
+			name: "invalid column type",
+			input: map[string]interface{}{
+				"table": map[string]interface{}{
+					"columns": []interface{}{"id", "name", "age"},
+					"rows": []interface{}{
+						[]interface{}{"not an int", "Alice", 30}, // id should be int
+						[]interface{}{2, "Bob", 25},
+					},
+				},
+			},
+			expectError: true,
+			errorMsg:    "invalid value in row 0, column id",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := ValidateSchema(tc.input, schema)
+			if tc.expectError {
+				assert.Error(t, err)
+				if tc.errorMsg != "" {
+					assert.Contains(t, err.Error(), tc.errorMsg)
+				}
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
