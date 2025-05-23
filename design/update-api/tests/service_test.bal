@@ -1536,6 +1536,122 @@ function testEntityWithEmptyMapValues() returns error? {
     return;
 }
 
+@test:Config {
+    groups: ["entity", "attributes", "map", "nested"]
+}
+function testEntityWithNestedMapValues() returns error? {
+    // Test ID for entity
+    string testId = "test-entity-nested-map-values";
+    
+    // Initialize the gRPC client to verify entity
+    CrudServiceClient ep = check new (testCrudServiceUrl);
+    
+    // Create entity with deeply nested map data
+    json nestedMap = {
+        "properties": {
+            "user": {
+                "profile": {
+                    "personal": {
+                        "name": "John Doe",
+                        "age": 30,
+                        "address": {
+                            "street": "123 Main St",
+                            "city": "New York",
+                            "zip": "10001"
+                        }
+                    },
+                    "preferences": {
+                        "theme": "dark",
+                        "notifications": true,
+                        "language": "en"
+                    }
+                },
+                "settings": {
+                    "account": {
+                        "type": "premium",
+                        "status": "active",
+                        "subscription": {
+                            "plan": "yearly",
+                            "start_date": "2024-01-01",
+                            "end_date": "2024-12-31"
+                        }
+                    },
+                    "security": {
+                        "two_factor": true,
+                        "last_login": "2024-03-21T10:00:00Z",
+                        "devices": {
+                            "mobile": ["iPhone", "iPad"],
+                            "desktop": ["MacBook", "Windows PC"]
+                        }
+                    }
+                }
+            },
+            "metadata": {
+                "created_at": "2024-01-01T00:00:00Z",
+                "updated_at": "2024-03-21T15:30:00Z",
+                "version": {
+                    "major": 1,
+                    "minor": 0,
+                    "patch": 0
+                }
+            }
+        }
+    };
+
+    // Convert JSON to protobuf Any values
+    pbAny:Any nestedMapAny = check jsonToAny(nestedMap);
+
+    Entity createEntityRequest = {
+        id: testId,
+        kind: {
+            major: "test",
+            minor: "nested-map-values"
+        },
+        created: "2024-01-01T00:00:00Z",
+        terminated: "",
+        name: {
+            startTime: "2024-01-01T00:00:00Z",
+            endTime: "",
+            value: check pbAny:pack("test-entity")
+        },
+        metadata: [
+            {
+                key: "test_metadata",
+                value: check pbAny:pack("test_value")
+            }
+        ],
+        attributes: [
+            {
+                key: "nested_data",
+                value: {
+                    values: [
+                        {
+                            startTime: "2024-01-01T00:00:00Z",
+                            endTime: "",
+                            value: nestedMapAny
+                        }
+                    ]
+                }
+            }
+        ],
+        relationships: []
+    };
+
+    // Create entity via gRPC
+    Entity createEntityResponse = check ep->CreateEntity(createEntityRequest);
+    io:println("Entity created with ID: " + createEntityResponse.id);
+    
+    // Read entity to verify attributes
+    EntityId readEntityRequest = {id: testId};
+    
+    // Clean up
+    Empty _ = check ep->DeleteEntity(readEntityRequest);
+    Empty _ = check ep->DeleteEntity({id: testId});
+    io:println("Test entity with nested map values deleted");
+    
+    return;
+}
+
 
 
 

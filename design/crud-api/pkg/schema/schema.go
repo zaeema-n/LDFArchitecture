@@ -896,81 +896,118 @@ func (sg *SchemaGenerator) handleMapData(structValue *structpb.Struct, schema *S
 	// Initialize the Properties map
 	schema.Properties = make(map[string]*SchemaInfo)
 
-	// Check if we have a "properties" field
-	if props, ok := structValue.Fields["properties"]; ok {
-		if propStruct, ok := props.GetKind().(*structpb.Value_StructValue); ok {
-			// Process properties from the properties field
-			for fieldName, fieldValue := range propStruct.StructValue.Fields {
-				if _, ok := fieldValue.GetKind().(*structpb.Value_StructValue); ok {
-					// Property is a struct, recurse as before
-					propStruct := &structpb.Struct{
-						Fields: map[string]*structpb.Value{
-							fieldName: fieldValue,
-						},
-					}
-					propAny, err := anypb.New(propStruct)
-					if err != nil {
-						return nil, fmt.Errorf("failed to create property Any value: %v", err)
-					}
-					propTypeSchema, err := sg.GenerateSchema(propAny)
-					if err != nil {
-						return nil, fmt.Errorf("failed to generate property schema: %v", err)
-					}
-					schema.Properties[fieldName] = propTypeSchema
-				} else {
-					// Property is a scalar, handle directly
-					scalarStruct := &structpb.Struct{
-						Fields: map[string]*structpb.Value{
-							fieldName: fieldValue,
-						},
-					}
-					scalarSchema, err := sg.handleScalarData(scalarStruct, &SchemaInfo{
-						StorageType: storageinference.ScalarData,
-						TypeInfo:    &typeinference.TypeInfo{},
-					})
-					if err != nil {
-						return nil, fmt.Errorf("failed to generate scalar property schema: %v", err)
-					}
-					schema.Properties[fieldName] = scalarSchema
-				}
-			}
-			return schema, nil
-		}
+	// Stack to keep track of nested structures to process
+	type stackItem struct {
+		structValue *structpb.Struct
+		schema      *SchemaInfo
+		fieldName   string
 	}
+	stack := []stackItem{{structValue: structValue, schema: schema}}
 
-	// If no properties field, process fields directly
-	for fieldName, fieldValue := range structValue.Fields {
-		if _, ok := fieldValue.GetKind().(*structpb.Value_StructValue); ok {
-			// Property is a struct, recurse as before
-			propStruct := &structpb.Struct{
-				Fields: map[string]*structpb.Value{
-					fieldName: fieldValue,
-				},
+	// Process stack until empty
+	for len(stack) > 0 {
+		// Pop the top item
+		item := stack[len(stack)-1]
+		stack = stack[:len(stack)-1]
+
+		// Check if we have a "properties" field
+		if props, ok := item.structValue.Fields["properties"]; ok {
+			if propStruct, ok := props.GetKind().(*structpb.Value_StructValue); ok {
+				// Process properties from the properties field
+				for fieldName, fieldValue := range propStruct.StructValue.Fields {
+					// Handle scalar values directly
+					if _, ok := fieldValue.GetKind().(*structpb.Value_StringValue); ok {
+						item.schema.Properties[fieldName] = &SchemaInfo{
+							StorageType: storageinference.ScalarData,
+							TypeInfo:    &typeinference.TypeInfo{Type: typeinference.StringType},
+						}
+					} else if numValue, ok := fieldValue.GetKind().(*structpb.Value_NumberValue); ok {
+						num := numValue.NumberValue
+						if num == float64(int64(num)) {
+							item.schema.Properties[fieldName] = &SchemaInfo{
+								StorageType: storageinference.ScalarData,
+								TypeInfo:    &typeinference.TypeInfo{Type: typeinference.IntType},
+							}
+						} else {
+							item.schema.Properties[fieldName] = &SchemaInfo{
+								StorageType: storageinference.ScalarData,
+								TypeInfo:    &typeinference.TypeInfo{Type: typeinference.FloatType},
+							}
+						}
+					} else if _, ok := fieldValue.GetKind().(*structpb.Value_BoolValue); ok {
+						item.schema.Properties[fieldName] = &SchemaInfo{
+							StorageType: storageinference.ScalarData,
+							TypeInfo:    &typeinference.TypeInfo{Type: typeinference.BoolType},
+						}
+					} else if _, ok := fieldValue.GetKind().(*structpb.Value_NullValue); ok {
+						item.schema.Properties[fieldName] = &SchemaInfo{
+							StorageType: storageinference.ScalarData,
+							TypeInfo:    &typeinference.TypeInfo{Type: typeinference.NullType, IsNullable: true},
+						}
+					} else if structValue, ok := fieldValue.GetKind().(*structpb.Value_StructValue); ok {
+						// For nested structures, create a map schema and add to stack
+						nestedSchema := &SchemaInfo{
+							StorageType: storageinference.MapData,
+							TypeInfo:    &typeinference.TypeInfo{Type: typeinference.StringType},
+							Properties:  make(map[string]*SchemaInfo),
+						}
+						item.schema.Properties[fieldName] = nestedSchema
+						stack = append(stack, stackItem{
+							structValue: structValue.StructValue,
+							schema:      nestedSchema,
+							fieldName:   fieldName,
+						})
+					}
+				}
+				continue
 			}
-			propAny, err := anypb.New(propStruct)
-			if err != nil {
-				return nil, fmt.Errorf("failed to create property Any value: %v", err)
+		}
+
+		// If no properties field, process fields directly
+		for fieldName, fieldValue := range item.structValue.Fields {
+			// Handle scalar values directly
+			if _, ok := fieldValue.GetKind().(*structpb.Value_StringValue); ok {
+				item.schema.Properties[fieldName] = &SchemaInfo{
+					StorageType: storageinference.ScalarData,
+					TypeInfo:    &typeinference.TypeInfo{Type: typeinference.StringType},
+				}
+			} else if numValue, ok := fieldValue.GetKind().(*structpb.Value_NumberValue); ok {
+				num := numValue.NumberValue
+				if num == float64(int64(num)) {
+					item.schema.Properties[fieldName] = &SchemaInfo{
+						StorageType: storageinference.ScalarData,
+						TypeInfo:    &typeinference.TypeInfo{Type: typeinference.IntType},
+					}
+				} else {
+					item.schema.Properties[fieldName] = &SchemaInfo{
+						StorageType: storageinference.ScalarData,
+						TypeInfo:    &typeinference.TypeInfo{Type: typeinference.FloatType},
+					}
+				}
+			} else if _, ok := fieldValue.GetKind().(*structpb.Value_BoolValue); ok {
+				item.schema.Properties[fieldName] = &SchemaInfo{
+					StorageType: storageinference.ScalarData,
+					TypeInfo:    &typeinference.TypeInfo{Type: typeinference.BoolType},
+				}
+			} else if _, ok := fieldValue.GetKind().(*structpb.Value_NullValue); ok {
+				item.schema.Properties[fieldName] = &SchemaInfo{
+					StorageType: storageinference.ScalarData,
+					TypeInfo:    &typeinference.TypeInfo{Type: typeinference.NullType, IsNullable: true},
+				}
+			} else if structValue, ok := fieldValue.GetKind().(*structpb.Value_StructValue); ok {
+				// For nested structures, create a map schema and add to stack
+				nestedSchema := &SchemaInfo{
+					StorageType: storageinference.MapData,
+					TypeInfo:    &typeinference.TypeInfo{Type: typeinference.StringType},
+					Properties:  make(map[string]*SchemaInfo),
+				}
+				item.schema.Properties[fieldName] = nestedSchema
+				stack = append(stack, stackItem{
+					structValue: structValue.StructValue,
+					schema:      nestedSchema,
+					fieldName:   fieldName,
+				})
 			}
-			propTypeSchema, err := sg.GenerateSchema(propAny)
-			if err != nil {
-				return nil, fmt.Errorf("failed to generate property schema: %v", err)
-			}
-			schema.Properties[fieldName] = propTypeSchema
-		} else {
-			// Property is a scalar, handle directly
-			scalarStruct := &structpb.Struct{
-				Fields: map[string]*structpb.Value{
-					fieldName: fieldValue,
-				},
-			}
-			scalarSchema, err := sg.handleScalarData(scalarStruct, &SchemaInfo{
-				StorageType: storageinference.ScalarData,
-				TypeInfo:    &typeinference.TypeInfo{},
-			})
-			if err != nil {
-				return nil, fmt.Errorf("failed to generate scalar property schema: %v", err)
-			}
-			schema.Properties[fieldName] = scalarSchema
 		}
 	}
 
