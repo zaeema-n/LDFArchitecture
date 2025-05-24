@@ -29,6 +29,149 @@ import (
 // It combines storage type information with detailed type information and
 // maintains relationships between different parts of the schema.
 //
+// Examples:
+//
+//  1. Scalar Data (e.g., string "hello"):
+// {
+// 	"storage_type": "scalar",
+// 	"type_info": {
+// 		"type": "int"
+// 	}
+// }
+//  2. List Data (e.g., [1, 2, 3]):
+// {
+// 	"storage_type": "list",
+// 	"type_info": {
+// 		"type": "string",
+// 		"is_array": true,
+// 		"array_type": {
+// 			"type": "int"
+// 		}
+// 	},
+// 	"items": {
+// 		"storage_type": "scalar",
+// 		"type_info": {
+// 			"type": "int"
+// 		}
+// 	}
+// }
+//  3. Map Data (e.g., {"name": "John", "age": 30}):
+// {
+// 	"storage_type": "map",
+// 	"type_info": {
+// 		"type": "string"
+// 	},
+// 	"properties": {
+// 		"empty_str": {
+// 			"storage_type": "scalar",
+// 			"type_info": {
+// 				"type": "string"
+// 			}
+// 		},
+// 		"zero": {
+// 			"storage_type": "scalar",
+// 			"type_info": {
+// 				"type": "int"
+// 			}
+// 		},
+// 		"null_val": {
+// 			"storage_type": "scalar",
+// 			"type_info": {
+// 				"type": "null",
+// 				"is_nullable": true
+// 			}
+// 		}
+// 	}
+// }
+//
+//  4. Tabular Data (e.g., table with columns "id", "name", "age"):
+//     {
+// 	"storage_type": "tabular",
+// 	"type_info": {
+// 		"type": "string"
+// 	},
+// 	"fields": {
+// 		"id": {
+// 			"storage_type": "scalar",
+// 			"type_info": {
+// 				"type": "int"
+// 			}
+// 		},
+// 		"name": {
+// 			"storage_type": "scalar",
+// 			"type_info": {
+// 				"type": "string"
+// 			}
+// 		},
+// 		"age": {
+// 			"storage_type": "scalar",
+// 			"type_info": {
+// 				"type": "int"
+// 			}
+// 		}
+// 	}
+// }
+//
+//  5. Graph Data (e.g., social network with users and connections):
+// {
+// 	"storage_type": "graph",
+// 	"type_info": {
+// 		"type": "string"
+// 	},
+// 	"fields": {
+// 		"nodes": {
+// 			"storage_type": "map",
+// 			"type_info": {
+// 				"type": "string"
+// 			},
+// 			"properties": {
+// 				"package": {
+// 					"storage_type": "map",
+// 					"type_info": {
+// 						"type": "string"
+// 					},
+// 					"properties": {
+// 						"name": {
+// 							"storage_type": "scalar",
+// 							"type_info": {
+// 								"type": "string"
+// 							}
+// 						},
+// 						"version": {
+// 							"storage_type": "scalar",
+// 							"type_info": {
+// 								"type": "string"
+// 							}
+// 						}
+// 					}
+// 				}
+// 			}
+// 		},
+// 		"edges": {
+// 			"storage_type": "map",
+// 			"type_info": {
+// 				"type": "string"
+// 			},
+// 			"properties": {
+// 				"depends_on": {
+// 					"storage_type": "map",
+// 					"type_info": {
+// 						"type": "string"
+// 					},
+// 					"properties": {
+// 						"version": {
+// 							"storage_type": "scalar",
+// 							"type_info": {
+// 								"type": "string"
+// 							}
+// 						}
+// 					}
+// 				}
+// 			}
+// 		}
+// 	}
+// }
+
 // Fields:
 //   - StorageType: Indicates how the data is organized (scalar, list, map, etc.)
 //   - TypeInfo: Contains detailed information about the data type
@@ -75,12 +218,37 @@ func NewSchemaGenerator() *SchemaGenerator {
 //   - Tabular: Structured data with defined columns
 //   - Graph: Data with relationships between entities
 //
+// The function processes the data in the following order:
+//  1. First unpacks the Any value to get the underlying message
+//  2. Checks if the message is a struct or scalar value
+//  3. For structs, determines the storage type based on structure:
+//     - Graph: Contains "nodes" or "edges" fields
+//     - Tabular: Contains "columns" and "rows" fields
+//     - Map: Contains key-value pairs
+//     - List: Contains array values
+//     - Scalar: Simple value types
+//  4. For each storage type, generates appropriate schema:
+//     - Scalar: Type information only
+//     - List: Type info + item schema
+//     - Map: Type info + property schemas
+//     - Tabular: Type info + field schemas
+//     - Graph: Type info + node/edge schemas
+//
 // Parameters:
 //   - anyValue: A protobuf Any value containing the data to analyze
 //
 // Returns:
 //   - *SchemaInfo: A complete schema representation of the data
 //   - error: Any error that occurred during schema generation
+//
+// Example usage:
+//
+//	generator := NewSchemaGenerator()
+//	schema, err := generator.GenerateSchema(anyValue)
+//	if err != nil {
+//	    // Handle error
+//	}
+//	// Use schema information
 func (sg *SchemaGenerator) GenerateSchema(anyValue *anypb.Any) (*SchemaInfo, error) {
 	// Unpack the Any value to get the underlying message
 	message, err := anyValue.UnmarshalNew()
@@ -272,6 +440,79 @@ func isDateOrDateTime(str string) (bool, bool) {
 }
 
 // handleTabularData processes tabular data and generates field schemas.
+// The function expects a struct with "columns" and "rows" fields, where:
+//   - columns: A list of strings representing column names
+//   - rows: A list of lists, where each inner list represents a row of data
+//
+// The function performs the following steps:
+//  1. Validates the presence of both columns and rows fields
+//  2. Verifies that columns is a list of strings
+//  3. Verifies that rows is a list of lists
+//  4. Processes the first row to determine column types
+//  5. Creates field schemas for each column based on its data type
+//
+// The function handles the following data types:
+//   - String: Regular text or date/datetime values
+//   - Number: Integer or floating-point values
+//   - Boolean: True/false values
+//   - Null: Nullable fields
+//
+// For date/datetime detection:
+//   - Date format: YYYY-MM-DD
+//   - DateTime format: RFC3339 (YYYY-MM-DDTHH:MM:SSZ)
+//
+// Parameters:
+//   - structValue: The protobuf struct value containing tabular data
+//   - schema: The base schema to populate with field information
+//
+// Returns:
+//   - *SchemaInfo: The complete schema with field information
+//   - error: Any error that occurred during processing
+//
+// Example input structure:
+//
+//	{
+//	    "columns": ["id", "name", "age", "created_at"],
+//	    "rows": [
+//	        [1, "John", 30, "2024-03-21T10:00:00Z"],
+//	        [2, "Jane", 25, "2024-03-21T11:00:00Z"]
+//	    ]
+//	}
+//
+// Example output schema:
+//
+//	{
+//	    "storage_type": "tabular",
+//	    "type_info": {
+//	        "type": "string"
+//	    },
+//	    "fields": {
+//	        "id": {
+//	            "storage_type": "scalar",
+//	            "type_info": {
+//	                "type": "int"
+//	            }
+//	        },
+//	        "name": {
+//	            "storage_type": "scalar",
+//	            "type_info": {
+//	                "type": "string"
+//	            }
+//	        },
+//	        "age": {
+//	            "storage_type": "scalar",
+//	            "type_info": {
+//	                "type": "int"
+//	            }
+//	        },
+//	        "created_at": {
+//	            "storage_type": "scalar",
+//	            "type_info": {
+//	                "type": "datetime"
+//	            }
+//	        }
+//	    }
+//	}
 func (sg *SchemaGenerator) handleTabularData(structValue *structpb.Struct, schema *SchemaInfo) (*SchemaInfo, error) {
 	// Initialize the Fields map
 	schema.Fields = make(map[string]*SchemaInfo)
@@ -363,14 +604,42 @@ func (sg *SchemaGenerator) handleTabularData(structValue *structpb.Struct, schem
 }
 
 // handleGraphData processes graph data and generates schemas for nodes and edges.
-// Graph data is expected to be a struct with "nodes" and "edges" fields, where each field can be either:
-//   - An array of objects with type and properties
-//   - A map of type to property objects
+// The function expects a struct with optional "nodes" and "edges" fields, where:
+//   - nodes: Can be either a list of node objects or a map of node types to properties
+//   - edges: Can be either a list of edge objects or a map of edge types to properties
 //
-// The function:
-//  1. Processes node schemas from the "nodes" field
-//  2. Processes edge schemas from the "edges" field
-//  3. Combines them into a complete graph schema
+// Node Structure:
+//   - id: Unique identifier for the node
+//   - type: Type of the node (e.g., "user", "post")
+//   - properties: Map of property names to values
+//
+// Edge Structure:
+//   - source: ID of the source node
+//   - target: ID of the target node
+//   - type: Type of the edge (e.g., "follows", "likes")
+//   - properties: Map of property names to values
+//
+// The function performs the following steps:
+//  1. Processes nodes if present:
+//     - Handles both array and map formats
+//     - Extracts node types and properties
+//     - Creates schemas for each node type
+//  2. Processes edges if present:
+//     - Handles both array and map formats
+//     - Extracts edge types and properties
+//     - Creates schemas for each edge type
+//  3. Combines node and edge schemas into a complete graph schema
+//
+// The function handles the following data types for properties:
+//   - String: Regular text or date/datetime values
+//   - Number: Integer or floating-point values
+//   - Boolean: True/false values
+//   - Null: Nullable fields
+//   - Struct: Nested object structures
+//
+// For date/datetime detection:
+//   - Date format: YYYY-MM-DD
+//   - DateTime format: RFC3339 (YYYY-MM-DDTHH:MM:SSZ)
 //
 // Parameters:
 //   - structValue: The protobuf struct value containing graph data
@@ -379,6 +648,127 @@ func (sg *SchemaGenerator) handleTabularData(structValue *structpb.Struct, schem
 // Returns:
 //   - *SchemaInfo: The complete schema with node and edge information
 //   - error: Any error that occurred during processing
+//
+// Example input structure:
+//
+//	{
+//	    "nodes": [
+//	        {
+//	            "id": "user1",
+//	            "type": "user",
+//	            "properties": {
+//	                "name": "John",
+//	                "age": 30,
+//	                "active": true
+//	            }
+//	        },
+//	        {
+//	            "id": "post1",
+//	            "type": "post",
+//	            "properties": {
+//	                "title": "Hello",
+//	                "created_at": "2024-03-21T10:00:00Z"
+//	            }
+//	        }
+//	    ],
+//	    "edges": [
+//	        {
+//	            "source": "user1",
+//	            "target": "post1",
+//	            "type": "created",
+//	            "properties": {
+//	                "timestamp": "2024-03-21T10:00:00Z"
+//	            }
+//	        }
+//	    ]
+//	}
+//
+// Example output schema:
+//
+//	{
+//	    "storage_type": "graph",
+//	    "type_info": {
+//	        "type": "string"
+//	    },
+//	    "fields": {
+//	        "nodes": {
+//	            "storage_type": "map",
+//	            "type_info": {
+//	                "type": "string"
+//	            },
+//	            "properties": {
+//	                "user": {
+//	                    "storage_type": "map",
+//	                    "type_info": {
+//	                        "type": "string"
+//	                    },
+//	                    "properties": {
+//	                        "name": {
+//	                            "storage_type": "scalar",
+//	                            "type_info": {
+//	                                "type": "string"
+//	                            }
+//	                        },
+//	                        "age": {
+//	                            "storage_type": "scalar",
+//	                            "type_info": {
+//	                                "type": "int"
+//	                            }
+//	                        },
+//	                        "active": {
+//	                            "storage_type": "scalar",
+//	                            "type_info": {
+//	                                "type": "bool"
+//	                            }
+//	                        }
+//	                    }
+//	                },
+//	                "post": {
+//	                    "storage_type": "map",
+//	                    "type_info": {
+//	                        "type": "string"
+//	                    },
+//	                    "properties": {
+//	                        "title": {
+//	                            "storage_type": "scalar",
+//	                            "type_info": {
+//	                                "type": "string"
+//	                            }
+//	                        },
+//	                        "created_at": {
+//	                            "storage_type": "scalar",
+//	                            "type_info": {
+//	                                "type": "datetime"
+//	                            }
+//	                        }
+//	                    }
+//	                }
+//	            }
+//	        },
+//	        "edges": {
+//	            "storage_type": "map",
+//	            "type_info": {
+//	                "type": "string"
+//	            },
+//	            "properties": {
+//	                "created": {
+//	                    "storage_type": "map",
+//	                    "type_info": {
+//	                        "type": "string"
+//	                    },
+//	                    "properties": {
+//	                        "timestamp": {
+//	                            "storage_type": "scalar",
+//	                            "type_info": {
+//	                                "type": "datetime"
+//	                            }
+//	                        }
+//	                    }
+//	                }
+//	            }
+//	        }
+//	    }
+//	}
 func (sg *SchemaGenerator) handleGraphData(structValue *structpb.Struct, schema *SchemaInfo) (*SchemaInfo, error) {
 	// Initialize the schema fields map
 	schema.Fields = make(map[string]*SchemaInfo)
@@ -818,14 +1208,39 @@ func (sg *SchemaGenerator) handleGraphData(structValue *structpb.Struct, schema 
 }
 
 // handleListData processes list data and generates item schema.
-// List data can be represented in two ways:
-//  1. Direct list: attributes is a list value
-//  2. Wrapped list: attributes is a struct containing a list field
+// The function handles two types of list representations:
+//  1. Direct List: A list value directly in the struct
+//     Example: {"values": [1, 2, 3]}
+//  2. Wrapped List: A struct containing a list field
+//     Example: {"data": {"items": [1, 2, 3]}}
 //
-// The function:
-//  1. Identifies the list value (either direct or in a struct field)
-//  2. Creates a schema for the first item in the list
-//  3. Sets the IsArray and ArrayType fields in the TypeInfo
+// The function performs the following steps:
+//  1. Identifies the list value by:
+//     - Looking for direct list values in the struct
+//     - Checking for nested list values in struct fields
+//  2. Processes the first item to determine the list type:
+//     - For scalar values: infers the appropriate type (int, float, string, bool)
+//     - For struct values: recursively generates schema for the struct
+//     - For null values: marks the type as nullable
+//  3. Creates a schema for the list items:
+//     - Sets the storage type to "scalar" for simple types
+//     - Sets the storage type to "map" for struct types
+//     - Sets the storage type to "list" for nested lists
+//  4. Updates the parent schema:
+//     - Sets IsArray flag to true
+//     - Sets ArrayType to the inferred item type
+//     - Stores the item schema in the Items field
+//
+// The function handles the following data types for list items:
+//   - String: Regular text or date/datetime values
+//   - Number: Integer or floating-point values
+//   - Boolean: True/false values
+//   - Null: Nullable fields
+//   - Struct: Nested object structures
+//
+// For date/datetime detection:
+//   - Date format: YYYY-MM-DD
+//   - DateTime format: RFC3339 (YYYY-MM-DDTHH:MM:SSZ)
 //
 // Parameters:
 //   - structValue: The protobuf struct value containing list data
@@ -834,6 +1249,113 @@ func (sg *SchemaGenerator) handleGraphData(structValue *structpb.Struct, schema 
 // Returns:
 //   - *SchemaInfo: The complete schema with item information
 //   - error: Any error that occurred during processing
+//
+// Example input structures:
+// 1. Direct list of numbers:
+//
+//	{
+//	    "values": [1, 2, 3]
+//	}
+//
+// 2. List of mixed types:
+//
+//	{
+//	    "values": [
+//	        "Hello",
+//	        42,
+//	        true,
+//	        "2024-03-21",
+//	        "2024-03-21T15:30:00Z",
+//	        null
+//	    ]
+//	}
+//
+// 3. List of objects:
+//
+//	{
+//	    "values": [
+//	        {
+//	            "name": "John",
+//	            "age": 30
+//	        },
+//	        {
+//	            "name": "Jane",
+//	            "age": 25
+//	        }
+//	    ]
+//	}
+//
+// Example output schemas:
+// 1. For list of numbers:
+//
+//	{
+//	    "storage_type": "list",
+//	    "type_info": {
+//	        "type": "string",
+//	        "is_array": true,
+//	        "array_type": {
+//	            "type": "int"
+//	        }
+//	    },
+//	    "items": {
+//	        "storage_type": "scalar",
+//	        "type_info": {
+//	            "type": "int"
+//	        }
+//	    }
+//	}
+//
+// 2. For list of mixed types:
+//
+//	{
+//	    "storage_type": "list",
+//	    "type_info": {
+//	        "type": "string",
+//	        "is_array": true,
+//	        "array_type": {
+//	            "type": "string"
+//	        }
+//	    },
+//	    "items": {
+//	        "storage_type": "scalar",
+//	        "type_info": {
+//	            "type": "string"
+//	        }
+//	    }
+//	}
+//
+// 3. For list of objects:
+//
+//	{
+//	    "storage_type": "list",
+//	    "type_info": {
+//	        "type": "string",
+//	        "is_array": true,
+//	        "array_type": {
+//	            "type": "string"
+//	        }
+//	    },
+//	    "items": {
+//	        "storage_type": "map",
+//	        "type_info": {
+//	            "type": "string"
+//	        },
+//	        "properties": {
+//	            "name": {
+//	                "storage_type": "scalar",
+//	                "type_info": {
+//	                    "type": "string"
+//	                }
+//	            },
+//	            "age": {
+//	                "storage_type": "scalar",
+//	                "type_info": {
+//	                    "type": "int"
+//	                }
+//	            }
+//	        }
+//	    }
+//	}
 func (sg *SchemaGenerator) handleListData(structValue *structpb.Struct, schema *SchemaInfo) (*SchemaInfo, error) {
 	// Find the first list field
 	var listField *structpb.Value
@@ -930,16 +1452,39 @@ func (sg *SchemaGenerator) handleListData(structValue *structpb.Struct, schema *
 }
 
 // handleMapData processes map data and generates property schemas.
-// Map data is expected to be a struct with an "attributes" field containing
-// a struct with a field that contains key-value pairs.
+// The function handles map data in two formats:
+//  1. Direct Map: A struct with key-value pairs
+//     Example: {"name": "John", "age": 30}
+//  2. Properties Map: A struct with a "properties" field containing key-value pairs
+//     Example: {"properties": {"name": "John", "age": 30}}
 //
-// The function:
-//  1. Extracts the attributes struct
-//  2. Finds the first struct field that contains key-value pairs
-//  3. For each property in the struct:
-//     - Creates a new Any value for the property
-//     - Recursively generates a schema for the property
-//     - Adds the property schema to the Properties map
+// The function performs the following steps:
+//  1. Initializes the Properties map in the schema
+//  2. Uses a stack-based approach to handle nested structures:
+//     - Pushes each nested struct onto the stack
+//     - Processes each struct's properties
+//     - Creates schemas for nested structures recursively
+//  3. For each property:
+//     - Identifies the property type (string, number, boolean, null, struct)
+//     - Creates appropriate schema based on type:
+//     * Scalar types: Creates simple schema with type info
+//     * Struct types: Creates map schema and processes recursively
+//     * Null values: Marks type as nullable
+//  4. Handles special cases:
+//     - Date/datetime strings: Detects and sets appropriate type
+//     - Nested objects: Creates nested map schemas
+//     - Empty values: Preserves type information
+//
+// The function handles the following data types for properties:
+//   - String: Regular text or date/datetime values
+//   - Number: Integer or floating-point values
+//   - Boolean: True/false values
+//   - Null: Nullable fields
+//   - Struct: Nested object structures
+//
+// For date/datetime detection:
+//   - Date format: YYYY-MM-DD
+//   - DateTime format: RFC3339 (YYYY-MM-DDTHH:MM:SSZ)
 //
 // Parameters:
 //   - structValue: The protobuf struct value containing map data
@@ -948,6 +1493,187 @@ func (sg *SchemaGenerator) handleListData(structValue *structpb.Struct, schema *
 // Returns:
 //   - *SchemaInfo: The complete schema with property information
 //   - error: Any error that occurred during processing
+//
+// Example input structures:
+// 1. Simple map:
+//
+//	{
+//	    "properties": {
+//	        "name": "John",
+//	        "age": 30,
+//	        "active": true
+//	    }
+//	}
+//
+// 2. Nested map:
+//
+//	{
+//	    "properties": {
+//	        "user": {
+//	            "name": "John",
+//	            "address": {
+//	                "street": "123 Main St",
+//	                "city": "New York"
+//	            }
+//	        }
+//	    }
+//	}
+//
+// 3. Map with mixed types:
+//
+//	{
+//	    "properties": {
+//	        "name": "John",
+//	        "age": 30,
+//	        "active": true,
+//	        "created_at": "2024-03-21T10:00:00Z",
+//	        "tags": ["admin", "user"],
+//	        "metadata": {
+//	            "last_login": "2024-03-21T09:00:00Z",
+//	            "login_count": 42
+//	        }
+//	    }
+//	}
+//
+// Example output schemas:
+// 1. For simple map:
+//
+//	{
+//	    "storage_type": "map",
+//	    "type_info": {
+//	        "type": "string"
+//	    },
+//	    "properties": {
+//	        "name": {
+//	            "storage_type": "scalar",
+//	            "type_info": {
+//	                "type": "string"
+//	            }
+//	        },
+//	        "age": {
+//	            "storage_type": "scalar",
+//	            "type_info": {
+//	                "type": "int"
+//	            }
+//	        },
+//	        "active": {
+//	            "storage_type": "scalar",
+//	            "type_info": {
+//	                "type": "bool"
+//	            }
+//	        }
+//	    }
+//	}
+//
+// 2. For nested map:
+//
+//	{
+//	    "storage_type": "map",
+//	    "type_info": {
+//	        "type": "string"
+//	    },
+//	    "properties": {
+//	        "user": {
+//	            "storage_type": "map",
+//	            "type_info": {
+//	                "type": "string"
+//	            },
+//	            "properties": {
+//	                "name": {
+//	                    "storage_type": "scalar",
+//	                    "type_info": {
+//	                        "type": "string"
+//	                    }
+//	                },
+//	                "address": {
+//	                    "storage_type": "map",
+//	                    "type_info": {
+//	                        "type": "string"
+//	                    },
+//	                    "properties": {
+//	                        "street": {
+//	                            "storage_type": "scalar",
+//	                            "type_info": {
+//	                                "type": "string"
+//	                            }
+//	                        },
+//	                        "city": {
+//	                            "storage_type": "scalar",
+//	                            "type_info": {
+//	                                "type": "string"
+//	                            }
+//	                        }
+//	                    }
+//	                }
+//	            }
+//	        }
+//	    }
+//	}
+//
+// 3. For map with mixed types:
+//
+//	{
+//	    "storage_type": "map",
+//	    "type_info": {
+//	        "type": "string"
+//	    },
+//	    "properties": {
+//	        "name": {
+//	            "storage_type": "scalar",
+//	            "type_info": {
+//	                "type": "string"
+//	            }
+//	        },
+//	        "age": {
+//	            "storage_type": "scalar",
+//	            "type_info": {
+//	                "type": "int"
+//	            }
+//	        },
+//	        "active": {
+//	            "storage_type": "scalar",
+//	            "type_info": {
+//	                "type": "bool"
+//	            }
+//	        },
+//	        "created_at": {
+//	            "storage_type": "scalar",
+//	            "type_info": {
+//	                "type": "datetime"
+//	            }
+//	        },
+//	        "tags": {
+//	            "storage_type": "list",
+//	            "type_info": {
+//	                "type": "string",
+//	                "is_array": true,
+//	                "array_type": {
+//	                    "type": "string"
+//	                }
+//	            }
+//	        },
+//	        "metadata": {
+//	            "storage_type": "map",
+//	            "type_info": {
+//	                "type": "string"
+//	            },
+//	            "properties": {
+//	                "last_login": {
+//	                    "storage_type": "scalar",
+//	                    "type_info": {
+//	                        "type": "datetime"
+//	                    }
+//	                },
+//	                "login_count": {
+//	                    "storage_type": "scalar",
+//	                    "type_info": {
+//	                        "type": "int"
+//	                    }
+//	                }
+//	            }
+//	        }
+//	    }
+//	}
 func (sg *SchemaGenerator) handleMapData(structValue *structpb.Struct, schema *SchemaInfo) (*SchemaInfo, error) {
 	// Initialize the Properties map
 	schema.Properties = make(map[string]*SchemaInfo)
@@ -1071,14 +1797,32 @@ func (sg *SchemaGenerator) handleMapData(structValue *structpb.Struct, schema *S
 }
 
 // handleScalarData processes scalar data and generates the appropriate schema.
-// Scalar data can be represented in two ways:
-//  1. Direct value: attributes is a scalar value
-//  2. Wrapped value: attributes is a struct containing a scalar value in any field
+// The function handles scalar data in two formats:
+//  1. Direct Scalar: A struct with a single scalar value
+//     Example: {"value": 42}
+//  2. Wrapped Scalar: A struct containing a scalar value in any field
+//     Example: {"data": {"count": 42}}
 //
-// The function:
-//  1. Identifies the scalar value (either direct or in a struct field)
-//  2. Uses type inference to determine the data type
-//  3. Updates the schema with the inferred type information
+// The function performs the following steps:
+//  1. Scans the struct for scalar fields by checking for:
+//     - String values
+//     - Number values (integers and floats)
+//     - Boolean values
+//     - Null values
+//  2. Identifies the first scalar field found
+//  3. Creates a schema based on the scalar type:
+//     - String: Sets type to string
+//     - Number: Checks if integer or float
+//     - Boolean: Sets type to boolean
+//     - Null: Sets type to null and marks as nullable
+//
+// The function handles the following scalar types:
+//   - String: Regular text values
+//   - Number:
+//   - Integer: Whole numbers (e.g., 42)
+//   - Float: Decimal numbers (e.g., 3.14)
+//   - Boolean: True/false values
+//   - Null: Null values (marks type as nullable)
 //
 // Parameters:
 //   - structValue: The protobuf struct value containing scalar data
@@ -1087,6 +1831,87 @@ func (sg *SchemaGenerator) handleMapData(structValue *structpb.Struct, schema *S
 // Returns:
 //   - *SchemaInfo: The complete schema with type information
 //   - error: Any error that occurred during processing
+//
+// Example input structures:
+// 1. Direct string value:
+//
+//	{
+//	    "value": "Hello, World!"
+//	}
+//
+// 2. Direct number value:
+//
+//	{
+//	    "value": 42
+//	}
+//
+// 3. Direct boolean value:
+//
+//	{
+//	    "value": true
+//	}
+//
+// 4. Direct null value:
+//
+//	{
+//	    "value": null
+//	}
+//
+// 5. Wrapped scalar value:
+//
+//	{
+//	    "data": {
+//	        "count": 42,
+//	        "name": "test"
+//	    }
+//	}
+//
+// Example output schemas:
+// 1. For string value:
+//
+//	{
+//	    "storage_type": "scalar",
+//	    "type_info": {
+//	        "type": "string"
+//	    }
+//	}
+//
+// 2. For integer value:
+//
+//	{
+//	    "storage_type": "scalar",
+//	    "type_info": {
+//	        "type": "int"
+//	    }
+//	}
+//
+// 3. For float value:
+//
+//	{
+//	    "storage_type": "scalar",
+//	    "type_info": {
+//	        "type": "float"
+//	    }
+//	}
+//
+// 4. For boolean value:
+//
+//	{
+//	    "storage_type": "scalar",
+//	    "type_info": {
+//	        "type": "bool"
+//	    }
+//	}
+//
+// 5. For null value:
+//
+//	{
+//	    "storage_type": "scalar",
+//	    "type_info": {
+//	        "type": "null",
+//	        "is_nullable": true
+//	    }
+//	}
 func (sg *SchemaGenerator) handleScalarData(structValue *structpb.Struct, schema *SchemaInfo) (*SchemaInfo, error) {
 	// Find the first scalar field
 	var scalarField *structpb.Value
