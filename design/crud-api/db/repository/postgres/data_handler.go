@@ -119,15 +119,6 @@ func HandleAttributes(attributes map[string]*pb.TimeBasedValueList) (map[string]
 		return nil, nil
 	}
 
-	// Print each attribute's key and values
-	for key, value := range attributes {
-		if value != nil {
-			log.Printf("Attribute - Key: %s, Values: %v", key, value.Values)
-		}
-		log.Printf("Attribute - Key: %s", key)
-		log.Printf("Attribute - Values: %v", value.Values)
-	}
-
 	result := make(map[string]interface{})
 	for key, value := range attributes {
 		if value != nil {
