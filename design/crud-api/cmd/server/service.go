@@ -12,6 +12,7 @@ import (
 
 	mongorepository "lk/datafoundation/crud-api/db/repository/mongo"
 	neo4jrepository "lk/datafoundation/crud-api/db/repository/neo4j"
+	postgres "lk/datafoundation/crud-api/db/repository/postgres"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -31,6 +32,7 @@ func (s *Server) CreateEntity(ctx context.Context, req *pb.Entity) (*pb.Entity, 
 
 	// Always save the entity in MongoDB, even if it has no metadata
 	// The HandleMetadata function will only process it if it has metadata
+	// FIXME: https://github.com/LDFLK/nexoan/issues/120
 	err := s.mongoRepo.HandleMetadata(ctx, req.Id, req)
 	if err != nil {
 		log.Printf("[server.CreateEntity] Error saving metadata in MongoDB: %v", err)
@@ -48,7 +50,7 @@ func (s *Server) CreateEntity(ctx context.Context, req *pb.Entity) (*pb.Entity, 
 		log.Printf("[server.CreateEntity] Successfully saved entity in Neo4j for entity: %s", req.Id)
 	}
 
-	// TODO: Add logic to handle relationships
+	// Handle relationships
 	err = s.neo4jRepo.HandleGraphRelationshipsCreate(ctx, req)
 	if err != nil {
 		log.Printf("[server.CreateEntity] Error saving relationships in Neo4j: %v", err)
@@ -57,7 +59,14 @@ func (s *Server) CreateEntity(ctx context.Context, req *pb.Entity) (*pb.Entity, 
 		log.Printf("[server.CreateEntity] Successfully saved relationships in Neo4j for entity: %s", req.Id)
 	}
 
-	// TODO: Add logic to handle attributes
+	// Handle attributes
+	_, err = postgres.HandleAttributes(req.Attributes)
+	if err != nil {
+		log.Printf("[server.CreateEntity] Error handling attributes: %v", err)
+		return nil, err
+	}
+
+	// Return the complete entity including attributes
 	return req, nil
 }
 

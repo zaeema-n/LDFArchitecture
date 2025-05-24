@@ -55,6 +55,8 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
+// FIXME: https://github.com/LDFLK/nexoan/issues/119
+
 // TestEmptyEntity tests creating an entity with empty metadata, attributes, and relationships
 // TODO: Think more about what is an empty entity, how empty it can be, define empty entity
 // func TestEmptyEntity(t *testing.T) {

@@ -33,6 +33,52 @@ function unwrapAny(pbAny:Any anyValue) returns string|error {
     return pbAny:unpack(anyValue, string);
 }
 
+// Helper function to convert JSON to protobuf Any value
+function jsonToAny(json data) returns pbAny:Any|error {
+    if data is int {
+        // For integer values
+        map<json> structMap = {
+            "value": data
+        };
+        return pbAny:pack(structMap);
+    } else if data is float {
+        // For float values
+        map<json> structMap = {
+            "value": data
+        };
+        return pbAny:pack(structMap);
+    } else if data is string {
+        // For string values
+        map<json> structMap = {
+            "value": data
+        };
+        return pbAny:pack(structMap);
+    } else if data is boolean {
+        // For boolean values
+        map<json> structMap = {
+            "value": data
+        };
+        return pbAny:pack(structMap);
+    } else if data is () {
+        // For null values
+        map<json> structMap = {
+            "null_value": ()
+        };
+        return pbAny:pack(structMap);
+    } else if data is json[] {
+        // For arrays, wrap in a list_value structure
+        map<json> structMap = {
+            "values": data
+        };
+        return pbAny:pack(structMap);
+    } else if data is map<json> {
+        // For objects, just pack them directly
+        return pbAny:pack(data);
+    } else {
+        return error("Unsupported data type: " + data.toString());
+    }
+}
+
 @test:Config {}
 function testMetadataHandling() returns error? {
     // Initialize the client
@@ -125,7 +171,7 @@ function testMetadataHandling() returns error? {
 }
 
 // TODO: Re-enable once the Result type response handling is added
-// See: https://github.com/zaeema-n/LDFArchitecture/issues/23
+// See: https://github.com/LDFLK/nexoan/issues/23
 @test:Config {
     enable: false
 }
@@ -426,7 +472,7 @@ function testEntityReading() returns error? {
     // Assert that we get an error for non-existent entity
     // For non-existence entities, we send a response with an empty data
     // But once the Result API is integrated this can be tested. 
-    // FIXME: https://github.com/zaeema-n/LDFArchitecture/issues/23
+    // FIXME: https://github.com/LDFLK/nexoan/issues/23
     // test:assertTrue(nonExistentResponse is error, "Expected error for non-existent entity ID");
     
     // Clean up
@@ -743,5 +789,1054 @@ function testEntityWithRelationship() returns error? {
     
     return;
 }
+
+@test:Config {
+    groups: ["entity", "attributes", "graph", "only_nodes"]
+}
+function testEntityWithSimpleOnlyNodesGraphAttributes() returns error? {
+    // Test ID for entity
+    string testId = "test-entity-simple-only-nodes-graph";
+    
+    // Initialize the gRPC client to verify entity
+    CrudServiceClient ep = check new (testCrudServiceUrl);
+    
+    // Create entity with tabular data in attributes
+    json socialNetworkGraph = {
+        "nodes": [
+            {"id": "user1", "type": "user", "properties": {"name": "Alice", "age": 30, "location": "NY"}},
+            {"id": "user2", "type": "user", "properties": {"name": "Bob", "age": 25, "location": "SF"}},
+            {"id": "user3", "type": "user", "properties": {"name": "Charlie", "age": 35, "location": "LA"}},
+            {"id": "post1", "type": "post", "properties": {"title": "Hello", "content": "World", "created": "2024-03-20"}},
+            {"id": "post2", "type": "post", "properties": {"title": "Graph", "content": "DB", "created": "2024-03-21"}}
+        ]
+    };
+
+    // Convert JSON to protobuf Any values
+    pbAny:Any socialNetworkGraphAny = check jsonToAny(socialNetworkGraph);
+
+    Entity createEntityRequest = {
+        id: testId,
+        kind: {
+            major: "test",
+            minor: "graph"
+        },
+        created: "2024-01-01T00:00:00Z",
+        terminated: "",
+        name: {
+            startTime: "2024-01-01T00:00:00Z",
+            endTime: "",
+            value: check pbAny:pack("test-entity")
+        },
+        metadata: [
+            {
+                key: "test_metadata",
+                value: check pbAny:pack("test_value")
+            }
+        ],
+        attributes: [
+            {
+                key: "employee_salary_history",
+                value: {
+                    values: [
+                        {
+                            startTime: "2024-01-01T00:00:00Z",
+                            endTime: "",
+                            value: socialNetworkGraphAny
+                        }
+                    ]
+                }
+            }
+        ],
+        relationships: []
+    };
+
+    // Create entity via gRPC
+    Entity createEntityResponse = check ep->CreateEntity(createEntityRequest);
+    io:println("Entity created with ID: " + createEntityResponse.id);
+    
+    // Read entity to verify attributes
+    ReadEntityRequest readEntityRequest = {
+        id: testId,
+        entity: {
+            id: testId,
+            kind: {},
+            created: "",
+            terminated: "",
+            name: {
+                startTime: "",
+                endTime: "",
+                value: check pbAny:pack("")
+            },
+            metadata: [],
+            attributes: [],
+            relationships: []
+        },
+        output: ["metadata", "attributes", "relationships"]
+    };
+    Entity readEntityResponse = check ep->ReadEntity(readEntityRequest);
+    
+    // Verify the response
+    test:assertTrue(readEntityResponse.id != "", "Entity should be found");
+    test:assertEquals(readEntityResponse.id, testId, "Entity ID should match");
+    
+    // Clean up
+    Empty _ = check ep->DeleteEntity({id: testId});
+    Empty _ = check ep->DeleteEntity({id: testId});
+    io:println("Test entity with graph attributes deleted");
+    
+    return;
+}
+
+@test:Config {
+    groups: ["entity", "attributes", "graph", "simple"]
+}
+function testEntityWithSimpleGraphAttributes() returns error? {
+    // Test ID for entity
+    string testId = "test-simple-entity-graph";
+    
+    // Initialize the gRPC client to verify entity
+    CrudServiceClient ep = check new (testCrudServiceUrl);
+    
+    // Create entity with tabular data in attributes
+    json socialNetworkGraph = {
+        "nodes": [
+            {"id": "user1", "type": "user", "properties": {"name": "Alice", "age": 30, "location": "NY"}},
+            {"id": "user2", "type": "user", "properties": {"name": "Bob", "age": 25, "location": "SF"}},
+            {"id": "user3", "type": "user", "properties": {"name": "Charlie", "age": 35, "location": "LA"}},
+            {"id": "post1", "type": "post", "properties": {"title": "Hello", "content": "World", "created": "2024-03-20"}},
+            {"id": "post2", "type": "post", "properties": {"title": "Graph", "content": "DB", "created": "2024-03-21"}}
+        ],
+        "edges": [
+            {"source": "user1", "target": "user2", "type": "follows", "properties": {"since": "2024-01-01"}},
+            {"source": "user2", "target": "user3", "type": "follows", "properties": {"since": "2024-02-01"}},
+            {"source": "user1", "target": "post1", "type": "created", "properties": {"timestamp": "2024-03-20T10:00:00Z"}},
+            {"source": "user2", "target": "post1", "type": "likes", "properties": {"timestamp": "2024-03-20T11:00:00Z"}},
+            {"source": "user3", "target": "post2", "type": "created", "properties": {"timestamp": "2024-03-21T09:00:00Z"}}
+        ]
+    };
+
+    // Convert JSON to protobuf Any values
+    pbAny:Any socialNetworkGraphAny = check jsonToAny(socialNetworkGraph);
+
+    Entity createEntityRequest = {
+        id: testId,
+        kind: {
+            major: "test",
+            minor: "graph"
+        },
+        created: "2024-01-01T00:00:00Z",
+        terminated: "",
+        name: {
+            startTime: "2024-01-01T00:00:00Z",
+            endTime: "",
+            value: check pbAny:pack("test-entity")
+        },
+        metadata: [
+            {
+                key: "test_metadata",
+                value: check pbAny:pack("test_value")
+            }
+        ],
+        attributes: [
+            {
+                key: "employee_salary_history",
+                value: {
+                    values: [
+                        {
+                            startTime: "2024-01-01T00:00:00Z",
+                            endTime: "",
+                            value: socialNetworkGraphAny
+                        }
+                    ]
+                }
+            }
+        ],
+        relationships: []
+    };
+
+    // Create entity via gRPC
+    Entity createEntityResponse = check ep->CreateEntity(createEntityRequest);
+    io:println("Entity created with ID: " + createEntityResponse.id);
+    
+    // Read entity to verify attributes
+    ReadEntityRequest readEntityRequest = {
+        id: testId,
+        entity: {
+            id: testId,
+            kind: {},
+            created: "",
+            terminated: "",
+            name: {
+                startTime: "",
+                endTime: "",
+                value: check pbAny:pack("")
+            },
+            metadata: [],
+            attributes: [],
+            relationships: []
+        },
+        output: ["metadata", "attributes", "relationships"]
+    };
+    Entity readEntityResponse = check ep->ReadEntity(readEntityRequest);
+    
+    // Verify the response
+    test:assertTrue(readEntityResponse.id != "", "Entity should be found");
+    test:assertEquals(readEntityResponse.id, testId, "Entity ID should match");
+    
+    // Clean up
+
+    Empty _ = check ep->DeleteEntity({id: testId});
+    io:println("Test entity with graph attributes deleted");
+    
+    return;
+}
+
+@test:Config {
+    groups: ["entity", "attributes", "graph", "multi"]
+}
+function testEntityWithMultiGraphAttributes() returns error? {
+    // Test ID for entity
+    string testId = "test-entity-graph";
+    
+    // Initialize the gRPC client to verify entity
+    CrudServiceClient ep = check new (testCrudServiceUrl);
+    
+    // Create entity with tabular data in attributes
+    json salaryGraph = {
+        "nodes": [
+					{"id": "user1", "type": "user", "properties": {"name": "Alice", "age": 30, "location": "NY"}},
+					{"id": "user2", "type": "user", "properties": {"name": "Bob", "age": 25, "location": "SF"}},
+					{"id": "user3", "type": "user", "properties": {"name": "Charlie", "age": 35, "location": "LA"}},
+					{"id": "post1", "type": "post", "properties": {"title": "Hello", "content": "World", "created": "2024-03-20"}},
+					{"id": "post2", "type": "post", "properties": {"title": "Graph", "content": "DB", "created": "2024-03-21"}}
+				],
+				"edges": [
+					{"source": "user1", "target": "user2", "type": "follows", "properties": {"since": "2024-01-01"}},
+					{"source": "user2", "target": "user3", "type": "follows", "properties": {"since": "2024-02-01"}},
+					{"source": "user1", "target": "post1", "type": "created", "properties": {"timestamp": "2024-03-20T10:00:00Z"}},
+					{"source": "user2", "target": "post1", "type": "likes", "properties": {"timestamp": "2024-03-20T11:00:00Z"}},
+					{"source": "user3", "target": "post2", "type": "created", "properties": {"timestamp": "2024-03-21T09:00:00Z"}}
+				]
+    };
+
+    json projectGraph = {
+        "nodes": [
+            {"id": "proj_redesign", "type": "project", "properties": {"id": "P001", "name": "System Redesign", "status": "active"}},
+            {"id": "proj_migration", "type": "project", "properties": {"id": "P002", "name": "API Migration", "status": "completed"}},
+            {"id": "proj_audit", "type": "project", "properties": {"id": "P003", "name": "Security Audit", "status": "completed"}},
+            {"id": "role_lead", "type": "role", "properties": {"title": "Lead Developer", "level": "senior"}},
+            {"id": "role_dev", "type": "role", "properties": {"title": "Developer", "level": "mid"}}
+        ],
+        "edges": [
+            {"source": "proj_redesign", "target": "role_lead", "type": "has_role", "properties": {"start_date": "2024-01-01", "end_date": ""}},
+            {"source": "proj_migration", "target": "role_dev", "type": "has_role", "properties": {"start_date": "2023-06-01", "end_date": "2023-12-31"}},
+            {"source": "proj_audit", "target": "role_dev", "type": "has_role", "properties": {"start_date": "2023-01-01", "end_date": "2023-05-31"}},
+            {"source": "proj_redesign", "target": "proj_migration", "type": "follows", "properties": {"transition_date": "2023-12-31"}},
+            {"source": "proj_migration", "target": "proj_audit", "type": "follows", "properties": {"transition_date": "2023-05-31"}}
+        ]
+    };
+
+    // Convert JSON to protobuf Any values
+    pbAny:Any salaryGraphAny = check jsonToAny(salaryGraph);
+    pbAny:Any projectGraphAny = check jsonToAny(projectGraph);
+
+    Entity createEntityRequest = {
+        id: testId,
+        kind: {
+            major: "test",
+            minor: "graph"
+        },
+        created: "2024-01-01T00:00:00Z",
+        terminated: "",
+        name: {
+            startTime: "2024-01-01T00:00:00Z",
+            endTime: "",
+            value: check pbAny:pack("test-entity")
+        },
+        metadata: [
+            {
+                key: "test_metadata",
+                value: check pbAny:pack("test_value")
+            }
+        ],
+        attributes: [
+            {
+                key: "employee_salary_history",
+                value: {
+                    values: [
+                        {
+                            startTime: "2024-01-01T00:00:00Z",
+                            endTime: "",
+                            value: salaryGraphAny
+                        }
+                    ]
+                }
+            },
+            {
+                key: "project_assignments",
+                value: {
+                    values: [
+                        {
+                            startTime: "2024-01-01T00:00:00Z",
+                            endTime: "",
+                            value: projectGraphAny
+                        }
+                    ]
+                }
+            }
+        ],
+        relationships: []
+    };
+
+    // Create entity via gRPC
+    Entity createEntityResponse = check ep->CreateEntity(createEntityRequest);
+    io:println("Entity created with ID: " + createEntityResponse.id);
+    
+    // Read entity to verify attributes
+    ReadEntityRequest readEntityRequest = {
+        id: testId,
+        entity: {
+            id: testId,
+            kind: {},
+            created: "",
+            terminated: "",
+            name: {
+                startTime: "",
+                endTime: "",
+                value: check pbAny:pack("")
+            },
+            metadata: [],
+            attributes: [],
+            relationships: []
+        },
+        output: ["metadata", "attributes", "relationships"]
+    };
+    Entity readEntityResponse = check ep->ReadEntity(readEntityRequest);
+    
+    // Verify the response
+    test:assertTrue(readEntityResponse.id != "", "Entity should be found");
+    test:assertEquals(readEntityResponse.id, testId, "Entity ID should match");
+    
+    // Clean up
+    
+    Empty _ = check ep->DeleteEntity({id: testId});
+    io:println("Test entity with graph attributes deleted");
+    
+    return;
+}
+
+@test:Config {
+    groups: ["entity", "attributes", "list"]
+}
+function testEntityWithSimpleListAttributes() returns error? {
+    // Test ID for entity
+    string testId = "test-entity-list";
+    
+    // Initialize the gRPC client to verify entity
+    CrudServiceClient ep = check new (testCrudServiceUrl);
+    
+    // Create entity with list data in attributes
+    json salaryList = {
+        "values": [
+            1,
+            2,
+            3
+        ]
+    };
+
+    // Convert JSON to protobuf Any values
+    pbAny:Any salaryListAny = check jsonToAny(salaryList);
+
+    Entity createEntityRequest = {
+        id: testId,
+        kind: {
+            major: "test",
+            minor: "list"
+        },
+        created: "2024-01-01T00:00:00Z",
+        terminated: "",
+        name: {
+            startTime: "2024-01-01T00:00:00Z",
+            endTime: "",
+            value: check pbAny:pack("test-entity")
+        },
+        metadata: [
+            {
+                key: "test_metadata",
+                value: check pbAny:pack("test_value")
+            }
+        ],
+        attributes: [
+            {
+                key: "salary_history",
+                value: {
+                    values: [
+                        {
+                            startTime: "2024-01-01T00:00:00Z",
+                            endTime: "",
+                            value: salaryListAny
+                        }
+                    ]
+                }
+            }
+        ],
+        relationships: []
+    };
+
+    // Create entity via gRPC
+    Entity createEntityResponse = check ep->CreateEntity(createEntityRequest);
+    io:println("Entity created with ID: " + createEntityResponse.id);
+    
+    // Clean up
+    Empty _ = check ep->DeleteEntity({id: testId});
+    io:println("Test entity with list attributes deleted");
+    
+    return;
+}
+
+@test:Config {
+    groups: ["entity", "attributes", "list", "mixed"]
+}
+function testEntityWithMixedTypeListAttributes() returns error? {
+    // Test ID for entity
+    string testId = "test-entity-mixed-list";
+    
+    // Initialize the gRPC client to verify entity
+    CrudServiceClient ep = check new (testCrudServiceUrl);
+    
+    // Create entity with mixed type list data in attributes
+    json mixedTypeList = {
+        "values": [
+            "Hello",
+            42,
+            true,
+            "2024-03-21",
+            "2024-03-21T15:30:00Z",
+            null
+        ]
+    };
+
+    // Convert JSON to protobuf Any values
+    pbAny:Any mixedTypeListAny = check jsonToAny(mixedTypeList);
+
+    Entity createEntityRequest = {
+        id: testId,
+        kind: {
+            major: "test",
+            minor: "mixed-list"
+        },
+        created: "2024-01-01T00:00:00Z",
+        terminated: "",
+        name: {
+            startTime: "2024-01-01T00:00:00Z",
+            endTime: "",
+            value: check pbAny:pack("test-entity")
+        },
+        metadata: [
+            {
+                key: "test_metadata",
+                value: check pbAny:pack("test_value")
+            }
+        ],
+        attributes: [
+            {
+                key: "mixed_type_history",
+                value: {
+                    values: [
+                        {
+                            startTime: "2024-01-01T00:00:00Z",
+                            endTime: "",
+                            value: mixedTypeListAny
+                        }
+                    ]
+                }
+            }
+        ],
+        relationships: []
+    };
+
+    // Create entity via gRPC
+    Entity createEntityResponse = check ep->CreateEntity(createEntityRequest);
+    io:println("Entity created with ID: " + createEntityResponse.id);
+    
+    // Read entity to verify attributes
+    ReadEntityRequest readEntityRequest = {
+        id: testId,
+        entity: {
+            id: testId,
+            kind: {},
+            created: "",
+            terminated: "",
+            name: {
+                startTime: "",
+                endTime: "",
+                value: check pbAny:pack("")
+            },
+            metadata: [],
+            attributes: [],
+            relationships: []
+        },
+        output: ["metadata", "attributes", "relationships"]
+    };
+    Entity readEntityResponse = check ep->ReadEntity(readEntityRequest);
+    
+    // Verify the response
+    test:assertTrue(readEntityResponse.id != "", "Entity should be found");
+    test:assertEquals(readEntityResponse.id, testId, "Entity ID should match");
+    
+    // Clean up
+    Empty _ = check ep->DeleteEntity({id: testId});
+    io:println("Test entity with mixed type list attributes deleted");
+    
+    return;
+}
+
+@test:Config {
+    groups: ["entity", "attributes", "list", "empty"]
+}
+function testEntityWithEmptyListAttributes() returns error? {
+    // Test ID for entity
+    string testId = "test-entity-empty-list";
+    
+    // Initialize the gRPC client to verify entity
+    CrudServiceClient ep = check new (testCrudServiceUrl);
+    
+    // Create entity with empty list data in attributes
+    json emptyList = {
+        "values": []
+    };
+
+    // Convert JSON to protobuf Any values
+    pbAny:Any emptyListAny = check jsonToAny(emptyList);
+
+    Entity createEntityRequest = {
+        id: testId,
+        kind: {
+            major: "test",
+            minor: "empty-list"
+        },
+        created: "2024-01-01T00:00:00Z",
+        terminated: "",
+        name: {
+            startTime: "2024-01-01T00:00:00Z",
+            endTime: "",
+            value: check pbAny:pack("test-entity")
+        },
+        metadata: [
+            {
+                key: "test_metadata",
+                value: check pbAny:pack("test_value")
+            }
+        ],
+        attributes: [
+            {
+                key: "empty_list_history",
+                value: {
+                    values: [
+                        {
+                            startTime: "2024-01-01T00:00:00Z",
+                            endTime: "",
+                            value: emptyListAny
+                        }
+                    ]
+                }
+            }
+        ],
+        relationships: []
+    };
+
+    // Create entity via gRPC
+    Entity createEntityResponse = check ep->CreateEntity(createEntityRequest);
+    io:println("Entity created with ID: " + createEntityResponse.id);
+    
+    // Read entity to verify attributes
+    ReadEntityRequest readEntityRequest = {
+        id: testId,
+        entity: {
+            id: testId,
+            kind: {},
+            created: "",
+            terminated: "",
+            name: {
+                startTime: "",
+                endTime: "",
+                value: check pbAny:pack("")
+            },
+            metadata: [],
+            attributes: [],
+            relationships: []
+        },
+        output: ["metadata", "attributes", "relationships"]
+    };
+    Entity readEntityResponse = check ep->ReadEntity(readEntityRequest);
+    
+    // Verify the response
+    test:assertTrue(readEntityResponse.id != "", "Entity should be found");
+    test:assertEquals(readEntityResponse.id, testId, "Entity ID should match");
+    
+    // Clean up
+    Empty _ = check ep->DeleteEntity({id: testId});
+    io:println("Test entity with empty list attributes deleted");
+    
+    return;
+}
+
+@test:Config {
+    groups: ["entity", "attributes", "map"]
+}
+function testEntityWithMapAttributes() returns error? {
+    // Test ID for entity
+    string testId = "test-entity-map";
+    
+    // Initialize the gRPC client to verify entity
+    CrudServiceClient ep = check new (testCrudServiceUrl);
+    
+    // Create entity with map data in attributes
+    json userProfileMap = {
+       "properties": {
+					"name": "John",
+					"age": 30,
+					"active": true
+				}
+    };
+
+    // Convert JSON to protobuf Any values
+    pbAny:Any userProfileMapAny = check jsonToAny(userProfileMap);
+
+    Entity createEntityRequest = {
+        id: testId,
+        kind: {
+            major: "test",
+            minor: "map"
+        },
+        created: "2024-01-01T00:00:00Z",
+        terminated: "",
+        name: {
+            startTime: "2024-01-01T00:00:00Z",
+            endTime: "",
+            value: check pbAny:pack("test-entity")
+        },
+        metadata: [
+            {
+                key: "test_metadata",
+                value: check pbAny:pack("test_value")
+            }
+        ],
+        attributes: [
+            {
+                key: "user_profile",
+                value: {
+                    values: [
+                        {
+                            startTime: "2024-01-01T00:00:00Z",
+                            endTime: "",
+                            value: userProfileMapAny
+                        }
+                    ]
+                }
+            }
+        ],
+        relationships: []
+    };
+
+    // Create entity via gRPC
+    Entity createEntityResponse = check ep->CreateEntity(createEntityRequest);
+    io:println("Entity created with ID: " + createEntityResponse.id);
+    
+    // Read entity to verify attributes
+    ReadEntityRequest readEntityRequest = {
+        id: testId,
+        entity: {
+            id: testId,
+            kind: {},
+            created: "",
+            terminated: "",
+            name: {
+                startTime: "",
+                endTime: "",
+                value: check pbAny:pack("")
+            },
+            metadata: [],
+            attributes: [],
+            relationships: []
+        },
+        output: ["metadata", "attributes", "relationships"]
+    };
+    Entity readEntityResponse = check ep->ReadEntity(readEntityRequest);
+    
+    // Verify the response
+    test:assertTrue(readEntityResponse.id != "", "Entity should be found");
+    test:assertEquals(readEntityResponse.id, testId, "Entity ID should match");
+    
+    // Clean up
+    Empty _ = check ep->DeleteEntity({id: testId});
+    io:println("Test entity with map attributes deleted");
+    
+    return;
+}
+
+@test:Config {
+    groups: ["entity", "attributes", "map", "nested"]
+}
+function testEntityWithNestedMapAttributes() returns error? {
+    // Test ID for entity
+    string testId = "test-entity-nested-map";
+    
+    // Initialize the gRPC client to verify entity
+    CrudServiceClient ep = check new (testCrudServiceUrl);
+    
+    // Create entity with nested map data in attributes
+    json nestedMap = {
+        "organization": {
+            "name": "Tech Corp",
+            "departments": {
+                "engineering": {
+                    "head": "Alice Smith",
+                    "size": 50,
+                    "projects": {
+                        "project1": {
+                            "name": "System Redesign",
+                            "status": "active",
+                            "team": ["John", "Jane", "Bob"]
+                        },
+                        "project2": {
+                            "name": "API Migration",
+                            "status": "completed",
+                            "team": ["Alice", "Charlie"]
+                        }
+                    }
+                },
+                "marketing": {
+                    "head": "Bob Johnson",
+                    "size": 20,
+                    "campaigns": {
+                        "campaign1": {
+                            "name": "Summer Sale",
+                            "budget": 50000,
+                            "channels": ["social", "email", "web"]
+                        }
+                    }
+                }
+            },
+            "metadata": {
+                "founded": "2020-01-01",
+                "location": {
+                    "country": "USA",
+                    "offices": ["NY", "SF", "LA"]
+                }
+            }
+        }
+    };
+
+    // Convert JSON to protobuf Any values
+    pbAny:Any nestedMapAny = check jsonToAny(nestedMap);
+
+    Entity createEntityRequest = {
+        id: testId,
+        kind: {
+            major: "test",
+            minor: "nested-map"
+        },
+        created: "2024-01-01T00:00:00Z",
+        terminated: "",
+        name: {
+            startTime: "2024-01-01T00:00:00Z",
+            endTime: "",
+            value: check pbAny:pack("test-entity")
+        },
+        metadata: [
+            {
+                key: "test_metadata",
+                value: check pbAny:pack("test_value")
+            }
+        ],
+        attributes: [
+            {
+                key: "org_structure",
+                value: {
+                    values: [
+                        {
+                            startTime: "2024-01-01T00:00:00Z",
+                            endTime: "",
+                            value: nestedMapAny
+                        }
+                    ]
+                }
+            }
+        ],
+        relationships: []
+    };
+
+    // Create entity via gRPC
+    Entity createEntityResponse = check ep->CreateEntity(createEntityRequest);
+    io:println("Entity created with ID: " + createEntityResponse.id);
+    
+    // Read entity to verify attributes
+    ReadEntityRequest readEntityRequest = {
+        id: testId,
+        entity: {
+            id: testId,
+            kind: {},
+            created: "",
+            terminated: "",
+            name: {
+                startTime: "",
+                endTime: "",
+                value: check pbAny:pack("")
+            },
+            metadata: [],
+            attributes: [],
+            relationships: []
+        },
+        output: ["metadata", "attributes", "relationships"]
+    };
+    Entity readEntityResponse = check ep->ReadEntity(readEntityRequest);
+    
+    // Verify the response
+    test:assertTrue(readEntityResponse.id != "", "Entity should be found");
+    test:assertEquals(readEntityResponse.id, testId, "Entity ID should match");
+    
+    // Clean up
+    Empty _ = check ep->DeleteEntity({id: testId});
+    io:println("Test entity with nested map attributes deleted");
+    
+    return;
+}
+
+@test:Config {
+    groups: ["entity", "attributes", "map", "empty"]
+}
+function testEntityWithEmptyMapValues() returns error? {
+    // Test ID for entity
+    string testId = "test-entity-empty-map-values";
+    
+    // Initialize the gRPC client to verify entity
+    CrudServiceClient ep = check new (testCrudServiceUrl);
+    
+    // Create entity with map data containing empty values
+    // FIXME: https://github.com/LDFLK/nexoan/issues/137
+    json emptyValuesMap = {
+        "properties": {
+            "empty_str": "",
+            "zero": 0,
+            "null_val": null
+        }
+    };
+
+    // Convert JSON to protobuf Any values
+    pbAny:Any emptyValuesMapAny = check jsonToAny(emptyValuesMap);
+
+    Entity createEntityRequest = {
+        id: testId,
+        kind: {
+            major: "test",
+            minor: "empty-map-values"
+        },
+        created: "2024-01-01T00:00:00Z",
+        terminated: "",
+        name: {
+            startTime: "2024-01-01T00:00:00Z",
+            endTime: "",
+            value: check pbAny:pack("test-entity")
+        },
+        metadata: [
+            {
+                key: "test_metadata",
+                value: check pbAny:pack("test_value")
+            }
+        ],
+        attributes: [
+            {
+                key: "empty_values",
+                value: {
+                    values: [
+                        {
+                            startTime: "2024-01-01T00:00:00Z",
+                            endTime: "",
+                            value: emptyValuesMapAny
+                        }
+                    ]
+                }
+            }
+        ],
+        relationships: []
+    };
+
+    // Create entity via gRPC
+    Entity createEntityResponse = check ep->CreateEntity(createEntityRequest);
+    io:println("Entity created with ID: " + createEntityResponse.id);
+    
+    // Read entity to verify attributes
+    ReadEntityRequest readEntityRequest = {
+        id: testId,
+        entity: {
+            id: testId,
+            kind: {},
+            created: "",
+            terminated: "",
+            name: {
+                startTime: "",
+                endTime: "",
+                value: check pbAny:pack("")
+            },
+            metadata: [],
+            attributes: [],
+            relationships: []
+        },
+        output: ["metadata", "attributes", "relationships"]
+    };
+    Entity readEntityResponse = check ep->ReadEntity(readEntityRequest);
+    
+    // Verify the response
+    test:assertTrue(readEntityResponse.id != "", "Entity should be found");
+    test:assertEquals(readEntityResponse.id, testId, "Entity ID should match");
+    
+    // Clean up
+    Empty _ = check ep->DeleteEntity({id: testId});
+    io:println("Test entity with empty map values deleted");
+    
+    return;
+}
+
+@test:Config {
+    groups: ["entity", "attributes", "map", "nested"]
+}
+function testEntityWithNestedMapValues() returns error? {
+    // Test ID for entity
+    string testId = "test-entity-nested-map-values";
+    
+    // Initialize the gRPC client to verify entity
+    CrudServiceClient ep = check new (testCrudServiceUrl);
+    
+    // Create entity with deeply nested map data
+    json nestedMap = {
+        "properties": {
+            "user": {
+                "profile": {
+                    "personal": {
+                        "name": "John Doe",
+                        "age": 30,
+                        "address": {
+                            "street": "123 Main St",
+                            "city": "New York",
+                            "zip": "10001"
+                        }
+                    },
+                    "preferences": {
+                        "theme": "dark",
+                        "notifications": true,
+                        "language": "en"
+                    }
+                },
+                "settings": {
+                    "account": {
+                        "type": "premium",
+                        "status": "active",
+                        "subscription": {
+                            "plan": "yearly",
+                            "start_date": "2024-01-01",
+                            "end_date": "2024-12-31"
+                        }
+                    },
+                    "security": {
+                        "two_factor": true,
+                        "last_login": "2024-03-21T10:00:00Z",
+                        "devices": {
+                            "mobile": ["iPhone", "iPad"],
+                            "desktop": ["MacBook", "Windows PC"]
+                        }
+                    }
+                }
+            },
+            "metadata": {
+                "created_at": "2024-01-01T00:00:00Z",
+                "updated_at": "2024-03-21T15:30:00Z",
+                "version": {
+                    "major": 1,
+                    "minor": 0,
+                    "patch": 0
+                }
+            }
+        }
+    };
+
+    // Convert JSON to protobuf Any values
+    pbAny:Any nestedMapAny = check jsonToAny(nestedMap);
+
+    Entity createEntityRequest = {
+        id: testId,
+        kind: {
+            major: "test",
+            minor: "nested-map-values"
+        },
+        created: "2024-01-01T00:00:00Z",
+        terminated: "",
+        name: {
+            startTime: "2024-01-01T00:00:00Z",
+            endTime: "",
+            value: check pbAny:pack("test-entity")
+        },
+        metadata: [
+            {
+                key: "test_metadata",
+                value: check pbAny:pack("test_value")
+            }
+        ],
+        attributes: [
+            {
+                key: "nested_data",
+                value: {
+                    values: [
+                        {
+                            startTime: "2024-01-01T00:00:00Z",
+                            endTime: "",
+                            value: nestedMapAny
+                        }
+                    ]
+                }
+            }
+        ],
+        relationships: []
+    };
+
+    // Create entity via gRPC
+    Entity createEntityResponse = check ep->CreateEntity(createEntityRequest);
+    io:println("Entity created with ID: " + createEntityResponse.id);
+    
+    // Read entity to verify attributes
+    ReadEntityRequest readEntityRequest = {
+        id: testId,
+        entity: {
+            id: testId,
+            kind: {},
+            created: "",
+            terminated: "",
+            name: {
+                startTime: "",
+                endTime: "",
+                value: check pbAny:pack("")
+            },
+            metadata: [],
+            attributes: [],
+            relationships: []
+        },
+        output: ["metadata", "attributes", "relationships"]
+    };
+    Entity readEntityResponse = check ep->ReadEntity(readEntityRequest);
+    
+    // Verify the response
+    test:assertTrue(readEntityResponse.id != "", "Entity should be found");
+    test:assertEquals(readEntityResponse.id, testId, "Entity ID should match");
+    
+    // Clean up
+    Empty _ = check ep->DeleteEntity({id: testId});
+    io:println("Test entity with nested map values deleted");
+    
+    return;
+}
+
+
+
+
 
 
