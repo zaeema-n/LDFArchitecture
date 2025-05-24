@@ -171,7 +171,7 @@ function testMetadataHandling() returns error? {
 }
 
 // TODO: Re-enable once the Result type response handling is added
-// See: https://github.com/zaeema-n/LDFArchitecture/issues/23
+// See: https://github.com/LDFLK/nexoan/issues/23
 @test:Config {
     enable: false
 }
@@ -472,7 +472,7 @@ function testEntityReading() returns error? {
     // Assert that we get an error for non-existent entity
     // For non-existence entities, we send a response with an empty data
     // But once the Result API is integrated this can be tested. 
-    // FIXME: https://github.com/zaeema-n/LDFArchitecture/issues/23
+    // FIXME: https://github.com/LDFLK/nexoan/issues/23
     // test:assertTrue(nonExistentResponse is error, "Expected error for non-existent entity ID");
     
     // Clean up

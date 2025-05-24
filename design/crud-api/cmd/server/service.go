@@ -32,7 +32,7 @@ func (s *Server) CreateEntity(ctx context.Context, req *pb.Entity) (*pb.Entity, 
 
 	// Always save the entity in MongoDB, even if it has no metadata
 	// The HandleMetadata function will only process it if it has metadata
-	// FIXME: https://github.com/zaeema-n/LDFArchitecture/issues/120
+	// FIXME: https://github.com/LDFLK/nexoan/issues/120
 	err := s.mongoRepo.HandleMetadata(ctx, req.Id, req)
 	if err != nil {
 		log.Printf("[server.CreateEntity] Error saving metadata in MongoDB: %v", err)

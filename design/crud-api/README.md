@@ -34,7 +34,7 @@ go test -v ./...
 Initialize a Go module. 
 
 ```bash
-go mod init github.com/zaeema-n/LDFArchitecture/design/crud-api
+go mod init github.com/LDFLK/nexoan/design/crud-api
 ```
 
 Generating the protobuf stubs for Go-lang

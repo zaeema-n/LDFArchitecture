@@ -79,7 +79,7 @@ jobs:
         fi
         
         ## Run E2E tests
-        ## FIXME: https://github.com/zaeema-n/LDFArchitecture/issues/117 
+        ## FIXME: https://github.com/LDFLK/nexoan/issues/117 
         ## Then uncomment the following lines
         # echo "Running E2E tests..."
         # docker compose run e2e
