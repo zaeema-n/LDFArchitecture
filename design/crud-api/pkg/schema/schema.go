@@ -154,6 +154,12 @@ func (sg *SchemaGenerator) GenerateSchema(anyValue *anypb.Any) (*SchemaInfo, err
 	}
 
 	// Determine storage type based on the structure of the data
+	// The order of checks is important because:
+	// 1. Graph data can contain both nodes and edges, which could be mistaken for other types
+	// 2. Tabular data has a specific structure with columns and rows that should be identified before map/list
+	// 3. Map data can contain nested structures that might look like lists
+	// 4. List data is checked before scalar to handle arrays of values
+	// 5. Scalar is the fallback for simple values
 	var storageType storageinference.StorageType
 	switch {
 	case hasGraphStructure(structValue):
