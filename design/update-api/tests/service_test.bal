@@ -795,7 +795,7 @@ function testEntityWithRelationship() returns error? {
 }
 function testEntityWithSimpleOnlyNodesGraphAttributes() returns error? {
     // Test ID for entity
-    string testId = "test-entity-graph";
+    string testId = "test-entity-simple-only-nodes-graph";
     
     // Initialize the gRPC client to verify entity
     CrudServiceClient ep = check new (testCrudServiceUrl);
@@ -855,10 +855,32 @@ function testEntityWithSimpleOnlyNodesGraphAttributes() returns error? {
     io:println("Entity created with ID: " + createEntityResponse.id);
     
     // Read entity to verify attributes
-    EntityId readEntityRequest = {id: testId};
+    ReadEntityRequest readEntityRequest = {
+        id: testId,
+        entity: {
+            id: testId,
+            kind: {},
+            created: "",
+            terminated: "",
+            name: {
+                startTime: "",
+                endTime: "",
+                value: check pbAny:pack("")
+            },
+            metadata: [],
+            attributes: [],
+            relationships: []
+        },
+        output: ["metadata", "attributes", "relationships"]
+    };
+    Entity readEntityResponse = check ep->ReadEntity(readEntityRequest);
+    
+    // Verify the response
+    test:assertTrue(readEntityResponse.id != "", "Entity should be found");
+    test:assertEquals(readEntityResponse.id, testId, "Entity ID should match");
     
     // Clean up
-    Empty _ = check ep->DeleteEntity(readEntityRequest);
+    Empty _ = check ep->DeleteEntity({id: testId});
     Empty _ = check ep->DeleteEntity({id: testId});
     io:println("Test entity with graph attributes deleted");
     
@@ -870,7 +892,7 @@ function testEntityWithSimpleOnlyNodesGraphAttributes() returns error? {
 }
 function testEntityWithSimpleGraphAttributes() returns error? {
     // Test ID for entity
-    string testId = "test-entity-graph";
+    string testId = "test-simple-entity-graph";
     
     // Initialize the gRPC client to verify entity
     CrudServiceClient ep = check new (testCrudServiceUrl);
@@ -937,10 +959,32 @@ function testEntityWithSimpleGraphAttributes() returns error? {
     io:println("Entity created with ID: " + createEntityResponse.id);
     
     // Read entity to verify attributes
-    EntityId readEntityRequest = {id: testId};
+    ReadEntityRequest readEntityRequest = {
+        id: testId,
+        entity: {
+            id: testId,
+            kind: {},
+            created: "",
+            terminated: "",
+            name: {
+                startTime: "",
+                endTime: "",
+                value: check pbAny:pack("")
+            },
+            metadata: [],
+            attributes: [],
+            relationships: []
+        },
+        output: ["metadata", "attributes", "relationships"]
+    };
+    Entity readEntityResponse = check ep->ReadEntity(readEntityRequest);
+    
+    // Verify the response
+    test:assertTrue(readEntityResponse.id != "", "Entity should be found");
+    test:assertEquals(readEntityResponse.id, testId, "Entity ID should match");
     
     // Clean up
-    Empty _ = check ep->DeleteEntity(readEntityRequest);
+
     Empty _ = check ep->DeleteEntity({id: testId});
     io:println("Test entity with graph attributes deleted");
     
@@ -1049,10 +1093,32 @@ function testEntityWithMultiGraphAttributes() returns error? {
     io:println("Entity created with ID: " + createEntityResponse.id);
     
     // Read entity to verify attributes
-    EntityId readEntityRequest = {id: testId};
+    ReadEntityRequest readEntityRequest = {
+        id: testId,
+        entity: {
+            id: testId,
+            kind: {},
+            created: "",
+            terminated: "",
+            name: {
+                startTime: "",
+                endTime: "",
+                value: check pbAny:pack("")
+            },
+            metadata: [],
+            attributes: [],
+            relationships: []
+        },
+        output: ["metadata", "attributes", "relationships"]
+    };
+    Entity readEntityResponse = check ep->ReadEntity(readEntityRequest);
+    
+    // Verify the response
+    test:assertTrue(readEntityResponse.id != "", "Entity should be found");
+    test:assertEquals(readEntityResponse.id, testId, "Entity ID should match");
     
     // Clean up
-    Empty _ = check ep->DeleteEntity(readEntityRequest);
+    
     Empty _ = check ep->DeleteEntity({id: testId});
     io:println("Test entity with graph attributes deleted");
     
@@ -1121,11 +1187,7 @@ function testEntityWithSimpleListAttributes() returns error? {
     Entity createEntityResponse = check ep->CreateEntity(createEntityRequest);
     io:println("Entity created with ID: " + createEntityResponse.id);
     
-    // Read entity to verify attributes
-    EntityId readEntityRequest = {id: testId};
-    
     // Clean up
-    Empty _ = check ep->DeleteEntity(readEntityRequest);
     Empty _ = check ep->DeleteEntity({id: testId});
     io:println("Test entity with list attributes deleted");
     
@@ -1198,7 +1260,24 @@ function testEntityWithMixedTypeListAttributes() returns error? {
     io:println("Entity created with ID: " + createEntityResponse.id);
     
     // Read entity to verify attributes
-    EntityId readEntityRequest = {id: testId};
+    ReadEntityRequest readEntityRequest = {
+        id: testId,
+        entity: {
+            id: testId,
+            kind: {},
+            created: "",
+            terminated: "",
+            name: {
+                startTime: "",
+                endTime: "",
+                value: check pbAny:pack("")
+            },
+            metadata: [],
+            attributes: [],
+            relationships: []
+        },
+        output: ["metadata", "attributes", "relationships"]
+    };
     Entity readEntityResponse = check ep->ReadEntity(readEntityRequest);
     
     // Verify the response
@@ -1206,7 +1285,6 @@ function testEntityWithMixedTypeListAttributes() returns error? {
     test:assertEquals(readEntityResponse.id, testId, "Entity ID should match");
     
     // Clean up
-    Empty _ = check ep->DeleteEntity(readEntityRequest);
     Empty _ = check ep->DeleteEntity({id: testId});
     io:println("Test entity with mixed type list attributes deleted");
     
@@ -1272,10 +1350,31 @@ function testEntityWithEmptyListAttributes() returns error? {
     io:println("Entity created with ID: " + createEntityResponse.id);
     
     // Read entity to verify attributes
-    EntityId readEntityRequest = {id: testId};
+    ReadEntityRequest readEntityRequest = {
+        id: testId,
+        entity: {
+            id: testId,
+            kind: {},
+            created: "",
+            terminated: "",
+            name: {
+                startTime: "",
+                endTime: "",
+                value: check pbAny:pack("")
+            },
+            metadata: [],
+            attributes: [],
+            relationships: []
+        },
+        output: ["metadata", "attributes", "relationships"]
+    };
+    Entity readEntityResponse = check ep->ReadEntity(readEntityRequest);
+    
+    // Verify the response
+    test:assertTrue(readEntityResponse.id != "", "Entity should be found");
+    test:assertEquals(readEntityResponse.id, testId, "Entity ID should match");
     
     // Clean up
-    Empty _ = check ep->DeleteEntity(readEntityRequest);
     Empty _ = check ep->DeleteEntity({id: testId});
     io:println("Test entity with empty list attributes deleted");
     
@@ -1345,10 +1444,31 @@ function testEntityWithMapAttributes() returns error? {
     io:println("Entity created with ID: " + createEntityResponse.id);
     
     // Read entity to verify attributes
-    EntityId readEntityRequest = {id: testId};
+    ReadEntityRequest readEntityRequest = {
+        id: testId,
+        entity: {
+            id: testId,
+            kind: {},
+            created: "",
+            terminated: "",
+            name: {
+                startTime: "",
+                endTime: "",
+                value: check pbAny:pack("")
+            },
+            metadata: [],
+            attributes: [],
+            relationships: []
+        },
+        output: ["metadata", "attributes", "relationships"]
+    };
+    Entity readEntityResponse = check ep->ReadEntity(readEntityRequest);
+    
+    // Verify the response
+    test:assertTrue(readEntityResponse.id != "", "Entity should be found");
+    test:assertEquals(readEntityResponse.id, testId, "Entity ID should match");
     
     // Clean up
-    Empty _ = check ep->DeleteEntity(readEntityRequest);
     Empty _ = check ep->DeleteEntity({id: testId});
     io:println("Test entity with map attributes deleted");
     
@@ -1452,10 +1572,31 @@ function testEntityWithNestedMapAttributes() returns error? {
     io:println("Entity created with ID: " + createEntityResponse.id);
     
     // Read entity to verify attributes
-    EntityId readEntityRequest = {id: testId};
+    ReadEntityRequest readEntityRequest = {
+        id: testId,
+        entity: {
+            id: testId,
+            kind: {},
+            created: "",
+            terminated: "",
+            name: {
+                startTime: "",
+                endTime: "",
+                value: check pbAny:pack("")
+            },
+            metadata: [],
+            attributes: [],
+            relationships: []
+        },
+        output: ["metadata", "attributes", "relationships"]
+    };
+    Entity readEntityResponse = check ep->ReadEntity(readEntityRequest);
+    
+    // Verify the response
+    test:assertTrue(readEntityResponse.id != "", "Entity should be found");
+    test:assertEquals(readEntityResponse.id, testId, "Entity ID should match");
     
     // Clean up
-    Empty _ = check ep->DeleteEntity(readEntityRequest);
     Empty _ = check ep->DeleteEntity({id: testId});
     io:println("Test entity with nested map attributes deleted");
     
@@ -1526,10 +1667,31 @@ function testEntityWithEmptyMapValues() returns error? {
     io:println("Entity created with ID: " + createEntityResponse.id);
     
     // Read entity to verify attributes
-    EntityId readEntityRequest = {id: testId};
+    ReadEntityRequest readEntityRequest = {
+        id: testId,
+        entity: {
+            id: testId,
+            kind: {},
+            created: "",
+            terminated: "",
+            name: {
+                startTime: "",
+                endTime: "",
+                value: check pbAny:pack("")
+            },
+            metadata: [],
+            attributes: [],
+            relationships: []
+        },
+        output: ["metadata", "attributes", "relationships"]
+    };
+    Entity readEntityResponse = check ep->ReadEntity(readEntityRequest);
+    
+    // Verify the response
+    test:assertTrue(readEntityResponse.id != "", "Entity should be found");
+    test:assertEquals(readEntityResponse.id, testId, "Entity ID should match");
     
     // Clean up
-    Empty _ = check ep->DeleteEntity(readEntityRequest);
     Empty _ = check ep->DeleteEntity({id: testId});
     io:println("Test entity with empty map values deleted");
     
@@ -1642,10 +1804,31 @@ function testEntityWithNestedMapValues() returns error? {
     io:println("Entity created with ID: " + createEntityResponse.id);
     
     // Read entity to verify attributes
-    EntityId readEntityRequest = {id: testId};
+    ReadEntityRequest readEntityRequest = {
+        id: testId,
+        entity: {
+            id: testId,
+            kind: {},
+            created: "",
+            terminated: "",
+            name: {
+                startTime: "",
+                endTime: "",
+                value: check pbAny:pack("")
+            },
+            metadata: [],
+            attributes: [],
+            relationships: []
+        },
+        output: ["metadata", "attributes", "relationships"]
+    };
+    Entity readEntityResponse = check ep->ReadEntity(readEntityRequest);
+    
+    // Verify the response
+    test:assertTrue(readEntityResponse.id != "", "Entity should be found");
+    test:assertEquals(readEntityResponse.id, testId, "Entity ID should match");
     
     // Clean up
-    Empty _ = check ep->DeleteEntity(readEntityRequest);
     Empty _ = check ep->DeleteEntity({id: testId});
     io:println("Test entity with nested map values deleted");
     
